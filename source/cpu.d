@@ -249,33 +249,33 @@ class CPU {
             Instruction("CP A",		    {cp(regs.a);}),
             Instruction("RET NZ",		null),
             Instruction("POP BC",		{popFromStack(regs.bc);}),
-            Instruction("JP NZ,a16",	&jumpImmediateNZ),
+            Instruction("JP NZ,a16",	{jumpImmediateIfFlag(Flag.ZERO, false);}),
             Instruction("JP a16",		&jumpImmediate),
-            Instruction("CALL NZ,a16",	null),
+            Instruction("CALL NZ,a16",	{callImmediateIfFlag(Flag.ZERO, false);}),
             Instruction("PUSH BC",		{pushToStack(regs.bc);}),
             Instruction("ADD A,d8",		&addImmediate),
             Instruction("RST 00H",		{rst(0x00);}),
             Instruction("RET Z",		null),
             Instruction("RET",		    null),
-            Instruction("JP Z,a16",		&jumpImmediateZ),
+            Instruction("JP Z,a16",		{jumpImmediateIfFlag(Flag.ZERO, true);}),
             Instruction("PREFIX CB",	null),
-            Instruction("CALL Z,a16",	null),
-            Instruction("CALL a16",		null),
+            Instruction("CALL Z,a16",	{callImmediateIfFlag(Flag.ZERO, true);}),
+            Instruction("CALL a16",		&callImmediate),
             Instruction("ADC A,d8",		&adcImmediate),
             Instruction("RST 08H",		{rst(0x08);}),
             Instruction("RET NC",		null),
             Instruction("POP DE",		{popFromStack(regs.de);}),
-            Instruction("JP NC,a16",	&jumpImmediateNC),
+            Instruction("JP NC,a16",	{jumpImmediateIfFlag(Flag.OVERFLOW, false);}),
             Instruction("XX",		    null),
-            Instruction("CALL NC,a16",	null),
+            Instruction("CALL NC,a16",	{callImmediateIfFlag(Flag.OVERFLOW, false);}),
             Instruction("PUSH DE",		{pushToStack(regs.de);}),
             Instruction("SUB d8",		null),
             Instruction("RST 10H",		{rst(0x10);}),
             Instruction("RET C",		null),
             Instruction("RETI",		    null),
-            Instruction("JP C,a16",		&jumpImmediateC),
+            Instruction("JP C,a16",		{jumpImmediateIfFlag(Flag.OVERFLOW, true);}),
             Instruction("XX",		    null),
-            Instruction("CALL C,a16",	null),
+            Instruction("CALL C,a16",	{callImmediateIfFlag(Flag.OVERFLOW, true);}),
             Instruction("XX",		    null),
             Instruction("SBC A,d8",		&sbcImmediate),
             Instruction("RST 18H",		{rst(0x18);}),
@@ -594,7 +594,7 @@ class CPU {
      */
     @safe private void addImmediate() {
         add(mmu.readByte(regs.pc));
-        regs.cp++;
+        regs.pc++;
     }
 
     /**
@@ -991,43 +991,10 @@ class CPU {
     }
 
     /**
-     * Jump to the immediate address if the zero flag is set
+     * Jump to the immediate address if the specified flag is set/reset (depending on second parameter)
      */
-    @safe private void jumpImmediateZ() {
-        if(isFlagSet(Flag.ZERO)) {
-            jumpImmediate();
-        } else { // Update PC to account for theoretically reading a 16-bit immediate
-            regs.pc += 2;
-        }
-    }
-
-    /**
-     * Jump to the immediate address if the zero flag is not set
-     */
-    @safe private void jumpImmediateNZ() {
-        if(!isFlagSet(Flag.ZERO)) {
-            jumpImmediate();
-        } else { // Update PC to account for theoretically reading a 16-bit immediate
-            regs.pc += 2;
-        }
-    }
-
-    /**
-     * Jump to the immediate address if the carry flag is set
-     */
-    @safe private void jumpImmediateC() {
-        if(isFlagSet(Flag.OVERFLOW)) {
-            jumpImmediate();
-        } else { // Update PC to account for theoretically reading a 16-bit immediate
-            regs.pc += 2;
-        }
-    }
-
-    /**
-     * Jump to the immediate address if the carry flag is not set
-     */
-    @safe private void jumpImmediateNC() {
-        if(!isFlagSet(Flag.OVERFLOW)) {
+    @safe private void jumpImmediateIfFlag(in Flag f, in bool set) {
+        if(isFlagSet(f) == set) {
             jumpImmediate();
         } else { // Update PC to account for theoretically reading a 16-bit immediate
             regs.pc += 2;
@@ -1164,6 +1131,34 @@ class CPU {
     @safe private void rst(ubyte addr) {
         pushToStack(regs.pc);
         regs.pc = addr;
+    }
+
+    /**
+     * Push the current PC to the stack, then jump to addr
+     */
+    @safe private void call(in ushort addr) {
+        pushToStack(regs.pc);
+        regs.pc = addr;
+    }
+
+    /**
+     * Push the PC of the next instruction to the stack, then jump to 16-bit immediate address
+     */
+    @safe private void callImmediate() {
+        immutable ushort toCall = mmu.readShort(regs.pc);
+        regs.pc += 2; // Compensate for reading and immediate short
+        call(toCall);
+    }
+
+    /**
+     * Call an immediate 16-bit value if the specified flag is set/reset (depending on second argument)
+     */
+    @safe private void callImmediateIfFlag(in Flag f, in bool set) {
+        if(isFlagSet(f) == set) {
+            callImmediate();
+        } else {
+            regs.pc += 2; // Compensate for theoretically reading an immediate short
+        }
     }
 
     // TODO use function templates for the functions that are the same between reg8 and reg16
