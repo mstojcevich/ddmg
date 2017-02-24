@@ -269,7 +269,7 @@ class CPU {
             Instruction("XX",		    null),
             Instruction("CALL NC,a16",	{callImmediateIfFlag(Flag.OVERFLOW, false);}),
             Instruction("PUSH DE",		{pushToStack(regs.de);}),
-            Instruction("SUB d8",		null),
+            Instruction("SUB d8",		&subImmediate),
             Instruction("RST 10H",		{rst(0x10);}),
             Instruction("RET C",		{retIfFlag(Flag.OVERFLOW, true);}),
             Instruction("RETI",		    null),
@@ -705,6 +705,14 @@ class CPU {
      */
     @safe private void subReference() {
         sub(mmu.readByte(regs.hl));
+    }
+
+    /**
+     * Subtract the 8-bit immediate value from register A
+     */
+    @safe private void subImmediate() {
+        sub(mmu.readByte(regs.pc));
+        regs.pc++;
     }
 
     @safe private void sbc(ubyte src) {
