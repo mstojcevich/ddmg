@@ -279,7 +279,7 @@ class CPU {
             Instruction("XX",		    null),
             Instruction("SBC A,d8",		&sbcImmediate),
             Instruction("RST 18H",		null),
-            Instruction("LDH (a8),A",	null),
+            Instruction("LDH (a8),A",	&ldhAToImmediate),
             Instruction("POP HL",		{popFromStack(regs.hl);}),
             Instruction("LD (C),A",		&ldCA),
             Instruction("XX",		    null),
@@ -295,7 +295,7 @@ class CPU {
             Instruction("XX",		    null),
             Instruction("XOR d8",		&xorImmediate),
             Instruction("RST 28H",		null),
-            Instruction("LDH A,(a8)",	null),
+            Instruction("LDH A,(a8)",	&ldhImmediateToA),
             Instruction("POP AF",		{popFromStack(regs.af);}),
             Instruction("LD A,(C)",		&ldAC),
             Instruction("DI",		    null),
@@ -1140,6 +1140,22 @@ class CPU {
      */
     @safe private void ldAC() {
         loadFromMemory(regs.a, 0xFF00 + regs.c);
+    }
+
+    /**
+     * Load the value in memory at FF00 + (8-bit immediate) to register A
+     */
+    @safe private void ldhImmediateToA() {
+        loadFromMemory(regs.a, 0xFF00 + mmu.readByte(regs.pc));
+        regs.pc++;
+    }
+
+    /**
+     * Save the value in register A to memory at FF00 + (8-bit immediate)
+     */
+    @safe private void ldhAToImmediate() {
+        storeInMemory(0xFF00 + mmu.readByte(regs.pc), regs.a);
+        regs.pc++;
     }
 
     // TODO use function templates for the functions that are the same between reg8 and reg16
