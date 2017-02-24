@@ -247,7 +247,7 @@ class CPU {
             Instruction("CP L",		    {cp(regs.l);}),
             Instruction("CP (HL)",		&cpReference),
             Instruction("CP A",		    {cp(regs.a);}),
-            Instruction("RET NZ",		null),
+            Instruction("RET NZ",		{retIfFlag(Flag.ZERO, false);}),
             Instruction("POP BC",		{popFromStack(regs.bc);}),
             Instruction("JP NZ,a16",	{jumpImmediateIfFlag(Flag.ZERO, false);}),
             Instruction("JP a16",		&jumpImmediate),
@@ -255,15 +255,15 @@ class CPU {
             Instruction("PUSH BC",		{pushToStack(regs.bc);}),
             Instruction("ADD A,d8",		&addImmediate),
             Instruction("RST 00H",		{rst(0x00);}),
-            Instruction("RET Z",		null),
-            Instruction("RET",		    null),
+            Instruction("RET Z",		{retIfFlag(Flag.ZERO, true);}),
+            Instruction("RET",		    &ret),
             Instruction("JP Z,a16",		{jumpImmediateIfFlag(Flag.ZERO, true);}),
             Instruction("PREFIX CB",	null),
             Instruction("CALL Z,a16",	{callImmediateIfFlag(Flag.ZERO, true);}),
             Instruction("CALL a16",		&callImmediate),
             Instruction("ADC A,d8",		&adcImmediate),
             Instruction("RST 08H",		{rst(0x08);}),
-            Instruction("RET NC",		null),
+            Instruction("RET NC",		{retIfFlag(Flag.OVERFLOW, false);}),
             Instruction("POP DE",		{popFromStack(regs.de);}),
             Instruction("JP NC,a16",	{jumpImmediateIfFlag(Flag.OVERFLOW, false);}),
             Instruction("XX",		    null),
@@ -271,7 +271,7 @@ class CPU {
             Instruction("PUSH DE",		{pushToStack(regs.de);}),
             Instruction("SUB d8",		null),
             Instruction("RST 10H",		{rst(0x10);}),
-            Instruction("RET C",		null),
+            Instruction("RET C",		{retIfFlag(Flag.OVERFLOW, true);}),
             Instruction("RETI",		    null),
             Instruction("JP C,a16",		{jumpImmediateIfFlag(Flag.OVERFLOW, true);}),
             Instruction("XX",		    null),
@@ -1158,6 +1158,22 @@ class CPU {
             callImmediate();
         } else {
             regs.pc += 2; // Compensate for theoretically reading an immediate short
+        }
+    }
+
+    /**
+     * Pop 16 bits from the stack and jump to that address
+     */
+    @safe private void ret() {
+        popFromStack(regs.pc);
+    }
+
+    /**
+     * RET if the specified flag is set/reset (depending on the second parameter)
+     */
+    @safe private void retIfFlag(in Flag f, in bool set) {
+        if(isFlagSet(f) == set) {
+            ret();
         }
     }
 
