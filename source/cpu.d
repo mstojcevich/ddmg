@@ -593,8 +593,8 @@ class CPU {
      * Add the next 8-bit value (after the opcode) to register A
      */
     @safe private void addImmediate() {
-        add(mmu.readByte(regs.sp));
-        regs.sp++;
+        add(mmu.readByte(regs.pc));
+        regs.cp++;
     }
 
     /**
@@ -683,8 +683,8 @@ class CPU {
      * Adc the next 8-bit value (after the opcode) to register A
      */
     @safe private void adcImmediate() {
-        adc(mmu.readByte(regs.sp));
-        regs.sp++;
+        adc(mmu.readByte(regs.pc));
+        regs.pc++;
     }
 
     @safe private void sub(ubyte src) {
@@ -737,8 +737,8 @@ class CPU {
      * SBC the 8-bit immediate value from register A
      */
     @safe private void sbcImmediate() {
-        sbc(mmu.readByte(regs.sp));
-        regs.sp++;
+        sbc(mmu.readByte(regs.pc));
+        regs.pc++;
     }
 
     /**
@@ -758,8 +758,8 @@ class CPU {
     }
 
     @safe private void andImmediate() {
-        and(mmu.readByte(regs.sp));
-        regs.sp++;
+        and(mmu.readByte(regs.pc));
+        regs.pc++;
     }
 
     /**
@@ -1048,7 +1048,7 @@ class CPU {
      */
     @safe private void jumpRelativeImmediate() {
         // Double cast to force a sign extension on the unsigned value
-        regs.pc += cast(short)(cast(byte)(mmu.readByte(regs.sp)));
+        regs.pc += cast(short)(cast(byte)(mmu.readByte(regs.pc)));
     }
 
     /**
@@ -1159,11 +1159,11 @@ class CPU {
     }
 
     /**
-     * Push the current SP to the stack, then jump to 0000 + addr
+     * Push the current PC to the stack, then jump to 0000 + addr
      */
     @safe private void rst(ubyte addr) {
-        pushToStack(regs.sp);
-        regs.sp = addr;
+        pushToStack(regs.pc);
+        regs.pc = addr;
     }
 
     // TODO use function templates for the functions that are the same between reg8 and reg16
