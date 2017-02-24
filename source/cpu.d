@@ -254,7 +254,7 @@ class CPU {
             Instruction("CALL NZ,a16",	null),
             Instruction("PUSH BC",		{pushToStack(regs.bc);}),
             Instruction("ADD A,d8",		&addImmediate),
-            Instruction("RST 00H",		null),
+            Instruction("RST 00H",		{rst(0x00);}),
             Instruction("RET Z",		null),
             Instruction("RET",		    null),
             Instruction("JP Z,a16",		&jumpImmediateZ),
@@ -262,7 +262,7 @@ class CPU {
             Instruction("CALL Z,a16",	null),
             Instruction("CALL a16",		null),
             Instruction("ADC A,d8",		&adcImmediate),
-            Instruction("RST 08H",		null),
+            Instruction("RST 08H",		{rst(0x08);}),
             Instruction("RET NC",		null),
             Instruction("POP DE",		{popFromStack(regs.de);}),
             Instruction("JP NC,a16",	&jumpImmediateNC),
@@ -270,7 +270,7 @@ class CPU {
             Instruction("CALL NC,a16",	null),
             Instruction("PUSH DE",		{pushToStack(regs.de);}),
             Instruction("SUB d8",		null),
-            Instruction("RST 10H",		null),
+            Instruction("RST 10H",		{rst(0x10);}),
             Instruction("RET C",		null),
             Instruction("RETI",		    null),
             Instruction("JP C,a16",		&jumpImmediateC),
@@ -278,7 +278,7 @@ class CPU {
             Instruction("CALL C,a16",	null),
             Instruction("XX",		    null),
             Instruction("SBC A,d8",		&sbcImmediate),
-            Instruction("RST 18H",		null),
+            Instruction("RST 18H",		{rst(0x18);}),
             Instruction("LDH (a8),A",	&ldhAToImmediate),
             Instruction("POP HL",		{popFromStack(regs.hl);}),
             Instruction("LD (C),A",		&ldCA),
@@ -286,7 +286,7 @@ class CPU {
             Instruction("XX",		    null),
             Instruction("PUSH HL",		{pushToStack(regs.hl);}),
             Instruction("AND d8",		&andImmediate),
-            Instruction("RST 20H",		null),
+            Instruction("RST 20H",		{rst(0x20);}),
             Instruction("ADD SP,r8",	&offsetStackPointerImmediate),
             Instruction("JP (HL)",		&jumpHL),
             Instruction("LD (a16),A",	{storeInImmediateReference(regs.a);}),
@@ -294,7 +294,7 @@ class CPU {
             Instruction("XX",		    null),
             Instruction("XX",		    null),
             Instruction("XOR d8",		&xorImmediate),
-            Instruction("RST 28H",		null),
+            Instruction("RST 28H",		{rst(0x28);}),
             Instruction("LDH A,(a8)",	&ldhImmediateToA),
             Instruction("POP AF",		{popFromStack(regs.af);}),
             Instruction("LD A,(C)",		&ldAC),
@@ -302,7 +302,7 @@ class CPU {
             Instruction("XX",		    null),
             Instruction("PUSH AF",		{pushToStack(regs.af);}),
             Instruction("OR d8",		&orImmediate),
-            Instruction("RST 30H",		null),
+            Instruction("RST 30H",		{rst(0x30);}),
             Instruction("LD HL,SP+r8",	null),
             Instruction("LD SP,HL",		{load(regs.sp, regs.hl);}),
             Instruction("LD A,(a16)",	{loadFromImmediateReference(regs.a);}),
@@ -310,7 +310,7 @@ class CPU {
             Instruction("XX",		    null),
             Instruction("XX",		    null),
             Instruction("CP d8",		&cpImmediate),
-            Instruction("RST 38H",		null),
+            Instruction("RST 38H",		{rst(0x38);}),
         ];
 
         int totalInstrs = 0;
@@ -1156,6 +1156,14 @@ class CPU {
     @safe private void ldhAToImmediate() {
         storeInMemory(0xFF00 + mmu.readByte(regs.pc), regs.a);
         regs.pc++;
+    }
+
+    /**
+     * Push the current SP to the stack, then jump to 0000 + addr
+     */
+    @safe private void rst(ubyte addr) {
+        pushToStack(regs.sp);
+        regs.sp = addr;
     }
 
     // TODO use function templates for the functions that are the same between reg8 and reg16
