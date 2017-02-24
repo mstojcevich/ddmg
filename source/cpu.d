@@ -29,7 +29,7 @@ private enum Flag : ubyte {
 
 struct Instruction {
     string disassembly;
-    void delegate() impl;
+    @safe void delegate() impl;
 }
 
 /**
@@ -53,72 +53,72 @@ class CPU {
 
     private MMU mmu;
 
-    this(MMU mmu) {
+    @safe this(MMU mmu) {
         this.instructions = [
             Instruction("NOP",          &nop),
-            Instruction("LD BC,d16",    null),
-            Instruction("LD (BC),A",    null),
-            Instruction("INC BC",       null),
-            Instruction("INC B",        null),
-            Instruction("DEC B",        null),
-            Instruction("LD B,d8",      null),
-            Instruction("RLCA",         null),
-            Instruction("LD (a16),SP",  null),
+            Instruction("LD BC,d16",    {loadImmediate(regs.bc);}),
+            Instruction("LD (BC),A",    {storeInMemory(regs.bc, regs.a);}),
+            Instruction("INC BC",       {inc(regs.bc);}),
+            Instruction("INC B",        {inc(regs.b);}),
+            Instruction("DEC B",        {dec(regs.b);}),
+            Instruction("LD B,d8",      {loadImmediate(regs.b);}),
+            Instruction("RLCA",         &rlca),
+            Instruction("LD (a16),SP",  {storeInImmediateReference(regs.sp);}),
             Instruction("ADD HL,BC",    {add(regs.hl, regs.bc);}),
-            Instruction("LD A,(BC)",    null),
-            Instruction("DEC BC",       null),
-            Instruction("INC C",        null),
-            Instruction("DEC C",        null),
-            Instruction("LD C,d8",      null),
-            Instruction("RRCA",         null),
+            Instruction("LD A,(BC)",    {loadFromMemory(regs.a, regs.bc);}),
+            Instruction("DEC BC",       {dec(regs.bc);}),
+            Instruction("INC C",        {inc(regs.c);}),
+            Instruction("DEC C",        {dec(regs.c);}),
+            Instruction("LD C,d8",      {loadImmediate(regs.c);}),
+            Instruction("RRCA",         &rrca),
             Instruction("STOP 0",       null),
-            Instruction("LD DE,d16",    null),
-            Instruction("LD (DE),A",	null),
-            Instruction("INC DE",		null),
-            Instruction("INC D",		null),
-            Instruction("DEC D",		null),
-            Instruction("LD D,d8",		null),
-            Instruction("RLA",		    null),
-            Instruction("JR r8",		null),
+            Instruction("LD DE,d16",    {loadImmediate(regs.de);}),
+            Instruction("LD (DE),A",	{storeInMemory(regs.de, regs.a);}),
+            Instruction("INC DE",		{inc(regs.de);}),
+            Instruction("INC D",		{inc(regs.d);}),
+            Instruction("DEC D",		{dec(regs.d);}),
+            Instruction("LD D,d8",		{loadImmediate(regs.d);}),
+            Instruction("RLA",		    &rla),
+            Instruction("JR r8",		&jumpRelativeImmediate),
             Instruction("ADD HL,DE",	{add(regs.hl, regs.de);}),
-            Instruction("LD A,(DE)",	null),
-            Instruction("DEC DE",		null),
-            Instruction("INC E",		null),
-            Instruction("DEC E",		null),
-            Instruction("LD E,d8",		null),
-            Instruction("RRA",		    null),
-            Instruction("JR NZ,r8",		null),
-            Instruction("LD HL,d16",	null),
-            Instruction("LD (HL+),A",	null),
-            Instruction("INC HL",		null),
-            Instruction("INC H",		null),
-            Instruction("DEC H",		null),
-            Instruction("LD H,d8",		null),
+            Instruction("LD A,(DE)",	{loadFromMemory(regs.a, regs.de);}),
+            Instruction("DEC DE",		{dec(regs.de);}),
+            Instruction("INC E",		{inc(regs.e);}),
+            Instruction("DEC E",		{dec(regs.e);}),
+            Instruction("LD E,d8",		{loadImmediate(regs.e);}),
+            Instruction("RRA",		    &rra),
+            Instruction("JR NZ,r8",		&jumpRelativeImmediateNZ),
+            Instruction("LD HL,d16",	{loadImmediate(regs.hl);}),
+            Instruction("LD (HL+),A",	&storeAInMemoryHLPlus),
+            Instruction("INC HL",		{inc(regs.hl);}),
+            Instruction("INC H",		{inc(regs.h);}),
+            Instruction("DEC H",		{dec(regs.h);}),
+            Instruction("LD H,d8",		{loadImmediate(regs.h);}),
             Instruction("DAA",		    null),
-            Instruction("JR Z,r8",		null),
+            Instruction("JR Z,r8",		&jumpRelativeImmediateZ),
             Instruction("ADD HL,HL",	{add(regs.hl, regs.hl);}),
-            Instruction("LD A,(HL+)",	null),
-            Instruction("DEC HL",		null),
-            Instruction("INC L",		null),
-            Instruction("DEC L",		null),
-            Instruction("LD L,d8",		null),
-            Instruction("CPL",		    null),
-            Instruction("JR NC,r8",		null),
-            Instruction("LD SP,d16",	null),
-            Instruction("LD (HL-),A",	null),
-            Instruction("INC SP",		null),
-            Instruction("INC (HL)",		null),
-            Instruction("DEC (HL)",		null),
-            Instruction("LD (HL),d8",	null),
+            Instruction("LD A,(HL+)",	{loadReferencePlus(regs.a);}),
+            Instruction("DEC HL",		{dec(regs.hl);}),
+            Instruction("INC L",		{inc(regs.l);}),
+            Instruction("DEC L",		{dec(regs.l);}),
+            Instruction("LD L,d8",		{loadImmediate(regs.l);}),
+            Instruction("CPL",		    {complement(regs.a);}),
+            Instruction("JR NC,r8",		&jumpRelativeImmediateNC),
+            Instruction("LD SP,d16",	{loadImmediate(regs.sp);}),
+            Instruction("LD (HL-),A",	&storeAInMemoryHLMinus),
+            Instruction("INC SP",		{inc(regs.sp);}),
+            Instruction("INC (HL)",		&incReference),
+            Instruction("DEC (HL)",		&decReference),
+            Instruction("LD (HL),d8",	{storeImmediateInMemory(regs.hl);}),
             Instruction("SCF",		    null),
-            Instruction("JR C,r8",		null),
+            Instruction("JR C,r8",		&jumpRelativeImmediateC),
             Instruction("ADD HL,SP",	{add(regs.hl, regs.sp);}),
-            Instruction("LD A,(HL-)",	null),
-            Instruction("DEC SP",		null),
-            Instruction("INC A",		null),
-            Instruction("DEC A",		null),
+            Instruction("LD A,(HL-)",	{loadReferenceMinus(regs.a);}),
+            Instruction("DEC SP",		{dec(regs.sp);}),
+            Instruction("INC A",		{inc(regs.a);}),
+            Instruction("DEC A",		{dec(regs.a);}),
             Instruction("LD A,d8",		{loadImmediate(regs.a);}),
-            Instruction("CCF",		    null),
+            Instruction("CCF",		    {complementFlag(Flag.OVERFLOW);}),
             Instruction("LD B,B",		{load(regs.b, regs.b);}),
             Instruction("LD B,C",		{load(regs.b, regs.c);}),
             Instruction("LD B,D",		{load(regs.b, regs.d);}),
@@ -167,14 +167,14 @@ class CPU {
             Instruction("LD L,L",		{load(regs.l, regs.l);}),
             Instruction("LD L,(HL)",	{loadReference(regs.l);}),
             Instruction("LD L,A",		{load(regs.l, regs.a);}),
-            Instruction("LD (HL),B",	{storeInMemory(regs.b);}),
-            Instruction("LD (HL),C",	{storeInMemory(regs.c);}),
-            Instruction("LD (HL),D",	{storeInMemory(regs.d);}),
-            Instruction("LD (HL),E",	{storeInMemory(regs.e);}),
-            Instruction("LD (HL),H",	{storeInMemory(regs.h);}),
-            Instruction("LD (HL),L",	{storeInMemory(regs.l);}),
+            Instruction("LD (HL),B",	{storeInMemory(regs.hl, regs.b);}),
+            Instruction("LD (HL),C",	{storeInMemory(regs.hl, regs.c);}),
+            Instruction("LD (HL),D",	{storeInMemory(regs.hl, regs.d);}),
+            Instruction("LD (HL),E",	{storeInMemory(regs.hl, regs.e);}),
+            Instruction("LD (HL),H",	{storeInMemory(regs.hl, regs.h);}),
+            Instruction("LD (HL),L",	{storeInMemory(regs.hl, regs.l);}),
             Instruction("HALT",		    null),
-            Instruction("LD (HL),A",	{storeInMemory(regs.a);}),
+            Instruction("LD (HL),A",	{storeInMemory(regs.hl, regs.a);}),
             Instruction("LD A,B",		{load(regs.a, regs.b);}),
             Instruction("LD A,C",		{load(regs.a, regs.c);}),
             Instruction("LD A,D",		{load(regs.a, regs.d);}),
@@ -199,65 +199,65 @@ class CPU {
             Instruction("ADC A,L",		{adc(regs.l);}),
             Instruction("ADC A,(HL)",	&adcReference),
             Instruction("ADC A,A",		{adc(regs.a);}),
-            Instruction("SUB B",		null),
-            Instruction("SUB C",		null),
-            Instruction("SUB D",		null),
-            Instruction("SUB E",		null),
-            Instruction("SUB H",		null),
-            Instruction("SUB L",		null),
-            Instruction("SUB (HL)",		null),
-            Instruction("SUB A",		null),
-            Instruction("SBC A,B",		null),
-            Instruction("SBC A,C",		null),
-            Instruction("SBC A,D",		null),
-            Instruction("SBC A,E",		null),
-            Instruction("SBC A,H",		null),
-            Instruction("SBC A,L",		null),
-            Instruction("SBC A,(HL)",	null),
-            Instruction("SBC A,A",		null),
-            Instruction("AND B",		null),
-            Instruction("AND C",		null),
-            Instruction("AND D",		null),
-            Instruction("AND E",		null),
-            Instruction("AND H",		null),
-            Instruction("AND L",		null),
-            Instruction("AND (HL)",		null),
-            Instruction("AND A",		null),
-            Instruction("XOR B",		null),
-            Instruction("XOR C",		null),
-            Instruction("XOR D",		null),
-            Instruction("XOR E",		null),
-            Instruction("XOR H",		null),
-            Instruction("XOR L",		null),
-            Instruction("XOR (HL)",		null),
-            Instruction("XOR A",		null),
-            Instruction("OR B",		    null),
-            Instruction("OR C",		    null),
-            Instruction("OR D",		    null),
-            Instruction("OR E",		    null),
-            Instruction("OR H",		    null),
-            Instruction("OR L",		    null),
-            Instruction("OR (HL)",		null),
-            Instruction("OR A",		    null),
-            Instruction("CP B",		    null),
-            Instruction("CP C",		    null),
-            Instruction("CP D",		    null),
-            Instruction("CP E",		    null),
-            Instruction("CP H",		    null),
-            Instruction("CP L",		    null),
-            Instruction("CP (HL)",		null),
-            Instruction("CP A",		    null),
+            Instruction("SUB B",		{sub(regs.b);}),
+            Instruction("SUB C",		{sub(regs.c);}),
+            Instruction("SUB D",		{sub(regs.d);}),
+            Instruction("SUB E",		{sub(regs.e);}),
+            Instruction("SUB H",		{sub(regs.h);}),
+            Instruction("SUB L",		{sub(regs.l);}),
+            Instruction("SUB (HL)",		&subReference),
+            Instruction("SUB A",		{sub(regs.a);}),
+            Instruction("SBC A,B",		{sbc(regs.b);}),
+            Instruction("SBC A,C",		{sbc(regs.c);}),
+            Instruction("SBC A,D",		{sbc(regs.d);}),
+            Instruction("SBC A,E",		{sbc(regs.e);}),
+            Instruction("SBC A,H",		{sbc(regs.h);}),
+            Instruction("SBC A,L",		{sbc(regs.l);}),
+            Instruction("SBC A,(HL)",	&sbcReference),
+            Instruction("SBC A,A",		{sbc(regs.a);}),
+            Instruction("AND B",		{and(regs.b);}),
+            Instruction("AND C",		{and(regs.c);}),
+            Instruction("AND D",		{and(regs.d);}),
+            Instruction("AND E",		{and(regs.e);}),
+            Instruction("AND H",		{and(regs.h);}),
+            Instruction("AND L",		{and(regs.l);}),
+            Instruction("AND (HL)",		&andReference),
+            Instruction("AND A",		{and(regs.a);}),
+            Instruction("XOR B",		{xor(regs.b);}),
+            Instruction("XOR C",		{xor(regs.c);}),
+            Instruction("XOR D",		{xor(regs.d);}),
+            Instruction("XOR E",		{xor(regs.e);}),
+            Instruction("XOR H",		{xor(regs.h);}),
+            Instruction("XOR L",		{xor(regs.l);}),
+            Instruction("XOR (HL)",		&xorReference),
+            Instruction("XOR A",		{xor(regs.a);}),
+            Instruction("OR B",		    {or(regs.b);}),
+            Instruction("OR C",		    {or(regs.c);}),
+            Instruction("OR D",		    {or(regs.d);}),
+            Instruction("OR E",		    {or(regs.e);}),
+            Instruction("OR H",		    {or(regs.h);}),
+            Instruction("OR L",		    {or(regs.l);}),
+            Instruction("OR (HL)",		&orReference),
+            Instruction("OR A",		    {or(regs.a);}),
+            Instruction("CP B",		    {cp(regs.b);}),
+            Instruction("CP C",		    {cp(regs.c);}),
+            Instruction("CP D",		    {cp(regs.d);}),
+            Instruction("CP E",		    {cp(regs.e);}),
+            Instruction("CP H",		    {cp(regs.h);}),
+            Instruction("CP L",		    {cp(regs.l);}),
+            Instruction("CP (HL)",		&cpReference),
+            Instruction("CP A",		    {cp(regs.a);}),
             Instruction("RET NZ",		null),
             Instruction("POP BC",		null),
-            Instruction("JP NZ,a16",	null),
-            Instruction("JP a16",		null),
+            Instruction("JP NZ,a16",	&jumpImmediateNZ),
+            Instruction("JP a16",		&jumpImmediate),
             Instruction("CALL NZ,a16",	null),
             Instruction("PUSH BC",		null),
             Instruction("ADD A,d8",		&addImmediate),
             Instruction("RST 00H",		null),
             Instruction("RET Z",		null),
             Instruction("RET",		    null),
-            Instruction("JP Z,a16",		null),
+            Instruction("JP Z,a16",		&jumpImmediateZ),
             Instruction("PREFIX CB",	null),
             Instruction("CALL Z,a16",	null),
             Instruction("CALL a16",		null),
@@ -265,7 +265,7 @@ class CPU {
             Instruction("RST 08H",		null),
             Instruction("RET NC",		null),
             Instruction("POP DE",		null),
-            Instruction("JP NC,a16",	null),
+            Instruction("JP NC,a16",	&jumpImmediateNC),
             Instruction("XX",		    null),
             Instruction("CALL NC,a16",	null),
             Instruction("PUSH DE",		null),
@@ -273,7 +273,7 @@ class CPU {
             Instruction("RST 10H",		null),
             Instruction("RET C",		null),
             Instruction("RETI",		    null),
-            Instruction("JP C,a16",		null),
+            Instruction("JP C,a16",		&jumpImmediateC),
             Instruction("XX",		    null),
             Instruction("CALL C,a16",	null),
             Instruction("XX",		    null),
@@ -285,15 +285,15 @@ class CPU {
             Instruction("XX",		    null),
             Instruction("XX",		    null),
             Instruction("PUSH HL",		null),
-            Instruction("AND d8",		null),
+            Instruction("AND d8",		&andImmediate),
             Instruction("RST 20H",		null),
-            Instruction("ADD SP,r8",	null),
-            Instruction("JP (HL)",		null),
-            Instruction("LD (a16),A",	null),
+            Instruction("ADD SP,r8",	&offsetStackPointerImmediate),
+            Instruction("JP (HL)",		&jumpHL),
+            Instruction("LD (a16),A",	{storeInImmediateReference(regs.a);}),
             Instruction("XX",		    null),
             Instruction("XX",		    null),
             Instruction("XX",		    null),
-            Instruction("XOR d8",		null),
+            Instruction("XOR d8",		&xorImmediate),
             Instruction("RST 28H",		null),
             Instruction("LDH A,(a8)",	null),
             Instruction("POP AF",		null),
@@ -301,15 +301,15 @@ class CPU {
             Instruction("DI",		    null),
             Instruction("XX",		    null),
             Instruction("PUSH AF",		null),
-            Instruction("OR d8",		null),
+            Instruction("OR d8",		&orImmediate),
             Instruction("RST 30H",		null),
             Instruction("LD HL,SP+r8",	null),
-            Instruction("LD SP,HL",		null),
-            Instruction("LD A,(a16)",	null),
+            Instruction("LD SP,HL",		{load(regs.sp, regs.hl);}),
+            Instruction("LD A,(a16)",	{loadFromImmediateReference(regs.a);}),
             Instruction("EI",		    null),
             Instruction("XX",		    null),
             Instruction("XX",		    null),
-            Instruction("CP d8",		null),
+            Instruction("CP d8",		&cpImmediate),
             Instruction("RST 38H",		null),
         ];
 
@@ -323,13 +323,9 @@ class CPU {
         regs.hl = 0x014D;
         regs.pc = 0x0100;
         // TODO the rom disable I/O register at memory address 0xFF50 should be set to 1
-    
-        regs.sp = 10;
-        add(regs.sp, cast(short)(cast(byte)(cast(ubyte)(-5))));
-        writeln(regs.sp);
     }
 
-    void step() {
+    @safe void step() {
         // Fetch the operation in memory
         ubyte opcode = mmu.readByte(regs.pc);
 
@@ -345,10 +341,16 @@ class CPU {
         instr.impl(); // Execute the operation
     }
 
+    // A debug function for printing the flag statuses
+    @safe private void printFlags() {
+        writefln("Z = %d, H = %d, N = %d, CY = %d", 
+            isFlagSet(Flag.ZERO), isFlagSet(Flag.HALF_OVERFLOW), isFlagSet(Flag.SUBTRACTION), isFlagSet(Flag.OVERFLOW));
+    }
+
     /**
      * Sets a flag on the flag register
      */
-    private void setFlag(in Flag f, in bool set) { // TODO make compile-time version for static flag setting
+    @safe private void setFlag(in Flag f, in bool set) { // TODO make compile-time version for static flag setting
         if(set) {
             regs.f = regs.f | f; // ORing with the flag will set it true
         } else {
@@ -359,7 +361,7 @@ class CPU {
     /**
      * If a flag is 0 in the flag register, this will make it 1; if it is 1, this will make it 0
      */
-    private void toggleFlag(in Flag f) {
+    @safe private void toggleFlag(in Flag f) {
         regs.f = regs.f ^ f; // XOR will invert the bits that are set in the input
     }
 
@@ -367,26 +369,26 @@ class CPU {
      * Check the status of a flag in the f register
      * If the flag is 1, returns true, else returns false
      */
-    private bool isFlagSet(in Flag f) {
+    @safe private bool isFlagSet(in Flag f) {
         return (regs.f & f) != 0;
     }
 
     /**
      * Do nothing
      */
-    private void nop() {}
+    @safe private void nop() {}
 
     /**
      * Load the value from one register into another register
      */
-    private void load(ref reg8 dest, in reg8 src) {
+    @safe private void load(ref reg8 dest, in reg8 src) {
         dest = src;
     }
 
     /**
      * Load the next 8-bit value (after the opcode) into a register
      */
-    private void loadImmediate(ref reg8 dest) {
+    @safe private void loadImmediate(ref reg8 dest) {
         dest = mmu.readByte(regs.pc);
         regs.pc += 1;
     }
@@ -394,7 +396,7 @@ class CPU {
     /**
      * Load the next 16-bit value (after the opcode) into a register
      */
-    private void loadImmediate(ref reg16 dest) {
+    @safe private void loadImmediate(ref reg16 dest) {
         dest = mmu.readShort(regs.pc);
         regs.pc += 2;
     }
@@ -402,21 +404,94 @@ class CPU {
     /**
      * Load the 8-bit value stored in memory at the address stored in register HL into a register
      */
-    private void loadReference(ref reg8 dest) {
-        dest = mmu.readByte(regs.hl);
+    @safe private void loadReference(ref reg8 dest) {
+        loadFromMemory(dest, regs.hl);
     }
 
     /**
-     * Store an 8-bit value into memory at the address stored in register HL
+     * Load the 8-bit value stored in memory at the address stored in register HL,
+     * then increment HL
      */
-    private void storeInMemory(in reg8 src) {
-        mmu.writeByte(regs.hl, src);
+    @safe private void loadReferencePlus(ref reg8 dest) {
+        loadFromMemory(dest, regs.hl++);
+    }
+
+    /**
+     * Load the 8-bit value stored in memory at the address stored in register HL,
+     * then decrement HL
+     */
+    @safe private void loadReferenceMinus(ref reg8 dest) {
+        loadFromMemory(dest, regs.hl--);
+    }
+
+    /**
+     * Load the value from one register into another register
+     */
+    @safe private void load(ref reg16 dest, in reg16 src) {
+        dest = src;
+    }
+
+    /**
+     * Store an 8-bit value into memory at the address specified
+     */
+    @safe private void storeInMemory(in ushort addr, in reg8 src) {
+        mmu.writeByte(addr, src);
+    }
+
+    /**
+     * Store the value of register A into memory at the address in HL,
+     * then increment HL
+     */
+    @safe private void storeAInMemoryHLPlus() {
+        storeInMemory(regs.hl++, regs.a);
+    }
+
+    /**
+     * Store the value of register A into memory at the address in HL,
+     * then decrement HL
+     */
+    @safe private void storeAInMemoryHLMinus() {
+        storeInMemory(regs.hl--, regs.a);
+    }
+
+    /**
+     * Store an 8-bit immediate value into memory at the address specified
+     */
+    @safe private void storeImmediateInMemory(in ushort addr) {
+        storeInMemory(addr, mmu.readByte(regs.pc));
+        regs.pc++;
+    }
+
+    @safe private void storeInImmediateReference(in reg8 src) {
+        storeInMemory(mmu.readShort(regs.pc), src);
+        regs.pc += 2;
+    }
+
+    @safe private void loadFromMemory(out reg8 dst, in ushort addr) {
+        dst = mmu.readByte(addr);
+    }
+
+    @safe private void loadFromImmediateReference(out reg8 dst) {
+        loadFromMemory(dst, mmu.readShort(regs.pc));
+        regs.pc += 2;
+    }
+
+    @safe private void storeInMemory(in ushort addr, in reg16 src) {
+        mmu.writeShort(addr, src);
+    }
+
+    /**
+     * Store the value of a 16-bit register at the address specified in the immediate 16-bit address
+     */
+    @safe private void storeInImmediateReference(in reg16 src) {
+        storeInMemory(mmu.readShort(regs.pc), src);
+        regs.pc += 2;
     }
 
     /**
      * Add a 16-bit value to a 16-bit register
      */
-    private void add(ref reg16 dst, in ushort src) {
+    @safe private void add(ref reg16 dst, in ushort src) {
         immutable uint result = dst + src;
         immutable ushort outResult = cast(ushort) result;
 
@@ -436,16 +511,16 @@ class CPU {
     /**
      * Add the next 8-bit value to the stack pointer
      */
-    private void offsetStackPointerImmediate(ref reg8 dst) {
+    @safe private void offsetStackPointerImmediate() {
         add(regs.sp, cast(short)(cast(byte)(mmu.readByte(regs.sp)))); // Casting twice is so that the sign will carry over to the short
 
         regs.pc += 1;
     }
 
     /**
-     * Add a ubyte to register A
+     * Add an 8-bit value to register A
      */
-    private void add(in ubyte src) {
+    @safe private void add(in ubyte src) {
         immutable ushort result = regs.a + src; // Storing in a short so overflow can be checked
         immutable ubyte outResult = cast(ubyte) result; // The result that actually goes into the output register
         
@@ -462,18 +537,49 @@ class CPU {
         // Result with the extra bits dropped
         regs.a = outResult;
     }
+    @safe unittest { // Unit test for ADD A, n
+        CPU c = new CPU(new MMU());
+
+        with(c) {
+            // Test 1, 0x3A + 0xC6
+            regs.a = 0x3A;
+            regs.b = 0xC6;
+            add(regs.b);
+
+            assert(regs.a == 0x00);
+            assert(isFlagSet(Flag.ZERO));
+            assert(isFlagSet(Flag.HALF_OVERFLOW));
+            assert(!isFlagSet(Flag.SUBTRACTION));
+            assert(isFlagSet(Flag.OVERFLOW));
+
+            // Test 2, 0xFF + 0x33
+            regs.a = 0xFF;
+            regs.c = 0x33;
+
+            // Set the subtraction flag to make sure it gets reset
+            setFlag(Flag.SUBTRACTION, true);
+
+            add(c.regs.c);
+
+            assert(regs.a == 0x32);
+            assert(!isFlagSet(Flag.ZERO));
+            assert(isFlagSet(Flag.HALF_OVERFLOW));
+            assert(!isFlagSet(Flag.SUBTRACTION));
+            assert(isFlagSet(Flag.OVERFLOW));
+        }
+    }
 
     /**
      * Add the 8-bit value stored in memory at the address stored in register HL to register A
      */
-    private void addReference() {
+    @safe private void addReference() {
         add(mmu.readByte(regs.hl));
     }
 
     /**
      * Add the next 8-bit value (after the opcode) to register A
      */
-    private void addImmediate() {
+    @safe private void addImmediate() {
         add(mmu.readByte(regs.sp));
         regs.sp++;
     }
@@ -483,7 +589,7 @@ class CPU {
      *
      * For example, if the carry flag was set before the method call, and the parameter is 5, then 6 is added to A
      */
-     private void adc(in ubyte src) {
+     @safe private void adc(in ubyte src) {
         // We can't just call add(src + carry) because if the ubyte overflows to 0 when adding carry, the GB's overflow bit won't get set among other problems
         // TODO check what real hardware does
 
@@ -505,20 +611,474 @@ class CPU {
         // Result with the extra bits dropped
         regs.a = outResult;
      }
+     @safe unittest { // Unit test for ADC A, n
+        CPU c = new CPU(new MMU());
+
+        with(c) {
+            regs.a = 0xE1;
+            regs.b = 0x0F;
+            regs.c = 0x3B;
+            regs.h = 0x1E;
+
+            setFlag(Flag.OVERFLOW, true);
+
+            adc(regs.b);
+            assert(regs.a == 0xF1);
+            assert(!isFlagSet(Flag.SUBTRACTION));
+            assert(!isFlagSet(Flag.ZERO));
+            assert(isFlagSet(Flag.HALF_OVERFLOW));
+            assert(!isFlagSet(Flag.OVERFLOW));
+
+            regs.a = 0xE1;
+            regs.b = 0x0F;
+            regs.c = 0x3B;
+            regs.h = 0x1E;
+
+            setFlag(Flag.OVERFLOW, true);
+
+            adc(regs.c);
+            assert(regs.a == 0x1D);
+            assert(!isFlagSet(Flag.SUBTRACTION));
+            assert(!isFlagSet(Flag.ZERO));
+            assert(!isFlagSet(Flag.HALF_OVERFLOW));
+            assert(isFlagSet(Flag.OVERFLOW));
+
+            regs.a = 0xE1;
+            regs.b = 0x0F;
+            regs.c = 0x3B;
+            regs.h = 0x1E;
+
+            setFlag(Flag.OVERFLOW, true);
+
+            adc(regs.h);
+            assert(regs.a == 0x00);
+            assert(!isFlagSet(Flag.SUBTRACTION));
+            assert(isFlagSet(Flag.ZERO));
+            assert(isFlagSet(Flag.HALF_OVERFLOW));
+            assert(isFlagSet(Flag.OVERFLOW));
+        }
+     }
 
     /**
      * Adc the 8-bit value stored in memory at the address stored in register HL to register A
      */
-    private void adcReference() {
+    @safe private void adcReference() {
         adc(mmu.readByte(regs.hl));
     }
 
     /**
      * Adc the next 8-bit value (after the opcode) to register A
      */
-    private void adcImmediate() {
+    @safe private void adcImmediate() {
         adc(mmu.readByte(regs.sp));
         regs.sp++;
     }
+
+    @safe private void sub(ubyte src) {
+        setFlag(Flag.SUBTRACTION, true);
+
+        setFlag(Flag.OVERFLOW, src > regs.a); // overflow if reg > a, so subtraction would result in a neg number
+
+        setFlag(Flag.HALF_OVERFLOW, (src & 0x0F) > (regs.a & 0x0F)); // same but for the last nibble
+
+        regs.a -= src;
+
+        setFlag(Flag.ZERO, regs.a == 0);
+    }
+
+
+    /**
+     * Subtract the 8-bit value stored in memory at the address stored in register HL from register A
+     */
+    @safe private void subReference() {
+        sub(mmu.readByte(regs.hl));
+    }
+
+    @safe private void sbc(ubyte src) {
+        // We can't just call sub(src + carry) because if the ubyte overflows to 0 when adding carry, the GB's overflow bit won't get set among other problems
+        // TODO check what real hardware does
+
+        immutable ubyte c = isFlagSet(Flag.OVERFLOW) ? 1 : 0;
+
+        immutable ushort subtrahend = src + c;
+        
+        setFlag(Flag.OVERFLOW, subtrahend > regs.a);
+
+        setFlag(Flag.HALF_OVERFLOW, (subtrahend & 0x0F) > (regs.a & 0x0F));
+
+        setFlag(Flag.SUBTRACTION, true);
+
+        regs.a = cast(ubyte) (regs.a - subtrahend);
+
+        setFlag(Flag.ZERO, regs.a == 0);
+    }
+
+    /**
+     * Sbc the 8-bit value stored in memory at the address stored in register HL from register A
+     */
+    @safe private void sbcReference() {
+        sbc(mmu.readByte(regs.hl));
+    }
+
+    @safe private void and(in ubyte src) {
+        regs.a &= src;
+
+        setFlag(Flag.ZERO, regs.a == 0);
+        setFlag(Flag.HALF_OVERFLOW, 1);
+        setFlag(Flag.SUBTRACTION, 0);
+        setFlag(Flag.OVERFLOW, 0);
+    }
+
+    @safe private void andReference() {
+        and(mmu.readByte(regs.hl));
+    }
+
+    @safe private void andImmediate() {
+        and(mmu.readByte(regs.sp));
+        regs.sp++;
+    }
+
+    @safe private void xor(in byte src) {
+        regs.a ^= src;
+        
+        setFlag(Flag.ZERO, regs.a == 0);
+        setFlag(Flag.HALF_OVERFLOW, 0);
+        setFlag(Flag.SUBTRACTION, 0);
+        setFlag(Flag.OVERFLOW, 0);
+    }
+
+    @safe private void xorReference() {
+        xor(mmu.readByte(regs.hl));
+    }
+
+    @safe private void xorImmediate() {
+        xor(mmu.readByte(regs.pc));
+        regs.pc++;
+    }
+
+    @safe private void or(in byte src) {
+        regs.a |= src;
+
+        setFlag(Flag.ZERO, regs.a == 0);
+        setFlag(Flag.HALF_OVERFLOW, 0);
+        setFlag(Flag.SUBTRACTION, 0);
+        setFlag(Flag.OVERFLOW, 0);
+    }
+
+    @safe private void orReference() {
+        or(mmu.readByte(regs.hl));
+    }
+
+    @safe private void orImmediate() {
+        or(mmu.readByte(regs.pc));
+        regs.pc++;
+    }
+
+    @safe private void cp(in byte src) {
+        setFlag(Flag.ZERO, regs.a == src);
+        setFlag(Flag.OVERFLOW, regs.a < src);
+        setFlag(Flag.HALF_OVERFLOW, (regs.a & 0x0F) < (src & 0x0F));
+        setFlag(Flag.SUBTRACTION, true);
+    }
+
+    @safe private void cpReference() {
+        cp(mmu.readByte(regs.hl));
+    }
+
+    @safe private void cpImmediate() {
+        cp(mmu.readByte(regs.pc));
+        regs.pc++;
+    }
+    
+    @safe private void inc(ref reg8 reg) {
+        setFlag(Flag.SUBTRACTION, true);
+        setFlag(Flag.HALF_OVERFLOW, (reg & 0x0F) == 0x0F);
+        reg = cast(reg8) (reg + 1);
+        setFlag(Flag.ZERO, reg == 0);
+    }
+
+    /**
+     * Increment the value of the memory pointed at by the address in HL
+     */
+    @safe private void incReference() {
+        ubyte mem = mmu.readByte(regs.hl);
+        inc(mem);
+        mmu.writeByte(regs.hl, mem);
+    }
+
+    @safe private void dec(ref reg8 reg) {
+        setFlag(Flag.SUBTRACTION, true);
+        setFlag(Flag.HALF_OVERFLOW, (reg & 0x0F) == 0);
+        reg = cast(reg8) (reg - 1);
+        setFlag(Flag.ZERO, reg == 0);
+    }
+
+    /**
+     * Decrement the value of the memory pointed at by the address in HL
+     */
+    @safe private void decReference() {
+        ubyte mem = mmu.readByte(regs.hl);
+        dec(mem);
+        mmu.writeByte(regs.hl, mem);
+    }
+
+    @safe private void inc(ref reg16 reg) {
+        reg++;
+    }
+
+    @safe private void dec(ref reg16 reg) {
+        reg--;
+    }
+
+    /**
+     * Rotate A left, with the previous 8th bit going to both the carry flag
+     * and to the new bit 0
+     */
+    @safe private void rlca() {
+        setFlag(Flag.SUBTRACTION, false);
+        setFlag(Flag.ZERO, false);
+        setFlag(Flag.HALF_OVERFLOW, false);
+
+        immutable bool leftmostBit = regs.a >> 7;
+
+        regs.a = cast(ubyte)((regs.a << 1) + leftmostBit);
+        setFlag(Flag.OVERFLOW, leftmostBit);
+    }
+    @safe unittest {  // Unit tests for RLCA
+        CPU c = new CPU(new MMU());
+        with(c) {
+            regs.a = 0x85;
+            setFlag(Flag.OVERFLOW, false);
+
+            rlca();
+
+            assert(regs.a == 0x0B);
+            assert(isFlagSet(Flag.OVERFLOW));
+            assert(!isFlagSet(Flag.ZERO));
+            assert(!isFlagSet(Flag.HALF_OVERFLOW));
+            assert(!isFlagSet(Flag.SUBTRACTION));
+        }
+    }
+
+    /**
+     * Rotate A left, with the previous 8th bit going to the carry flag
+     * and the previous carry flag going to the new bit 0
+     */
+    @safe private void rla() {
+        setFlag(Flag.SUBTRACTION, false);
+        setFlag(Flag.ZERO, false);
+        setFlag(Flag.HALF_OVERFLOW, false);
+
+        immutable bool leftmostBit = regs.a >> 7;
+        immutable bool carryFlag = isFlagSet(Flag.OVERFLOW);
+        
+        regs.a = cast(ubyte)((regs.a << 1)) | carryFlag;
+        setFlag(Flag.OVERFLOW, leftmostBit);
+    }
+    @safe unittest {  // Unit tests for RLA
+        CPU c = new CPU(new MMU());
+        with(c) {
+            regs.a = 0x05;
+            setFlag(Flag.OVERFLOW, true);
+
+            rla();
+
+            assert(regs.a == 0x0B);
+            assert(!isFlagSet(Flag.OVERFLOW));
+            assert(!isFlagSet(Flag.ZERO));
+            assert(!isFlagSet(Flag.HALF_OVERFLOW));
+            assert(!isFlagSet(Flag.SUBTRACTION));
+        }
+    }
+
+    /**
+     * Rotate A right, with the previous 0th bit going to both 
+     * the new 8th bit and the carry flag
+     */
+    @safe private void rrca() {
+        setFlag(Flag.SUBTRACTION, false);
+        setFlag(Flag.ZERO, false);
+        setFlag(Flag.HALF_OVERFLOW, false);
+
+        immutable bool rightmostBit = regs.a & 0b1;
+
+        regs.a = (regs.a >> 1) | (rightmostBit << 7);
+        setFlag(Flag.OVERFLOW, rightmostBit);
+    }
+    @safe unittest {
+        CPU c = new CPU(new MMU());
+        with(c) {
+            regs.a = 0x3B;
+            setFlag(Flag.OVERFLOW, false);
+
+            rrca();
+
+            assert(regs.a == 0x9D);
+            assert(isFlagSet(Flag.OVERFLOW));
+            assert(!isFlagSet(Flag.ZERO));
+            assert(!isFlagSet(Flag.HALF_OVERFLOW));
+            assert(!isFlagSet(Flag.SUBTRACTION));
+        }
+    }
+
+    /**
+     * Rotate A right, with the carry flag bit going to the new 8th bit
+     * and the old 0th bit going to the carry flag
+     */
+    @safe private void rra() {
+        setFlag(Flag.SUBTRACTION, false);
+        setFlag(Flag.ZERO, false);
+        setFlag(Flag.HALF_OVERFLOW, false);
+
+        immutable bool rightmostBit = regs.a & 0b1;
+        immutable bool carryBit = isFlagSet(Flag.OVERFLOW);
+        
+        regs.a = (regs.a >> 1) | (carryBit << 7);
+        setFlag(Flag.OVERFLOW, rightmostBit);
+    }
+    @safe unittest {
+        CPU c = new CPU(new MMU());
+        with(c) {
+            regs.a = 0x81;
+            setFlag(Flag.OVERFLOW, false);
+
+            rra();
+
+            assert(regs.a == 0x40);
+            assert(isFlagSet(Flag.OVERFLOW));
+            assert(!isFlagSet(Flag.ZERO));
+            assert(!isFlagSet(Flag.HALF_OVERFLOW));
+            assert(!isFlagSet(Flag.SUBTRACTION));
+        }
+    }
+
+    @safe private void jumpImmediate() {
+        regs.pc = mmu.readShort(regs.pc);
+        // No need to increment pc to compensate for the immediate value because we jumped
+    }
+
+    /**
+     * Jump to the immediate address if the zero flag is set
+     */
+    @safe private void jumpImmediateZ() {
+        if(isFlagSet(Flag.ZERO)) {
+            jumpImmediate();
+        } else { // Update PC to account for theoretically reading a 16-bit immediate
+            regs.pc += 2;
+        }
+    }
+
+    /**
+     * Jump to the immediate address if the zero flag is not set
+     */
+    @safe private void jumpImmediateNZ() {
+        if(!isFlagSet(Flag.ZERO)) {
+            jumpImmediate();
+        } else { // Update PC to account for theoretically reading a 16-bit immediate
+            regs.pc += 2;
+        }
+    }
+
+    /**
+     * Jump to the immediate address if the carry flag is set
+     */
+    @safe private void jumpImmediateC() {
+        if(isFlagSet(Flag.OVERFLOW)) {
+            jumpImmediate();
+        } else { // Update PC to account for theoretically reading a 16-bit immediate
+            regs.pc += 2;
+        }
+    }
+
+    /**
+     * Jump to the immediate address if the carry flag is not set
+     */
+    @safe private void jumpImmediateNC() {
+        if(!isFlagSet(Flag.OVERFLOW)) {
+            jumpImmediate();
+        } else { // Update PC to account for theoretically reading a 16-bit immediate
+            regs.pc += 2;
+        }
+    }
+
+    /**
+     * Despite the misleading disassembly, this instruction doesn't jump to
+     * the address specified by the data referenced by HL,
+     * it actually jumps to the address stored in HL
+     */
+    @safe private void jumpHL() {
+        regs.pc = regs.hl;
+    }
+
+    /**
+     * Add the immediate 8-bit value (interpreted as signed two's complement) to the PC
+     */
+    @safe private void jumpRelativeImmediate() {
+        // Double cast to force a sign extension on the unsigned value
+        regs.pc += cast(short)(cast(byte)(mmu.readByte(regs.sp)));
+    }
+
+    /**
+     * JR if the zero flag is set
+     */
+    @safe private void jumpRelativeImmediateZ() {
+        if(isFlagSet(Flag.ZERO)) {
+            jumpRelativeImmediate();
+        } else { // Update PC to account for theoretically reading an 8-bit immediate
+            regs.pc += 1;
+        }
+    }
+
+    /**
+     * JR if the zero flag is not set
+     */
+    @safe private void jumpRelativeImmediateNZ() {
+        if(!isFlagSet(Flag.ZERO)) {
+            jumpRelativeImmediate();
+        } else { // Update PC to account for theoretically reading an 8-bit immediate
+            regs.pc += 1;
+        }
+    }
+
+    /**
+     * JR if the carry flag is set
+     */
+    @safe private void jumpRelativeImmediateC() {
+        if(isFlagSet(Flag.OVERFLOW)) {
+            jumpRelativeImmediate();
+        } else { // Update PC to account for theoretically reading an 8-bit immediate
+            regs.pc += 1;
+        }
+    }
+
+    /**
+     * JR if the carry flag is not set
+     */
+    @safe private void jumpRelativeImmediateNC() {
+        if(!isFlagSet(Flag.OVERFLOW)) {
+            jumpRelativeImmediate();
+        } else { // Update PC to account for theoretically reading an 8-bit immediate
+            regs.pc += 1;
+        }
+    }
+
+    /**
+     * Calculate the one's complement of the register
+     * and store it in itself
+     */
+    @safe private void complement(ref reg8 src) {
+        src = ~src;
+    }
+
+    /**
+     * Invert the specified flag in the flags register
+     */
+    @safe private void complementFlag(in Flag f) {
+        // You look really nice today Ms. Carry
+
+        toggleFlag(f);
+    }
+
+    // TODO use function templates for the functions that are the same between reg8 and reg16
 
 }

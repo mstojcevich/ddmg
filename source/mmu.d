@@ -9,7 +9,7 @@ private const WORK_RAM_SHADOW_END   = 0xFDFF;
  * Exception to be thrown when a caller tries to access a memory address not mapped by the MMU
  */
 class UnmappedMemoryAccessException : Exception {
-    this(size_t addr) {
+    @safe this(size_t addr) {
         super("Tried to read unmapped memory at 0x" ~ to!string(addr, 16));
     }
 }
@@ -25,7 +25,11 @@ class MMU {
     /**
      * Read a 8-bit value in memory at the specified address
     */
-    public const ubyte readByte(in size_t address) {
+    @safe public const ubyte readByte(in size_t address)
+    in {
+        assert(address <= 0xFFFF);
+    }
+    body {
         if(WORK_RAM_BEGIN <= address && address <= WORK_RAM_END) {
             return workRam[address - WORK_RAM_BEGIN];
         }
@@ -39,13 +43,41 @@ class MMU {
     /**
      * Read a 16-bit value in memory at the specified address
      */
-    public const ushort readShort(in size_t address) {
+    @safe public const ushort readShort(in size_t address)
+    in {
+        assert(address <= 0xFFFF);
+    }
+    body {
         // Read from memory and correct for endianness, so the bytes are swapped
+        // TODO On little endian hosts, we can treat the array as an array of shorts and don't have to do bit operations like crazy
         return (readByte(cast(ushort)(address+1)) << 8) | readByte(address);
     }
 
-    public void writeByte(in size_t address, in ubyte val) {
-        workRam[address] = val;
+    @safe public void writeByte(in size_t address, in ubyte val) 
+    in {
+        assert(address <= 0xFFFF);
+    }
+    body {
+        if(WORK_RAM_BEGIN <= address && address <= WORK_RAM_END) {
+            workRam[address - WORK_RAM_BEGIN] = val;
+        }
+        if(WORK_RAM_SHADOW_BEGIN <= address && address <= WORK_RAM_SHADOW_END) {
+            workRam[address - WORK_RAM_SHADOW_BEGIN] = val;
+        }
+
+        throw new UnmappedMemoryAccessException(address);
+    }
+
+    @safe public void writeShort(in size_t address, in ushort val)
+    in {
+        assert(address <= 0xFFFF);
+    }
+    body {
+        // TODO On little endian hosts, we can treat the array as an array of shorts and don't have to do a two-part save
+        
+        // Bytes are swapped to correct for endianness
+        writeByte(address, val & 0x00FF);
+        writeByte(address + 1, val >> 8);
     }
 
 }

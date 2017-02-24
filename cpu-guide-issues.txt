@@ -1,0 +1,5 @@
+Issues that I've found with the CPU manual so far
+---
+
+RLCA lists that Z is set if the result is 0, while real hardware always resets Z
+RLA lists that Z is set if hte result is 0, while real hardware always resets Z
