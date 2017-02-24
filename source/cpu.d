@@ -110,7 +110,7 @@ class CPU {
             Instruction("INC (HL)",		&incReference),
             Instruction("DEC (HL)",		&decReference),
             Instruction("LD (HL),d8",	{storeImmediateInMemory(regs.hl);}),
-            Instruction("SCF",		    null),
+            Instruction("SCF",		    {setFlag(Flag.OVERFLOW, true);}),
             Instruction("JR C,r8",		&jumpRelativeImmediateC),
             Instruction("ADD HL,SP",	{add(regs.hl, regs.sp);}),
             Instruction("LD A,(HL-)",	{loadReferenceMinus(regs.a);}),
@@ -248,11 +248,11 @@ class CPU {
             Instruction("CP (HL)",		&cpReference),
             Instruction("CP A",		    {cp(regs.a);}),
             Instruction("RET NZ",		null),
-            Instruction("POP BC",		null),
+            Instruction("POP BC",		{popFromStack(regs.bc);}),
             Instruction("JP NZ,a16",	&jumpImmediateNZ),
             Instruction("JP a16",		&jumpImmediate),
             Instruction("CALL NZ,a16",	null),
-            Instruction("PUSH BC",		null),
+            Instruction("PUSH BC",		{pushToStack(regs.bc);}),
             Instruction("ADD A,d8",		&addImmediate),
             Instruction("RST 00H",		null),
             Instruction("RET Z",		null),
@@ -264,11 +264,11 @@ class CPU {
             Instruction("ADC A,d8",		&adcImmediate),
             Instruction("RST 08H",		null),
             Instruction("RET NC",		null),
-            Instruction("POP DE",		null),
+            Instruction("POP DE",		{popFromStack(regs.de);}),
             Instruction("JP NC,a16",	&jumpImmediateNC),
             Instruction("XX",		    null),
             Instruction("CALL NC,a16",	null),
-            Instruction("PUSH DE",		null),
+            Instruction("PUSH DE",		{pushToStack(regs.de);}),
             Instruction("SUB d8",		null),
             Instruction("RST 10H",		null),
             Instruction("RET C",		null),
@@ -277,14 +277,14 @@ class CPU {
             Instruction("XX",		    null),
             Instruction("CALL C,a16",	null),
             Instruction("XX",		    null),
-            Instruction("SBC A,d8",		null),
+            Instruction("SBC A,d8",		&sbcImmediate),
             Instruction("RST 18H",		null),
             Instruction("LDH (a8),A",	null),
-            Instruction("POP HL",		null),
-            Instruction("LD (C),A",		null),
+            Instruction("POP HL",		{popFromStack(regs.hl);}),
+            Instruction("LD (C),A",		&ldCA),
             Instruction("XX",		    null),
             Instruction("XX",		    null),
-            Instruction("PUSH HL",		null),
+            Instruction("PUSH HL",		{pushToStack(regs.hl);}),
             Instruction("AND d8",		&andImmediate),
             Instruction("RST 20H",		null),
             Instruction("ADD SP,r8",	&offsetStackPointerImmediate),
@@ -296,11 +296,11 @@ class CPU {
             Instruction("XOR d8",		&xorImmediate),
             Instruction("RST 28H",		null),
             Instruction("LDH A,(a8)",	null),
-            Instruction("POP AF",		null),
-            Instruction("LD A,(C)",		null),
+            Instruction("POP AF",		{popFromStack(regs.af);}),
+            Instruction("LD A,(C)",		&ldAC),
             Instruction("DI",		    null),
             Instruction("XX",		    null),
-            Instruction("PUSH AF",		null),
+            Instruction("PUSH AF",		{pushToStack(regs.af);}),
             Instruction("OR d8",		&orImmediate),
             Instruction("RST 30H",		null),
             Instruction("LD HL,SP+r8",	null),
@@ -312,6 +312,19 @@ class CPU {
             Instruction("CP d8",		&cpImmediate),
             Instruction("RST 38H",		null),
         ];
+
+        int totalInstrs = 0;
+        int implInstrs = 0;
+        foreach(instr; instructions) {
+            if(instr.disassembly != "XX") {
+                totalInstrs++;
+
+                if(instr.impl != null) {
+                    implInstrs++;
+                }
+            }
+        }
+        writefln("Initializing CPU with %d%% (%d / %d) regular instruction support", cast(int)((cast(float)implInstrs/totalInstrs)*100), implInstrs, totalInstrs);
 
         this.mmu = mmu;
 
@@ -714,12 +727,23 @@ class CPU {
     }
 
     /**
-     * Sbc the 8-bit value stored in memory at the address stored in register HL from register A
+     * SBC the 8-bit value stored in memory at the address stored in register HL from register A
      */
     @safe private void sbcReference() {
         sbc(mmu.readByte(regs.hl));
     }
 
+    /**
+     * SBC the 8-bit immediate value from register A
+     */
+    @safe private void sbcImmediate() {
+        sbc(mmu.readByte(regs.sp));
+        regs.sp++;
+    }
+
+    /**
+     * Bitwise and a value with register A and store in register A
+     */
     @safe private void and(in ubyte src) {
         regs.a &= src;
 
@@ -738,6 +762,9 @@ class CPU {
         regs.sp++;
     }
 
+    /**
+     * Bitwise xor a value with register A and store in register A
+     */
     @safe private void xor(in byte src) {
         regs.a ^= src;
         
@@ -756,6 +783,9 @@ class CPU {
         regs.pc++;
     }
 
+    /**
+     * Bitwise or a value with register A and store in register A
+     */
     @safe private void or(in byte src) {
         regs.a |= src;
 
@@ -774,6 +804,9 @@ class CPU {
         regs.pc++;
     }
 
+    /**
+     * Set the flags as if a number was subtracted from A, without actually storing the result of the subtraction
+     */
     @safe private void cp(in byte src) {
         setFlag(Flag.ZERO, regs.a == src);
         setFlag(Flag.OVERFLOW, regs.a < src);
@@ -1077,6 +1110,36 @@ class CPU {
         // You look really nice today Ms. Carry
 
         toggleFlag(f);
+    }
+
+    /**
+     * Decrement the stack pointer by 2, then write a 16-bit value to the stack
+     */
+    @safe private void pushToStack(in ushort src) {
+        regs.sp -= 2;
+        mmu.writeShort(regs.sp, src);
+    }
+
+    /**
+     * Read a 16-bit value from the stack into a register, then increment the stack pointer by 2
+     */
+    @safe private void popFromStack(out reg16 dest) {
+        dest = mmu.readShort(regs.sp);
+        regs.sp += 2;
+    }
+
+    /**
+     * Load the content of register A to the memory location at FF00 + (value of register C)
+     */
+    @safe private void ldCA() {
+        storeInMemory(0xFF00 + regs.c, regs.a);
+    }
+
+    /**
+     * Load the content at memory location FF00 + (value of register C) to register A
+     */
+    @safe private void ldAC() {
+        loadFromMemory(regs.a, 0xFF00 + regs.c);
     }
 
     // TODO use function templates for the functions that are the same between reg8 and reg16
