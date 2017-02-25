@@ -7,6 +7,7 @@ class Gameboy {
     private const CPU cpu;
 
     this() {
+        this.clock = new Clock();
         this.mmu = new MMU();
         this.cpu = new CPU(this.mmu, this.clock);
     }

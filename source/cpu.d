@@ -25,7 +25,7 @@ class CPU {
     private MMU mmu;
     private Clock clk;
 
-    @safe this(ref MMU mmu, ref Clock clk) {
+    @safe this(MMU mmu, Clock clk) {
         // 0 in the t-clock will mean it's calculated conditionally later
         this.instructions = [
             Instruction("NOP",          4, &nop),
@@ -547,7 +547,7 @@ class CPU {
         regs.a = outResult;
     }
     @safe unittest { // Unit test for ADD A, n
-        CPU c = new CPU(new MMU());
+        CPU c = new CPU(new MMU(), new Clock());
 
         with(c) {
             // Test 1, 0x3A + 0xC6
@@ -621,7 +621,7 @@ class CPU {
         regs.a = outResult;
      }
      @safe unittest { // Unit test for ADC A, n
-        CPU c = new CPU(new MMU());
+        CPU c = new CPU(new MMU(), new Clock());
 
         with(c) {
             regs.a = 0xE1;
@@ -882,7 +882,7 @@ class CPU {
         setFlag(Flag.OVERFLOW, leftmostBit);
     }
     @safe unittest {  // Unit tests for RLCA
-        CPU c = new CPU(new MMU());
+        CPU c = new CPU(new MMU(), new Clock());
         with(c) {
             regs.a = 0x85;
             setFlag(Flag.OVERFLOW, false);
@@ -913,7 +913,7 @@ class CPU {
         setFlag(Flag.OVERFLOW, leftmostBit);
     }
     @safe unittest {  // Unit tests for RLA
-        CPU c = new CPU(new MMU());
+        CPU c = new CPU(new MMU(), new Clock());
         with(c) {
             regs.a = 0x05;
             setFlag(Flag.OVERFLOW, true);
@@ -943,7 +943,7 @@ class CPU {
         setFlag(Flag.OVERFLOW, rightmostBit);
     }
     @safe unittest {
-        CPU c = new CPU(new MMU());
+        CPU c = new CPU(new MMU(), new Clock());
         with(c) {
             regs.a = 0x3B;
             setFlag(Flag.OVERFLOW, false);
@@ -974,7 +974,7 @@ class CPU {
         setFlag(Flag.OVERFLOW, rightmostBit);
     }
     @safe unittest {
-        CPU c = new CPU(new MMU());
+        CPU c = new CPU(new MMU(), new Clock());
         with(c) {
             regs.a = 0x81;
             setFlag(Flag.OVERFLOW, false);
