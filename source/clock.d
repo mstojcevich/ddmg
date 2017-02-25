@@ -2,8 +2,7 @@
  * Keeps track of how many cycles have elapsed
  */
 class Clock {
-    // TODO research why there are two types of ticks
-
+    
     /**
      * The numbers of cycles that have elapsed so far
      */
