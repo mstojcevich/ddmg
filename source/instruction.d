@@ -1,6 +1,5 @@
 struct Instruction {
     string disassembly;
-    uint mCycles;
-    uint tCycles;
+    uint cycles;
     @safe void delegate() impl;
 }
