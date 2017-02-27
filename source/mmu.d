@@ -1,16 +1,25 @@
 import std.conv;
 
-private const WORK_RAM_BEGIN        = 0xC000;
-private const WORK_RAM_END          = 0xDFFF;
+import cartridge;
 
-private const WORK_RAM_SHADOW_BEGIN = 0xE000;
-private const WORK_RAM_SHADOW_END   = 0xFDFF;
+private const WORK_RAM_BEGIN            = 0xC000;
+private const WORK_RAM_END              = 0xDFFF;
 
-private const ZERO_PAGE_BEGIN       = 0xFF80;
-private const ZERO_PAGE_END         = 0xFFFF;
+private const WORK_RAM_SHADOW_BEGIN     = 0xE000;
+private const WORK_RAM_SHADOW_END       = 0xFDFF;
 
-private const EXTERNAL_RAM_BEGIN    = 0xA000;
-private const EXTERNAL_RAM_END      = 0xBFFF;
+private const ZERO_PAGE_BEGIN           = 0xFF80;
+private const ZERO_PAGE_END             = 0xFFFF;
+
+private const EXTERNAL_RAM_BEGIN        = 0xA000;
+private const EXTERNAL_RAM_END          = 0xBFFF;
+
+private const CARTRIDGE_BANK_0_BEGIN    = 0x0000;
+private const CARTRIDGE_BANK_0_END      = 0x3FFF;
+private const CARTRIDGE_BANK_0_SIZE     = (CARTRIDGE_BANK_0_END - CARTRIDGE_BANK_0_BEGIN) + 1;
+
+private const CARTRIDGE_BANK_1_BEGIN    = 0x4000;
+private const CARTRIDGE_BANK_1_END      = 0x7FFF;
 
 /**
  * Exception to be thrown when a caller tries to access a memory address not mapped by the MMU
@@ -35,10 +44,16 @@ class MMU {
     // Not sure if this should be here or in a cartridge class...
     private ubyte[EXTERNAL_RAM_END - EXTERNAL_RAM_BEGIN + 1] externalRAM;
 
+    private Cartridge cartridge;
+
+    @safe this(Cartridge c) {
+        this.cartridge = c;
+    }
+
     /**
      * Read a 8-bit value in memory at the specified address
     */
-    @safe public const ubyte readByte(in size_t address)
+    @safe public ubyte readByte(in size_t address) const
     in {
         assert(address <= 0xFFFF);
     }
@@ -58,13 +73,21 @@ class MMU {
             return externalRAM[address - EXTERNAL_RAM_BEGIN];
         }
 
+        if(CARTRIDGE_BANK_0_BEGIN <= address && address <= CARTRIDGE_BANK_0_END) {
+            return cartridge.readROM(address - CARTRIDGE_BANK_0_BEGIN);
+        }
+
+        if(CARTRIDGE_BANK_1_BEGIN <= address && address <= CARTRIDGE_BANK_1_END) {
+            return cartridge.readROM(address - CARTRIDGE_BANK_1_BEGIN + CARTRIDGE_BANK_0_SIZE);
+        }
+
         throw new UnmappedMemoryAccessException(address);
     }
 
     /**
      * Read a 16-bit value in memory at the specified address
      */
-    @safe public const ushort readShort(in size_t address)
+    @safe public ushort readShort(in size_t address) const
     in {
         assert(address <= 0xFFFF);
     }

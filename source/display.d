@@ -8,19 +8,19 @@ import std.random;
 /**
  * The width of the Gameboy display in pixels
  */
-const auto GB_DISPLAY_WIDTH = 160;
+const GB_DISPLAY_WIDTH  = 160;
 
 /**
  * The height of the Gameboy display in pixels
  */
-const auto GB_DISPLAY_HEIGHT = 144;
+const GB_DISPLAY_HEIGHT = 144;
 
 /**
  * The total number of pixels on the Gameboy display
  *
  * Equivalent to GB_DISPLAY_WIDTH * GB_DISPLAY_HEIGHT
  */
-const auto GB_PIXEL_COUNT = GB_DISPLAY_WIDTH * GB_DISPLAY_HEIGHT;
+const GB_PIXEL_COUNT = GB_DISPLAY_WIDTH * GB_DISPLAY_HEIGHT;
 
 /**
  * A display to render on

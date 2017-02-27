@@ -41,7 +41,7 @@ class  Cartridge {
         writefln("Loaded ROM: %s - %d bytes large", title, cartridgeROM.length);
     }
 
-    @safe public ubyte readROM(size_t addr)
+    @safe public ubyte readROM(size_t addr) const
     in {
         assert(addr < 8192);
     }
