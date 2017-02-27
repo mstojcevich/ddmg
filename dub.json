@@ -1,3 +1,7 @@
 {
-	"name": "ddmg"
+	"name": "ddmg",
+	"dependencies": {
+        "derelict-glfw3": ">=3.1.0",
+        "derelict-gl3": ">=1.0.0"
+    }
 }

@@ -19,8 +19,9 @@ private template Register(string firstHalf, string secondHalf) {
         reg16 " ~ firstHalf ~ secondHalf ~ ";
 
         struct {
-            reg8 " ~ secondHalf ~ ";
-            reg8 " ~ firstHalf ~";
+            align(1):  // Pack the bytes right next to each other
+                reg8 " ~ secondHalf ~ ";
+                reg8 " ~ firstHalf ~";
         }
     }
     ";

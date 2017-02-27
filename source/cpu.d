@@ -1,5 +1,6 @@
 import std.stdio;
 import std.format;
+import std.exception;
 
 import mmu;
 import registers;
@@ -292,7 +293,7 @@ class CPU {
             if(instr.disassembly != "XX") {
                 totalInstrs++;
 
-                if(instr.impl != null) {
+                if(instr.impl !is null) {
                     implInstrs++;
                 } else {
                     writefln("%s not implemented", instr.disassembly);
@@ -319,9 +320,8 @@ class CPU {
         ubyte opcode = mmu.readByte(regs.pc);
 
         Instruction instr = instructions[opcode];
-        if(instr.impl == null) {
-            throw new Exception(format("Emulated code used unimplemented operation 0x%02X @ 0x%04X", opcode, regs.pc));
-        }
+        enforce(instr.impl !is null,
+            format("Emulated code used unimplemented operation 0x%02X @ 0x%04X", opcode, regs.pc));
 
         // Increment the program counter
         // Done before instruction execution so that jumps are easier. Pretty sure that's how it's done on real hardware too.
