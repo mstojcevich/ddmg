@@ -26,7 +26,7 @@ class CPU {
     private Clock clk;
 
     @safe this(MMU mmu, Clock clk) {
-        // 0 in the t-clock will mean it's calculated conditionally later
+        // 0 in the cycle count will mean it's calculated conditionally later
         this.instructions = [
             Instruction("NOP",          4, &nop),
             Instruction("LD BC,d16",    12, {loadImmediate(regs.bc);}),
@@ -1000,8 +1000,12 @@ class CPU {
     @safe private void jumpImmediateIfFlag(in Flag f, in bool set) {
         if(isFlagSet(f) == set) {
             jumpImmediate();
+
+            clk.spendCycles(16);
         } else { // Update PC to account for theoretically reading a 16-bit immediate
             regs.pc += 2;
+
+            clk.spendCycles(12);
         }
     }
 
@@ -1160,8 +1164,12 @@ class CPU {
     @safe private void callImmediateIfFlag(in Flag f, in bool set) {
         if(isFlagSet(f) == set) {
             callImmediate();
+
+            clk.spendCycles(24);
         } else {
             regs.pc += 2; // Compensate for theoretically reading an immediate short
+            
+            clk.spendCycles(12);
         }
     }
 
@@ -1178,6 +1186,10 @@ class CPU {
     @safe private void retIfFlag(in Flag f, in bool set) {
         if(isFlagSet(f) == set) {
             ret();
+
+            clk.spendCycles(20);
+        } else {
+            clk.spendCycles(8);
         }
     }
 

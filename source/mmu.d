@@ -2,8 +2,15 @@ import std.conv;
 
 private const WORK_RAM_BEGIN        = 0xC000;
 private const WORK_RAM_END          = 0xDFFF;
+
 private const WORK_RAM_SHADOW_BEGIN = 0xE000;
 private const WORK_RAM_SHADOW_END   = 0xFDFF;
+
+private const ZERO_PAGE_BEGIN       = 0xFF80;
+private const ZERO_PAGE_END         = 0xFFFF;
+
+private const EXTERNAL_RAM_BEGIN    = 0xA000;
+private const EXTERNAL_RAM_END      = 0xBFFF;
 
 /**
  * Exception to be thrown when a caller tries to access a memory address not mapped by the MMU
@@ -20,7 +27,13 @@ class UnmappedMemoryAccessException : Exception {
  */
 class MMU {
 
-    private ubyte[8192] workRam;
+    private ubyte[WORK_RAM_END - WORK_RAM_BEGIN + 1] workRam;
+
+    private ubyte[ZERO_PAGE_END - ZERO_PAGE_BEGIN + 1] zeroPage;
+
+    // External RAM provided by the cartridge
+    // Not sure if this should be here or in a cartridge class...
+    private ubyte[EXTERNAL_RAM_END - EXTERNAL_RAM_BEGIN + 1] externalRAM;
 
     /**
      * Read a 8-bit value in memory at the specified address
@@ -30,11 +43,19 @@ class MMU {
         assert(address <= 0xFFFF);
     }
     body {
+        if(ZERO_PAGE_BEGIN <= address && address <= ZERO_PAGE_END) {
+            return zeroPage[address - ZERO_PAGE_BEGIN];
+        }
+
         if(WORK_RAM_BEGIN <= address && address <= WORK_RAM_END) {
             return workRam[address - WORK_RAM_BEGIN];
         }
         if(WORK_RAM_SHADOW_BEGIN <= address && address <= WORK_RAM_SHADOW_END) {
             return workRam[address - WORK_RAM_SHADOW_BEGIN];
+        }
+
+        if(EXTERNAL_RAM_BEGIN <= address && address <= EXTERNAL_RAM_END) {
+            return externalRAM[address - EXTERNAL_RAM_BEGIN];
         }
 
         throw new UnmappedMemoryAccessException(address);
@@ -58,11 +79,19 @@ class MMU {
         assert(address <= 0xFFFF);
     }
     body {
+        if(ZERO_PAGE_BEGIN <= address && address <= ZERO_PAGE_END) {
+            zeroPage[address - ZERO_PAGE_BEGIN] = val;
+        }
+
         if(WORK_RAM_BEGIN <= address && address <= WORK_RAM_END) {
             workRam[address - WORK_RAM_BEGIN] = val;
         }
         if(WORK_RAM_SHADOW_BEGIN <= address && address <= WORK_RAM_SHADOW_END) {
             workRam[address - WORK_RAM_SHADOW_BEGIN] = val;
+        }
+
+        if(EXTERNAL_RAM_BEGIN <= address && address <= EXTERNAL_RAM_END) {
+            externalRAM[address - EXTERNAL_RAM_BEGIN] = val;
         }
 
         throw new UnmappedMemoryAccessException(address);

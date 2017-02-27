@@ -11,14 +11,14 @@ class Clock {
     /**
      * Get the number of cycles that have elapsed so far
      */
-    public int getElapsedCycles() {
+    @safe @property public int getElapsedCycles() {
         return cyclesElapsed;
     }
 
     /**
      * Cause the specified number of cycles to be elapsed
      */
-    public void spendCycles(int num)
+    @safe public void spendCycles(int num)
     in {
         assert(num >= 0);
     }
