@@ -105,7 +105,12 @@ class Display {
         return false;
     }
 
-    @safe void setPixel(ubyte x, ubyte y, ubyte r, ubyte g, ubyte b) {
+    @safe void setPixel(ubyte x, ubyte y, ubyte r, ubyte g, ubyte b)
+    in {
+        assert(x < GB_DISPLAY_WIDTH);
+        assert(y < GB_DISPLAY_HEIGHT);
+    }
+    body {
         int pixelNum = (y * GB_DISPLAY_WIDTH) + x;
 
         pixels[pixelNum].red = r;

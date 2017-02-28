@@ -41,9 +41,25 @@ class  Cartridge {
         writefln("Loaded ROM: %s - %d bytes large", title, cartridgeROM.length);
     }
 
+    @safe public this() {
+        cartridgeROM = new ubyte[0];
+
+        nintendoLogo = cartridgeROM[0 .. 0];
+        title = cast(const(char[])) cartridgeROM[0 .. 0];
+        cgbFlag = 0;
+        cartridgeType = 0;
+        headerRomSize = 0;
+        headerRamSize = 0;
+        destinationCode = 0;
+        oldLicenseeCode = 0;
+        romVersionNum = 0;
+        headerChecksum = 0;
+        globalChecksum = cartridgeROM[0 .. 0];
+    }
+
     @safe public ubyte readROM(size_t addr) const
     in {
-        assert(addr < 8192);
+        assert(addr < 32_768); // Max size of a ROM without bank-switching
     }
     body {
         return cartridgeROM[addr];

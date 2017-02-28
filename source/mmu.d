@@ -1,4 +1,5 @@
 import std.conv;
+import std.stdio;
 
 import cartridge;
 
@@ -26,7 +27,7 @@ private const CARTRIDGE_BANK_1_END      = 0x7FFF;
  */
 class UnmappedMemoryAccessException : Exception {
     @safe this(size_t addr) {
-        super("Tried to read unmapped memory at 0x" ~ to!string(addr, 16));
+        super("Tried to access unmapped memory at 0x" ~ to!string(addr, 16));
     }
 }
 
@@ -44,9 +45,9 @@ class MMU {
     // Not sure if this should be here or in a cartridge class...
     private ubyte[EXTERNAL_RAM_END - EXTERNAL_RAM_BEGIN + 1] externalRAM;
 
-    private Cartridge cartridge;
+    private const Cartridge cartridge;
 
-    @safe this(Cartridge c) {
+    @safe this(const Cartridge c) {
         this.cartridge = c;
     }
 
@@ -104,20 +105,20 @@ class MMU {
     body {
         if(ZERO_PAGE_BEGIN <= address && address <= ZERO_PAGE_END) {
             zeroPage[address - ZERO_PAGE_BEGIN] = val;
-        }
+        } else
 
         if(WORK_RAM_BEGIN <= address && address <= WORK_RAM_END) {
             workRam[address - WORK_RAM_BEGIN] = val;
-        }
+        } else
         if(WORK_RAM_SHADOW_BEGIN <= address && address <= WORK_RAM_SHADOW_END) {
             workRam[address - WORK_RAM_SHADOW_BEGIN] = val;
-        }
+        } else
 
         if(EXTERNAL_RAM_BEGIN <= address && address <= EXTERNAL_RAM_END) {
             externalRAM[address - EXTERNAL_RAM_BEGIN] = val;
+        } else {
+            throw new UnmappedMemoryAccessException(address);
         }
-
-        throw new UnmappedMemoryAccessException(address);
     }
 
     @safe public void writeShort(in size_t address, in ushort val)

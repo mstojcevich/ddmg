@@ -6,6 +6,7 @@ import mmu;
 import registers;
 import instruction;
 import clock;
+import cartridge;
 
 private enum Flag : ubyte {
     ZERO            = 0b10000000, // Set to 1 when the result of an operation is 0
@@ -61,7 +62,7 @@ class CPU {
             Instruction("DEC E",		4, {dec(regs.e);}),
             Instruction("LD E,d8",		8, {loadImmediate(regs.e);}),
             Instruction("RRA",		    4, &rra),
-            Instruction("JR NZ,r8",		0, &jumpRelativeImmediateNZ),
+            Instruction("JR NZ,r8",		0, {jumpRelativeImmediateIfFlag(Flag.ZERO, false);}),
             Instruction("LD HL,d16",	12, {loadImmediate(regs.hl);}),
             Instruction("LD (HL+),A",	8, &storeAInMemoryHLPlus),
             Instruction("INC HL",		8, {inc(regs.hl);}),
@@ -69,7 +70,7 @@ class CPU {
             Instruction("DEC H",		4, {dec(regs.h);}),
             Instruction("LD H,d8",		8, {loadImmediate(regs.h);}),
             Instruction("DAA",		    4, null),
-            Instruction("JR Z,r8",		0, &jumpRelativeImmediateZ),
+            Instruction("JR Z,r8",		0, {jumpRelativeImmediateIfFlag(Flag.ZERO, true);}),
             Instruction("ADD HL,HL",	8, {add(regs.hl, regs.hl);}),
             Instruction("LD A,(HL+)",	8, {loadReferencePlus(regs.a);}),
             Instruction("DEC HL",		8, {dec(regs.hl);}),
@@ -77,7 +78,7 @@ class CPU {
             Instruction("DEC L",		4, {dec(regs.l);}),
             Instruction("LD L,d8",		8, {loadImmediate(regs.l);}),
             Instruction("CPL",		    4, {complement(regs.a);}),
-            Instruction("JR NC,r8",		0, &jumpRelativeImmediateNC),
+            Instruction("JR NC,r8",		0, {jumpRelativeImmediateIfFlag(Flag.OVERFLOW, false);}),
             Instruction("LD SP,d16",	12, {loadImmediate(regs.sp);}),
             Instruction("LD (HL-),A",	8, &storeAInMemoryHLMinus),
             Instruction("INC SP",		8, {inc(regs.sp);}),
@@ -85,7 +86,7 @@ class CPU {
             Instruction("DEC (HL)",		1, &decReference),
             Instruction("LD (HL),d8",	12, {storeImmediateInMemory(regs.hl);}),
             Instruction("SCF",		    4, {setFlag(Flag.OVERFLOW, true);}),
-            Instruction("JR C,r8",		0, &jumpRelativeImmediateC),
+            Instruction("JR C,r8",		0, {jumpRelativeImmediateIfFlag(Flag.OVERFLOW, true);}),
             Instruction("ADD HL,SP",	8, {add(regs.hl, regs.sp);}),
             Instruction("LD A,(HL-)",	8, {loadReferenceMinus(regs.a);}),
             Instruction("DEC SP",		8, {dec(regs.sp);}),
@@ -317,9 +318,19 @@ class CPU {
 
     @safe void step() {
         // Fetch the operation in memory
-        ubyte opcode = mmu.readByte(regs.pc);
+        immutable ubyte opcode = mmu.readByte(regs.pc);
 
         Instruction instr = instructions[opcode];
+
+        if(regs.pc == 0x029A) {
+            writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
+            writefln("PC: %04X\tSP: %04X", regs.pc, regs.sp);
+            writefln("@ %04X: %02X -> %s", regs.pc, opcode, instr.disassembly);
+            writeln();
+            
+            return;
+        }
+
         enforce(instr.impl !is null,
             format("Emulated code used unimplemented operation 0x%02X @ 0x%04X", opcode, regs.pc));
 
@@ -328,6 +339,7 @@ class CPU {
         regs.pc++;
 
         instr.impl(); // Execute the operation
+
     }
 
     // A debug function for printing the flag statuses
@@ -547,7 +559,7 @@ class CPU {
         regs.a = outResult;
     }
     @safe unittest { // Unit test for ADD A, n
-        CPU c = new CPU(new MMU(), new Clock());
+        CPU c = new CPU(new MMU(new Cartridge()), new Clock());
 
         with(c) {
             // Test 1, 0x3A + 0xC6
@@ -621,7 +633,7 @@ class CPU {
         regs.a = outResult;
      }
      @safe unittest { // Unit test for ADC A, n
-        CPU c = new CPU(new MMU(), new Clock());
+        CPU c = new CPU(new MMU(new Cartridge()), new Clock());
 
         with(c) {
             regs.a = 0xE1;
@@ -882,7 +894,7 @@ class CPU {
         setFlag(Flag.OVERFLOW, leftmostBit);
     }
     @safe unittest {  // Unit tests for RLCA
-        CPU c = new CPU(new MMU(), new Clock());
+        CPU c = new CPU(new MMU(new Cartridge()), new Clock());
         with(c) {
             regs.a = 0x85;
             setFlag(Flag.OVERFLOW, false);
@@ -913,7 +925,7 @@ class CPU {
         setFlag(Flag.OVERFLOW, leftmostBit);
     }
     @safe unittest {  // Unit tests for RLA
-        CPU c = new CPU(new MMU(), new Clock());
+        CPU c = new CPU(new MMU(new Cartridge()), new Clock());
         with(c) {
             regs.a = 0x05;
             setFlag(Flag.OVERFLOW, true);
@@ -943,7 +955,7 @@ class CPU {
         setFlag(Flag.OVERFLOW, rightmostBit);
     }
     @safe unittest {
-        CPU c = new CPU(new MMU(), new Clock());
+        CPU c = new CPU(new MMU(new Cartridge()), new Clock());
         with(c) {
             regs.a = 0x3B;
             setFlag(Flag.OVERFLOW, false);
@@ -974,7 +986,7 @@ class CPU {
         setFlag(Flag.OVERFLOW, rightmostBit);
     }
     @safe unittest {
-        CPU c = new CPU(new MMU(), new Clock());
+        CPU c = new CPU(new MMU(new Cartridge()), new Clock());
         with(c) {
             regs.a = 0x81;
             setFlag(Flag.OVERFLOW, false);
@@ -1022,51 +1034,21 @@ class CPU {
      * Add the immediate 8-bit value (interpreted as signed two's complement) to the PC
      */
     @safe private void jumpRelativeImmediate() {
-        // Double cast to force a sign extension on the unsigned value
-        regs.pc += cast(short)(cast(byte)(mmu.readByte(regs.pc)));
+        regs.pc += cast(byte)(mmu.readByte(regs.pc)) + 1; // Casting to signed
     }
 
     /**
-     * JR if the zero flag is set
+     * JR if the specified flag is set/unset
      */
-    @safe private void jumpRelativeImmediateZ() {
-        if(isFlagSet(Flag.ZERO)) {
+    @safe private void jumpRelativeImmediateIfFlag(Flag f, bool set) {
+        if(isFlagSet(f) == set) {
             jumpRelativeImmediate();
-        } else { // Update PC to account for theoretically reading an 8-bit immediate
+            
+            clk.spendCycles(12);
+        } else {
             regs.pc += 1;
-        }
-    }
 
-    /**
-     * JR if the zero flag is not set
-     */
-    @safe private void jumpRelativeImmediateNZ() {
-        if(!isFlagSet(Flag.ZERO)) {
-            jumpRelativeImmediate();
-        } else { // Update PC to account for theoretically reading an 8-bit immediate
-            regs.pc += 1;
-        }
-    }
-
-    /**
-     * JR if the carry flag is set
-     */
-    @safe private void jumpRelativeImmediateC() {
-        if(isFlagSet(Flag.OVERFLOW)) {
-            jumpRelativeImmediate();
-        } else { // Update PC to account for theoretically reading an 8-bit immediate
-            regs.pc += 1;
-        }
-    }
-
-    /**
-     * JR if the carry flag is not set
-     */
-    @safe private void jumpRelativeImmediateNC() {
-        if(!isFlagSet(Flag.OVERFLOW)) {
-            jumpRelativeImmediate();
-        } else { // Update PC to account for theoretically reading an 8-bit immediate
-            regs.pc += 1;
+            clk.spendCycles(8);
         }
     }
 
