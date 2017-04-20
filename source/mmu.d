@@ -1,7 +1,7 @@
 import std.conv;
 import std.stdio;
 
-import cartridge;
+import cartridge, gpu;
 
 private const WORK_RAM_BEGIN            = 0xC000;
 private const WORK_RAM_END              = 0xDFFF;
@@ -10,7 +10,7 @@ private const WORK_RAM_SHADOW_BEGIN     = 0xE000;
 private const WORK_RAM_SHADOW_END       = 0xFDFF;
 
 private const ZERO_PAGE_BEGIN           = 0xFF80;
-private const ZERO_PAGE_END             = 0xFFFF;
+private const ZERO_PAGE_END             = 0xFFFE;
 
 private const EXTERNAL_RAM_BEGIN        = 0xA000;
 private const EXTERNAL_RAM_END          = 0xBFFF;
@@ -21,6 +21,12 @@ private const CARTRIDGE_BANK_0_SIZE     = (CARTRIDGE_BANK_0_END - CARTRIDGE_BANK
 
 private const CARTRIDGE_BANK_1_BEGIN    = 0x4000;
 private const CARTRIDGE_BANK_1_END      = 0x7FFF;
+
+private const VRAM_BEGIN                = 0x8000;
+private const VRAM_END                  = 0x9FFF;
+
+private const OAM_BEGIN                 = 0xFE00;
+private const OAM_END                   = 0xFE9F;
 
 /**
  * Exception to be thrown when a caller tries to access a memory address not mapped by the MMU
@@ -46,9 +52,11 @@ class MMU {
     private ubyte[EXTERNAL_RAM_END - EXTERNAL_RAM_BEGIN + 1] externalRAM;
 
     private const Cartridge cartridge;
+    private GPU gpu;
 
-    @safe this(const Cartridge c) {
+    @safe this(const Cartridge c, GPU g) {
         this.cartridge = c;
+        this.gpu = g;
     }
 
     /**
@@ -80,6 +88,37 @@ class MMU {
 
         if(CARTRIDGE_BANK_1_BEGIN <= address && address <= CARTRIDGE_BANK_1_END) {
             return cartridge.readROM(address - CARTRIDGE_BANK_1_BEGIN + CARTRIDGE_BANK_0_SIZE);
+        }
+
+        if(VRAM_BEGIN <= address && address <= VRAM_END) {
+            gpu.getVRAM(cast(ushort)(address - VRAM_BEGIN));
+        }
+        
+        if(OAM_BEGIN <= address && address <= OAM_END) {
+            gpu.getOAM(cast(ushort)(address - OAM_BEGIN));
+        }
+
+        if(address == 0xFF40) {
+            return gpu.getLCDControl();
+        }
+        if(address == 0xFF44) { // Reset the current scanline if the CPU tries to write to it
+            return gpu.getCurScanline();
+        }
+        if(address == 0xFF45) {
+            return gpu.getScanlineCompare();
+        }
+        if(address == 0xFF41) {
+            return gpu.getLCDStatus();
+        }
+        if(address == 0xFF42) {
+            return gpu.getScrollY();
+        }
+        if(address == 0xFF43) {
+            return gpu.getScrollX();
+        }
+
+        debug {
+            writefln("UNIMPLEMENTED : Reading address %04X", address);
         }
 
         throw new UnmappedMemoryAccessException(address);
@@ -116,7 +155,34 @@ class MMU {
 
         if(EXTERNAL_RAM_BEGIN <= address && address <= EXTERNAL_RAM_END) {
             externalRAM[address - EXTERNAL_RAM_BEGIN] = val;
+        } else 
+
+        if(VRAM_BEGIN <= address && address <= VRAM_END) {
+            gpu.setVRAM(cast(ushort)(address - VRAM_BEGIN), val);
+        } else
+        
+        if(OAM_BEGIN <= address && address <= OAM_END) {
+            gpu.setOAM(cast(ushort)(address - OAM_BEGIN), val);
+        } else
+
+        if(address == 0xFF40) {
+            gpu.setLCDControl(val);
+        } else if(address == 0xFF44) { // Reset the current scanline if the CPU tries to write to it
+            gpu.resetCurScanline();
+        } else if(address == 0xFF45) {
+            gpu.setScanlineCompare(val);
+        } else if(address == 0xFF41) {
+            gpu.setLCDStatus(val);
+        } else if(address == 0xFF42) {
+            gpu.setScrollX(val);
+        } else if(address == 0xFF43) {
+            gpu.setScrollY(val);
+
         } else {
+            debug {
+                writefln("UNIMPLEMENTED : Writing %02X at address %04X", val, address);
+            }
+
             throw new UnmappedMemoryAccessException(address);
         }
     }

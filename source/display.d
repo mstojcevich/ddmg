@@ -36,13 +36,24 @@ class Display {
     
     private Color[GB_PIXEL_COUNT] pixels;
 
+    /**
+     * THe color palette of the Gameboy
+     */
+    private Color[4] palette = [
+        {255, 255, 255},
+        {192, 192, 192},
+        {96, 96, 96},
+        {0, 0, 0}
+    ];
+
     this() {
         pixels = new Color[GB_PIXEL_COUNT];
 
+        Color white = {255, 255, 255};
         // Initialize the pixels all to white
         for(ubyte x = 0; x < GB_DISPLAY_WIDTH; x++) {
             for(ubyte y = 0; y < GB_DISPLAY_HEIGHT; y++) {
-                setPixel(x, y, 255, 255, 255);
+                setPixel(x, y, white);
             }
         }
 
@@ -105,7 +116,7 @@ class Display {
         return false;
     }
 
-    @safe void setPixel(ubyte x, ubyte y, ubyte r, ubyte g, ubyte b)
+    @safe void setPixel(in ubyte x, in ubyte y, in Color c)
     in {
         assert(x < GB_DISPLAY_WIDTH);
         assert(y < GB_DISPLAY_HEIGHT);
@@ -113,13 +124,19 @@ class Display {
     body {
         int pixelNum = (y * GB_DISPLAY_WIDTH) + x;
 
-        pixels[pixelNum].red = r;
-        pixels[pixelNum].green = g;
-        pixels[pixelNum].blue = b;
+        pixels[pixelNum] = c;
+    }
+
+    @safe void setPixelGB(in ubyte x, in ubyte y, in ubyte value)
+    in {
+        assert(value <= 3);
+    }
+    body {
+        setPixel(x, y, palette[value]);
     }
 }
 
-private struct Color {
+struct Color {
     align(1):
         ubyte red, green, blue;
 }

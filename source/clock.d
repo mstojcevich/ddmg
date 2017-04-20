@@ -6,13 +6,13 @@ class Clock {
     /**
      * The numbers of cycles that have elapsed so far
      */
-    private int cyclesElapsed = 0;
+    private int elapsedCycles = 0;
 
     /**
      * Get the number of cycles that have elapsed so far
      */
     @safe @property public int getElapsedCycles() {
-        return cyclesElapsed;
+        return elapsedCycles;
     }
 
     /**
@@ -23,6 +23,6 @@ class Clock {
         assert(num >= 0);
     }
     body {
-        this.cyclesElapsed += num;
+        this.elapsedCycles += num;
     }
 }

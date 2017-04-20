@@ -7,6 +7,8 @@ import registers;
 import instruction;
 import clock;
 import cartridge;
+import gpu;
+import display;
 
 private enum Flag : ubyte {
     ZERO            = 0b10000000, // Set to 1 when the result of an operation is 0
@@ -322,13 +324,11 @@ class CPU {
 
         Instruction instr = instructions[opcode];
 
-        if(regs.pc == 0x029A) {
+        if(false) {
             writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
             writefln("PC: %04X\tSP: %04X", regs.pc, regs.sp);
             writefln("@ %04X: %02X -> %s", regs.pc, opcode, instr.disassembly);
             writeln();
-            
-            return;
         }
 
         enforce(instr.impl !is null,
@@ -558,8 +558,9 @@ class CPU {
         // Result with the extra bits dropped
         regs.a = outResult;
     }
-    @safe unittest { // Unit test for ADD A, n
-        CPU c = new CPU(new MMU(new Cartridge()), new Clock());
+    @system unittest { // Unit test for ADD A, n
+        Clock clk =  new Clock();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
 
         with(c) {
             // Test 1, 0x3A + 0xC6
@@ -632,8 +633,9 @@ class CPU {
         // Result with the extra bits dropped
         regs.a = outResult;
      }
-     @safe unittest { // Unit test for ADC A, n
-        CPU c = new CPU(new MMU(new Cartridge()), new Clock());
+     @system unittest { // Unit test for ADC A, n
+        Clock clk =  new Clock();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
 
         with(c) {
             regs.a = 0xE1;
@@ -893,8 +895,10 @@ class CPU {
         regs.a = cast(ubyte)((regs.a << 1) + leftmostBit);
         setFlag(Flag.OVERFLOW, leftmostBit);
     }
-    @safe unittest {  // Unit tests for RLCA
-        CPU c = new CPU(new MMU(new Cartridge()), new Clock());
+    @system unittest {  // Unit tests for RLCA
+        Clock clk =  new Clock();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+
         with(c) {
             regs.a = 0x85;
             setFlag(Flag.OVERFLOW, false);
@@ -924,8 +928,10 @@ class CPU {
         regs.a = cast(ubyte)((regs.a << 1)) | carryFlag;
         setFlag(Flag.OVERFLOW, leftmostBit);
     }
-    @safe unittest {  // Unit tests for RLA
-        CPU c = new CPU(new MMU(new Cartridge()), new Clock());
+    @system unittest {  // Unit tests for RLA
+        Clock clk =  new Clock();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+
         with(c) {
             regs.a = 0x05;
             setFlag(Flag.OVERFLOW, true);
@@ -954,8 +960,10 @@ class CPU {
         regs.a = (regs.a >> 1) | (rightmostBit << 7);
         setFlag(Flag.OVERFLOW, rightmostBit);
     }
-    @safe unittest {
-        CPU c = new CPU(new MMU(new Cartridge()), new Clock());
+    @system unittest {
+        Clock clk =  new Clock();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+
         with(c) {
             regs.a = 0x3B;
             setFlag(Flag.OVERFLOW, false);
@@ -985,8 +993,10 @@ class CPU {
         regs.a = (regs.a >> 1) | (carryBit << 7);
         setFlag(Flag.OVERFLOW, rightmostBit);
     }
-    @safe unittest {
-        CPU c = new CPU(new MMU(new Cartridge()), new Clock());
+    @system unittest {
+        Clock clk =  new Clock();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+
         with(c) {
             regs.a = 0x81;
             setFlag(Flag.OVERFLOW, false);
