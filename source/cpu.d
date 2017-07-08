@@ -331,14 +331,19 @@ class CPU {
             writeln();
         }
 
-        enforce(instr.impl !is null,
-            format("Emulated code used unimplemented operation 0x%02X @ 0x%04X", opcode, regs.pc));
+        //enforce(instr.impl !is null,
+        //    format("Emulated code used unimplemented operation 0x%02X @ 0x%04X", opcode, regs.pc));
 
         // Increment the program counter
         // Done before instruction execution so that jumps are easier. Pretty sure that's how it's done on real hardware too.
         regs.pc++;
 
-        instr.impl(); // Execute the operation
+        if(instr.impl !is null) {
+             instr.impl(); // Execute the operation
+        } else {
+            writefln("Program tried to execute instruction %s, which isn't defined", instr.disassembly);
+            writefln("The execution is probably tainted");
+        }
 
     }
 

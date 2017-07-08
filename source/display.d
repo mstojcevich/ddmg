@@ -32,6 +32,9 @@ const GB_PIXEL_COUNT = GB_DISPLAY_WIDTH * GB_DISPLAY_HEIGHT;
  */
 class Display {
 
+    private const DISPLAY_WIDTH = GB_DISPLAY_WIDTH * 4;
+    private const DISPLAY_HEIGHT = GB_DISPLAY_HEIGHT * 4;
+
     private GLFWwindow* window;
     
     private Color[GB_PIXEL_COUNT] pixels;
@@ -75,7 +78,7 @@ class Display {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
         // Create a window
-        window = glfwCreateWindow(160, 144, "DDMG", null, null); // 160x144 is Gameboy resolution
+        window = glfwCreateWindow(DISPLAY_WIDTH, DISPLAY_HEIGHT, "DDMG", null, null); // 160x144 is Gameboy resolution
         enforce!GLFWDisplayInitializeException(window !is null,
                 "GLFW window creation failed. Make sure you have up-to-date graphics drivers installed.");
         
@@ -94,8 +97,21 @@ class Display {
         glfwTerminate(); // Also frees allocated memory such as the window
     }
 
+    void resetFrameBuffer() {
+        Color white = {255, 255, 255};
+
+        // Initialize the pixels all to white
+        for(ubyte x = 0; x < GB_DISPLAY_WIDTH; x++) {
+            for(ubyte y = 0; y < GB_DISPLAY_HEIGHT; y++) {
+                setPixel(x, y, white);
+            }
+        }
+    }
+
     void drawFrame() {
         glfwPollEvents();
+
+        glPixelZoom(DISPLAY_WIDTH / GB_DISPLAY_WIDTH, DISPLAY_HEIGHT / GB_DISPLAY_HEIGHT);
 
         glDrawPixels(GB_DISPLAY_WIDTH, GB_DISPLAY_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, &pixels);
         
@@ -122,7 +138,7 @@ class Display {
         assert(y < GB_DISPLAY_HEIGHT);
     }
     body {
-        int pixelNum = (y * GB_DISPLAY_WIDTH) + x;
+        int pixelNum = ((GB_DISPLAY_HEIGHT - y - 1) * GB_DISPLAY_WIDTH) + x;
 
         pixels[pixelNum] = c;
     }

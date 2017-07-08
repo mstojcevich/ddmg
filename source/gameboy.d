@@ -21,8 +21,6 @@ class Gameboy {
             cpu.step();
             gpu.step();
 
-            display.drawFrame();
-
             if(display.shouldProgramTerminate()) {
                 break;
             }

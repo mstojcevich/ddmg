@@ -91,11 +91,11 @@ class MMU {
         }
 
         if(VRAM_BEGIN <= address && address <= VRAM_END) {
-            gpu.getVRAM(cast(ushort)(address - VRAM_BEGIN));
+            return gpu.getVRAM(cast(ushort)(address - VRAM_BEGIN));
         }
         
         if(OAM_BEGIN <= address && address <= OAM_END) {
-            gpu.getOAM(cast(ushort)(address - OAM_BEGIN));
+            return gpu.getOAM(cast(ushort)(address - OAM_BEGIN));
         }
 
         if(address == 0xFF40) {
@@ -116,12 +116,16 @@ class MMU {
         if(address == 0xFF43) {
             return gpu.getScrollX();
         }
+        if(address == 0xFF47) {
+            return gpu.backgroundPalette;
+        }
 
         debug {
             writefln("UNIMPLEMENTED : Reading address %04X", address);
+            return 0;
+        } else {
+            throw new UnmappedMemoryAccessException(address);
         }
-
-        throw new UnmappedMemoryAccessException(address);
     }
 
     /**
@@ -177,13 +181,15 @@ class MMU {
             gpu.setScrollX(val);
         } else if(address == 0xFF43) {
             gpu.setScrollY(val);
+        } else if(address == 0xFF47) {
+            gpu.backgroundPalette = val;
 
         } else {
             debug {
                 writefln("UNIMPLEMENTED : Writing %02X at address %04X", val, address);
             }
 
-            throw new UnmappedMemoryAccessException(address);
+            //throw new UnmappedMemoryAccessException(address);
         }
     }
 
