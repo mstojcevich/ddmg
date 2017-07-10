@@ -217,7 +217,9 @@ class GPU
      */
     private void updateCurLine()
     {
-        renderBackground(curScanline);
+        if(isControlFlagSet(LCDControlFlag.BG_DISPLAY)) {
+            renderBackground(curScanline);
+        }
     }
 
     /**
@@ -307,6 +309,10 @@ class GPU
     @safe @property ubyte getScanlineCompare() const
     {
         return this.scanlineCompare;
+    }
+
+    @safe private bool isLCDStatusFlagSet(in LCDStatusFlag f) {
+        return (lcdStatusRegister & f) != 0;
     }
 
     @safe private void setLCDStatusFlag(in LCDStatusFlag f, in bool set)
