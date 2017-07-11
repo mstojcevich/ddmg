@@ -217,7 +217,9 @@ class GPU
      */
     private void updateCurLine()
     {
-        renderBackground(curScanline);
+        if(isControlFlagSet(LCDControlFlag.BG_DISPLAY)) {
+            renderBackground(curScanline);
+        }
     }
 
     /**
