@@ -344,6 +344,7 @@ class CPU {
 
         if(instr.impl !is null) {
             instr.impl(); // Execute the operation
+            clk.spendCycles(instr.cycles);
         } else {
             writefln("Program tried to execute instruction %s, which isn't defined", instr.disassembly);
             writefln("The execution is probably tainted");
