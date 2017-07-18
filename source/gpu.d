@@ -113,7 +113,6 @@ class GPU
                     setState(GPUMode.VERT_BLANK);
 
                     // TODO vblank interrupt
-                    iuptHandler.fireInterrupt(Interrupts.VBLANK);
                 }
                 else
                 { // Go to OAM read
