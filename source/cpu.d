@@ -252,7 +252,7 @@ class CPU {
             Instruction("SUB d8",		8, &subImmediate),
             Instruction("RST 10H",		16, {rst(0x10);}),
             Instruction("RET C",		0, {retIfFlag(Flag.OVERFLOW, true);}),
-            Instruction("RETI",		    16, null),
+            Instruction("RETI",		    16, {ret(); iuptHandler.masterToggle = true;}),
             Instruction("JP C,a16",		0, {jumpImmediateIfFlag(Flag.OVERFLOW, true);}),
             Instruction("XX",		    0, null),
             Instruction("CALL C,a16",	0, {callImmediateIfFlag(Flag.OVERFLOW, true);}),
