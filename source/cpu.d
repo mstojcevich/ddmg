@@ -343,7 +343,7 @@ class CPU {
         regs.pc++;
 
         if(instr.impl !is null) {
-             instr.impl(); // Execute the operation
+            instr.impl(); // Execute the operation
         } else {
             writefln("Program tried to execute instruction %s, which isn't defined", instr.disassembly);
             writefln("The execution is probably tainted");
@@ -551,7 +551,7 @@ class CPU {
      * Add the next 8-bit value to the stack pointer
      */
     @safe private void offsetStackPointerImmediate() {
-        add(regs.sp, cast(short)(cast(byte)(mmu.readByte(regs.sp)))); // Casting twice is so that the sign will carry over to the short
+        add(regs.sp, cast(short)(cast(byte)(mmu.readByte(regs.pc)))); // Casting twice is so that the sign will carry over to the short
 
         setFlag(Flag.ZERO, false);
 
@@ -1166,7 +1166,7 @@ class CPU {
      */
     @safe private void callImmediate() {
         immutable ushort toCall = mmu.readShort(regs.pc);
-        regs.pc += 2; // Compensate for reading and immediate short
+        regs.pc += 2; // Compensate for reading an immediate short
         call(toCall);
     }
 
