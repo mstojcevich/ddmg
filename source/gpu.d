@@ -311,10 +311,6 @@ class GPU
         return this.scanlineCompare;
     }
 
-    @safe private bool isLCDStatusFlagSet(in LCDStatusFlag f) {
-        return (lcdStatusRegister & f) != 0;
-    }
-
     @safe private void setLCDStatusFlag(in LCDStatusFlag f, in bool set)
     {
         if (set)
