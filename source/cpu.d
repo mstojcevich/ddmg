@@ -355,6 +355,9 @@ class CPU {
             if(iuptHandler.shouldHandle(iupt)) {
                 rst(iupt.address);
                 iuptHandler.markHandled(iupt);
+                iuptHandler.masterToggle = false;
+
+                break;
             }
         }
     }

@@ -88,6 +88,7 @@ class GPU
         this.display = d;
         this.vram = new ubyte[8192];
         this.oam = new ubyte[160];
+        this.iuptHandler = ih;
 
         bgPalette = 0b00011011;
     }
@@ -111,7 +112,7 @@ class GPU
                     updateDisplay();
                     setState(GPUMode.VERT_BLANK);
 
-                    iuptHandler.fireInterrupt(Interrupts.VBLANK);
+                    // TODO vblank interrupt
                 }
                 else
                 { // Go to OAM read
@@ -218,6 +219,11 @@ class GPU
      */
     private void updateCurLine()
     {
+        // Don't worry about stuff off of the screen
+        if(curScanline > GB_DISPLAY_HEIGHT - 1) {
+            return;
+        }
+
         if(isControlFlagSet(LCDControlFlag.BG_DISPLAY)) {
             renderBackground(curScanline);
         }

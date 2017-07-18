@@ -123,8 +123,13 @@ class MMU {
         if(address == 0xFF47) {
             return gpu.backgroundPalette;
         }
+
         if(address == 0xFF00) {
             return keypad.readJOYP();
+        }
+
+        if(address == 0xFFFF) {
+            return iuptHandler.interruptEnableRegister;
         }
 
         debug {
@@ -193,6 +198,9 @@ class MMU {
 
         } else if(address == 0xFF00) { 
             keypad.writeJOYP(val);
+
+        } else if(address == 0xFFFF) {
+            iuptHandler.interruptEnableRegister = val;
 
         } else {
             debug {
