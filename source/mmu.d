@@ -1,7 +1,7 @@
 import std.conv;
 import std.stdio;
 
-import cartridge, gpu, keypad;
+import cartridge, gpu, keypad, interrupt;
 
 private const WORK_RAM_BEGIN            = 0xC000;
 private const WORK_RAM_END              = 0xDFFF;
@@ -54,11 +54,13 @@ class MMU {
     private const Cartridge cartridge;
     private GPU gpu;
     private Keypad keypad;
+    private InterruptHandler iuptHandler;
 
-    @safe this(const Cartridge c, GPU g, Keypad k) {
+    @safe this(const Cartridge c, GPU g, Keypad k, InterruptHandler ih) {
         this.cartridge = c;
         this.gpu = g;
         this.keypad = k;
+        this.iuptHandler = ih;
     }
 
     /**

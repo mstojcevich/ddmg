@@ -1,6 +1,7 @@
 import std.stdio;
 import std.format;
 import std.exception;
+import std.traits;
 
 import mmu;
 import registers;
@@ -9,6 +10,7 @@ import clock;
 import cartridge;
 import gpu;
 import display;
+import interrupt;
 
 private enum Flag : ubyte {
     ZERO            = 0b10000000, // Set to 1 when the result of an operation is 0
@@ -28,8 +30,9 @@ class CPU {
 
     private MMU mmu;
     private Clock clk;
+    private InterruptHandler iuptHandler;
 
-    @safe this(MMU mmu, Clock clk) {
+    @safe this(MMU mmu, Clock clk, InterruptHandler ih) {
         // 0 in the cycle count will mean it's calculated conditionally later
         this.instructions = [
             Instruction("NOP",          4, &nop),
@@ -275,7 +278,7 @@ class CPU {
             Instruction("LDH A,(a8)",	12, &ldhImmediateToA),
             Instruction("POP AF",		12, {popFromStack(regs.af);}),
             Instruction("LD A,(C)",		8, &ldAC),
-            Instruction("DI",		    4, null),
+            Instruction("DI",		    4, {iuptHandler.masterToggle = false;}),
             Instruction("XX",		    0, null),
             Instruction("PUSH AF",		16, {pushToStack(regs.af);}),
             Instruction("OR d8",		8, &orImmediate),
@@ -283,7 +286,7 @@ class CPU {
             Instruction("LD HL,SP+r8",	12, &loadSPplusImmediateToHL),
             Instruction("LD SP,HL",		8, {load(regs.sp, regs.hl);}),
             Instruction("LD A,(a16)",	16, {loadFromImmediateReference(regs.a);}),
-            Instruction("EI",		    4, null),
+            Instruction("EI",		    4, {iuptHandler.masterToggle = true;}),
             Instruction("XX",		    0, null),
             Instruction("XX",		    0, null),
             Instruction("CP d8",		8, &cpImmediate),
@@ -307,6 +310,7 @@ class CPU {
 
         this.mmu = mmu;
         this.clk = clk;
+        this.iuptHandler = ih;
 
         // Initialize like the original bootstrap rom
         regs.sp = 0xFFFE;
@@ -345,6 +349,14 @@ class CPU {
             writefln("The execution is probably tainted");
         }
 
+        // Handle any interrupts that were triggered
+        // TODO not sure if this should be done before processing the instruction or after
+        foreach(iupt; EnumMembers!Interrupts) {
+            if(iuptHandler.shouldHandle(iupt)) {
+                rst(iupt.address);
+                iuptHandler.markHandled(iupt);
+            }
+        }
     }
 
     // A debug function for printing the flag statuses

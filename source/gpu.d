@@ -1,7 +1,7 @@
 import std.conv;
 import std.stdio;
 
-import clock, display;
+import clock, display, interrupt;
 
 private const CYCLES_PER_HBLANK = 204; // Cycles for a line of hblank
 private const CYCLES_PER_VBLANK = 456; // Cycles for a line of vblank
@@ -61,6 +61,7 @@ class GPU
     private int stateClock; // Number of cycles have been in current state
     private Clock clock;
     private Display display;
+    private InterruptHandler iuptHandler;
 
     private ubyte controlRegister;
     private ubyte lcdStatusRegister;
@@ -80,7 +81,7 @@ class GPU
     private ubyte objPalette0; // FF48 Object Palette 0 Data
     private ubyte objPalette1; // FF49 Object Palette 1 Data
 
-    @safe this(Display d, Clock clk)
+    @safe this(Display d, Clock clk, InterruptHandler ih)
     {
         setState(GPUMode.HORIZ_BLANK);
         this.clock = clk;
@@ -110,7 +111,7 @@ class GPU
                     updateDisplay();
                     setState(GPUMode.VERT_BLANK);
 
-                    // TODO flag vblank interrupt
+                    iuptHandler.fireInterrupt(Interrupts.VBLANK);
                 }
                 else
                 { // Go to OAM read
