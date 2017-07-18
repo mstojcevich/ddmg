@@ -113,6 +113,7 @@ class GPU
                     setState(GPUMode.VERT_BLANK);
 
                     // TODO vblank interrupt
+                    iuptHandler.fireInterrupt(Interrupts.VBLANK);
                 }
                 else
                 { // Go to OAM read
@@ -366,7 +367,11 @@ class GPU
     body
     {
         this.vram[addr] = val;
-        updateTile(addr, val);
+
+        // TODO support the 8800-97ff tile data
+        if(addr >= 0x0000 && addr <= 0x0FFF) {
+            updateTile(addr, val);
+        }
     }
 
     @safe ubyte getVRAM(in ushort addr) const
