@@ -17,8 +17,8 @@ class Gameboy {
         this.display = new Display();
         this.keypad = new Keypad(this.display.glfwWindow);
         this.clock = new Clock();
-        this.gpu = new GPU(this.display, this.clock);
         this.iuptHandler = new InterruptHandler();
+        this.gpu = new GPU(this.display, this.clock, this.iuptHandler);
         this.mmu = new MMU(this.cartridge, this.gpu, this.keypad, this.iuptHandler);
         this.cpu = new CPU(this.mmu, this.clock, this.iuptHandler);
 
