@@ -13,10 +13,10 @@ import display;
 import interrupt;
 
 private enum Flag : ubyte {
-    ZERO            = 0b10000000, // Set to 1 when the result of an operation is 0
-    SUBTRACTION     = 0b01000000, // Set to 1 following the execution of the subtraction instruction
-    HALF_OVERFLOW   = 0b00100000, // Set to 1 when an operation carries from or borrows to bit 3
-    OVERFLOW        = 0b00010000  // Set to 1 when an operation carries from or borrows to bit 7
+    ZERO            = 1 << 7, // Set to 1 when the result of an operation is 0
+    SUBTRACTION     = 1 << 6, // Set to 1 following the execution of the subtraction instruction
+    HALF_OVERFLOW   = 1 << 5, // Set to 1 when an operation carries from or borrows to bit 3
+    OVERFLOW        = 1 << 4  // Set to 1 when an operation carries from or borrows to bit 7
 }
 
 /**

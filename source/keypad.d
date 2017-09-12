@@ -1,18 +1,17 @@
 import derelict.glfw3.glfw3;
 import std.stdio;
 import std.exception;
+import std.typecons;
 
 // Flags for the JOYP register
 enum JOYPFlag : ubyte
 {
-    UNUSED_1 = 0b10000000,
-    UNUSED_2 = 0b01000000,
-    BUTTON_MODE = 0b00100000,
-    DIRECTION_MODE = 0b00010000,
-    DOWN_OR_START = 0b00001000,
-    UP_OR_SELECT = 0b00000100,
-    LEFT_OR_B = 0b00000010,
-    RIGHT_OR_A = 0b00000001
+    BUTTON_MODE     = 1 << 5,
+    DIRECTION_MODE  = 1 << 4,
+    DOWN_OR_START   = 1 << 3,
+    UP_OR_SELECT    = 1 << 2,
+    LEFT_OR_B       = 1 << 1,
+    RIGHT_OR_A      = 1 << 0
 }
 
 class Keypad {
@@ -31,11 +30,11 @@ class Keypad {
     }
 
     @safe bool isJOYPFlagSet(JOYPFlag flag) {
-        return useDirections ? (joypDirections & flag) != 0 : (joypButtons & flag) != 0;
+        return useDirections ? cast(bool) (joypDirections & flag) : cast(bool) (joypButtons & flag);
     }
 
     @safe const ubyte readJOYP() {
-        return useDirections ? joypDirections : joypButtons;
+        return useDirections ? cast(ubyte) joypDirections : cast(ubyte) joypButtons;
     }
 
     @safe void writeJOYP(ubyte joyp) {
@@ -50,8 +49,8 @@ class Keypad {
 
 // Keep two copies of the current input, one for button selected, one for direction selected
 // These need to be outside of the class file since they're set by a c callback
-private ubyte joypButtons = JOYPFlag.BUTTON_MODE;
-private ubyte joypDirections = JOYPFlag.DIRECTION_MODE;
+private BitFlags!JOYPFlag joypButtons = JOYPFlag.BUTTON_MODE;
+private BitFlags!JOYPFlag joypDirections = JOYPFlag.DIRECTION_MODE;
 
 private extern(C) void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) nothrow {
     if(action == GLFW_PRESS) {
