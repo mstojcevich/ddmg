@@ -8,11 +8,11 @@ private struct Interrupt {
 
 enum Interrupts : Interrupt
 {
-    VBLANK = Interrupt(0b00000001, 0x0040, 0),
-    LCD_STATUS = Interrupt(0b00000010, 0x0048, 1),
-    TIMER_OVERFLOW = Interrupt(0b00000100, 0x0050, 2),
-    SERIAL_LINK = Interrupt(0b00001000, 0x0058, 3),
-    JOYPAD_PRESS = Interrupt(0b00010000, 0x0060, 4),
+    VBLANK          = Interrupt(1 << 0, 0x0040, 0),
+    LCD_STATUS      = Interrupt(1 << 1, 0x0048, 1),
+    TIMER_OVERFLOW  = Interrupt(1 << 2, 0x0050, 2),
+    SERIAL_LINK     = Interrupt(1 << 3, 0x0058, 3),
+    JOYPAD_PRESS    = Interrupt(1 << 4, 0x0060, 4),
 }
 
 // TODO emulate the delay bug for EI and DI instructions
