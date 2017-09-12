@@ -58,15 +58,6 @@ union LCDStatus {
     ));
 }
 
-enum LCDStatusFlag : ubyte
-{
-    HBLANK_INTERRUPT = 1 << 3,
-    VBLANK_INTERRUPT = 1 << 4,
-    OAM_INTERRUPT = 1 << 5,
-    COINCIDENCE_INTERRUPT = 1 << 6,
-    COINCIDENCE_FLAG = 1 << 7
-}
-
 enum SpritePriority : bool
 {
     ABOVE_BACKGROUND = false,
