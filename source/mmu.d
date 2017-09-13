@@ -28,6 +28,10 @@ private const VRAM_END                  = 0x9FFF;
 private const OAM_BEGIN                 = 0xFE00;
 private const OAM_END                   = 0xFE9F;
 
+private const BGP                       = 0xFF47;
+private const OBP0                      = 0xFF48;
+private const OBP1                      = 0xFF49;
+
 /**
  * Exception to be thrown when a caller tries to access a memory address not mapped by the MMU
  */
@@ -120,8 +124,14 @@ class MMU {
         if(address == 0xFF43) {
             return gpu.getScrollX();
         }
-        if(address == 0xFF47) {
+        if(address == BGP) {
             return gpu.backgroundPalette;
+        }
+        if(address == OBP0) {
+            return gpu.obp0;
+        }
+        if(address == OBP1) {
+            return gpu.obp1;
         }
 
         if(address == 0xFF00) {
@@ -193,8 +203,12 @@ class MMU {
             gpu.setScrollX(val);
         } else if(address == 0xFF43) {
             gpu.setScrollY(val);
-        } else if(address == 0xFF47) {
+        } else if(address == BGP) {
             gpu.backgroundPalette = val;
+        } else if(address == OBP0) {
+            gpu.obp0 = val;
+        } else if(address == OBP1) {
+            gpu.obp1 = val;
 
         } else if(address == 0xFF00) { 
             keypad.writeJOYP(val);

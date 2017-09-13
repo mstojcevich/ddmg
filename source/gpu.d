@@ -58,10 +58,18 @@ union LCDStatus {
     ));
 }
 
-enum SpritePriority : bool
-{
+enum SpritePriority : bool {
     ABOVE_BACKGROUND = false,
     BEHIND_BACKGROUND = true
+}
+
+/**
+ * The palette to use when drawing a sprite.
+ * A sprite can specify whether it wants to use OBP0 (0xFF48) or OBP1 (0xFF49)
+ */
+enum SpritePalette : bool {
+    OBP0 = false,
+    OBP1 = true
 }
 
 struct OAMSprite {
@@ -74,7 +82,7 @@ struct OAMSprite {
             mixin(bitfields!(
                 uint, "", 3,        // Color palette: used on CGB only
                 bool, "", 1,        // Character bank: used on CGB only
-                bool, "palette", 1, // Palette to use: unused on CGB
+                SpritePalette, "palette", 1, // Palette to use: unused on CGB
                 bool, "xflip", 1,   // Whether to flip horizontally
                 bool, "yflip", 1,   // Whether to flip vertically
                 SpritePriority, "priority", 1 // Whether to force above the background
@@ -84,7 +92,6 @@ struct OAMSprite {
 
 class GPU
 {
-
     private GPUMode state;
     private int stateClock; // Number of cycles have been in current state
     private Clock clock;
@@ -419,6 +426,22 @@ class GPU
     @safe @property ubyte backgroundPalette(ubyte bp)
     {
         return bgPalette = bp;
+    }
+
+    @safe @property ubyte obp0() const {
+        return objPalette0;
+    }
+
+    @safe @property ubyte obp0(ubyte obp0) {
+        return objPalette0 = obp0;
+    }
+
+    @safe @property ubyte obp1() const {
+        return objPalette1;
+    }
+
+    @safe @property ubyte obp1(ubyte obp1) {
+        return objPalette1 = obp1;
     }
 
     /**
