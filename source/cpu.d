@@ -1,6 +1,7 @@
 import std.stdio;
 import std.format;
 import std.exception;
+import std.traits;
 
 import mmu;
 import registers;
@@ -9,12 +10,13 @@ import clock;
 import cartridge;
 import gpu;
 import display;
+import interrupt;
 
 private enum Flag : ubyte {
-    ZERO            = 0b10000000, // Set to 1 when the result of an operation is 0
-    SUBTRACTION     = 0b01000000, // Set to 1 following the execution of the subtraction instruction
-    HALF_OVERFLOW   = 0b00100000, // Set to 1 when an operation carries from or borrows to bit 3
-    OVERFLOW        = 0b00010000  // Set to 1 when an operation carries from or borrows to bit 7
+    ZERO            = 1 << 7, // Set to 1 when the result of an operation is 0
+    SUBTRACTION     = 1 << 6, // Set to 1 following the execution of the subtraction instruction
+    HALF_OVERFLOW   = 1 << 5, // Set to 1 when an operation carries from or borrows to bit 3
+    OVERFLOW        = 1 << 4  // Set to 1 when an operation carries from or borrows to bit 7
 }
 
 /**
@@ -28,8 +30,9 @@ class CPU {
 
     private MMU mmu;
     private Clock clk;
+    private InterruptHandler iuptHandler;
 
-    @safe this(MMU mmu, Clock clk) {
+    @safe this(MMU mmu, Clock clk, InterruptHandler ih) {
         // 0 in the cycle count will mean it's calculated conditionally later
         this.instructions = [
             Instruction("NOP",          4, &nop),
@@ -249,7 +252,7 @@ class CPU {
             Instruction("SUB d8",		8, &subImmediate),
             Instruction("RST 10H",		16, {rst(0x10);}),
             Instruction("RET C",		0, {retIfFlag(Flag.OVERFLOW, true);}),
-            Instruction("RETI",		    16, null),
+            Instruction("RETI",		    16, {ret(); iuptHandler.masterToggle = true;}),
             Instruction("JP C,a16",		0, {jumpImmediateIfFlag(Flag.OVERFLOW, true);}),
             Instruction("XX",		    0, null),
             Instruction("CALL C,a16",	0, {callImmediateIfFlag(Flag.OVERFLOW, true);}),
@@ -275,7 +278,7 @@ class CPU {
             Instruction("LDH A,(a8)",	12, &ldhImmediateToA),
             Instruction("POP AF",		12, {popFromStack(regs.af);}),
             Instruction("LD A,(C)",		8, &ldAC),
-            Instruction("DI",		    4, null),
+            Instruction("DI",		    4, {iuptHandler.masterToggle = false;}),
             Instruction("XX",		    0, null),
             Instruction("PUSH AF",		16, {pushToStack(regs.af);}),
             Instruction("OR d8",		8, &orImmediate),
@@ -283,7 +286,7 @@ class CPU {
             Instruction("LD HL,SP+r8",	12, &loadSPplusImmediateToHL),
             Instruction("LD SP,HL",		8, {load(regs.sp, regs.hl);}),
             Instruction("LD A,(a16)",	16, {loadFromImmediateReference(regs.a);}),
-            Instruction("EI",		    4, null),
+            Instruction("EI",		    4, {iuptHandler.masterToggle = true;}),
             Instruction("XX",		    0, null),
             Instruction("XX",		    0, null),
             Instruction("CP d8",		8, &cpImmediate),
@@ -307,6 +310,7 @@ class CPU {
 
         this.mmu = mmu;
         this.clk = clk;
+        this.iuptHandler = ih;
 
         // Initialize like the original bootstrap rom
         regs.sp = 0xFFFE;
@@ -339,12 +343,24 @@ class CPU {
         regs.pc++;
 
         if(instr.impl !is null) {
-             instr.impl(); // Execute the operation
+            instr.impl(); // Execute the operation
+            clk.spendCycles(instr.cycles);
         } else {
             writefln("Program tried to execute instruction %s, which isn't defined", instr.disassembly);
             writefln("The execution is probably tainted");
         }
 
+        // Handle any interrupts that were triggered
+        // TODO not sure if this should be done before processing the instruction or after
+        foreach(iupt; EnumMembers!Interrupts) {
+            if(iuptHandler.shouldHandle(iupt)) {
+                rst(iupt.address);
+                iuptHandler.markHandled(iupt);
+                iuptHandler.masterToggle = false;
+
+                break;
+            }
+        }
     }
 
     // A debug function for printing the flag statuses
@@ -536,7 +552,7 @@ class CPU {
      * Add the next 8-bit value to the stack pointer
      */
     @safe private void offsetStackPointerImmediate() {
-        add(regs.sp, cast(short)(cast(byte)(mmu.readByte(regs.sp)))); // Casting twice is so that the sign will carry over to the short
+        add(regs.sp, cast(short)(cast(byte)(mmu.readByte(regs.pc)))); // Casting twice is so that the sign will carry over to the short
 
         setFlag(Flag.ZERO, false);
 
@@ -1151,7 +1167,7 @@ class CPU {
      */
     @safe private void callImmediate() {
         immutable ushort toCall = mmu.readShort(regs.pc);
-        regs.pc += 2; // Compensate for reading and immediate short
+        regs.pc += 2; // Compensate for reading an immediate short
         call(toCall);
     }
 

@@ -115,6 +115,7 @@ class Display {
 
         glDrawPixels(GB_DISPLAY_WIDTH, GB_DISPLAY_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, &pixels);
         
+        glfwSwapInterval(0); // No vsync
         glfwSwapBuffers(window);
     }
 
@@ -149,6 +150,10 @@ class Display {
     }
     body {
         setPixel(x, y, palette[value]);
+    }
+
+    @property GLFWwindow* glfwWindow() {
+        return window;
     }
 }
 

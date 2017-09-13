@@ -1,7 +1,8 @@
 import std.conv;
 import std.stdio;
+import std.bitmanip;
 
-import clock, display;
+import clock, display, interrupt;
 
 private const CYCLES_PER_HBLANK = 204; // Cycles for a line of hblank
 private const CYCLES_PER_VBLANK = 456; // Cycles for a line of vblank
@@ -30,28 +31,55 @@ enum GPUMode : ubyte
     SCANLINE_VRAM = 3
 }
 
-/**
- * Control flags for the LCD control register
- */
-enum LCDControlFlag : ubyte
-{
-    BG_DISPLAY = 0b00000001,
-    OBJ_ENABLE = 0b00000010,
-    OBJ_SIZE = 0b00000100,
-    BG_TILE_MAP_SELECT = 0b00001000,
-    BG_TILE_DATA_SELECT = 0b00010000,
-    WINDOW_ENABLE = 0b00100000,
-    WINDOW_MAP_SELECT = 0b01000000,
-    LCD_ENABLE = 0b10000000
+union LCDControl {
+    ubyte data;
+    mixin(bitfields!(
+        bool, "bgDisplay", 1,
+        bool, "objEnable", 1,
+        bool, "objSize", 1,
+        TileMapDisplay, "bgMapSelect", 1,
+        bool, "bgDataSelect", 1,
+        bool, "windowEnable", 1,
+        bool, "windowMapSelect", 1,
+        bool, "lcdEnable", 1
+    ));
 }
 
-enum LCDStatusFlag : ubyte
+union LCDStatus {
+    ubyte data;
+    mixin(bitfields!(
+        GPUMode, "gpuMode", 2,
+        bool, "coincidenceFlag", 1,
+        bool, "hblankInterrupt", 1,
+        bool, "vblankInterrupt", 1,
+        bool, "oamInterrupt", 1,
+        bool, "coincidenceInterrupt", 1,
+        bool, "", 1
+    ));
+}
+
+enum SpritePriority : bool
 {
-    HBLANK_INTERRUPT = 0b00001000,
-    VBLANK_INTERRUPT = 0b00010000,
-    OAM_INTERRUPT = 0b00100000,
-    COINCIDENCE_INTERRUPT = 0b01000000,
-    COINCIDENCE_FLAG = 0b10000000
+    ABOVE_BACKGROUND = false,
+    BEHIND_BACKGROUND = true
+}
+
+struct OAMSprite {
+    align(1): // Tightly pack the bytes
+        ubyte y;
+        ubyte x;
+        ubyte tileNum;
+        union {
+            ubyte options;
+            mixin(bitfields!(
+                uint, "", 3,        // Color palette: used on CGB only
+                bool, "", 1,        // Character bank: used on CGB only
+                bool, "palette", 1, // Palette to use: unused on CGB
+                bool, "xflip", 1,   // Whether to flip horizontally
+                bool, "yflip", 1,   // Whether to flip vertically
+                SpritePriority, "priority", 1 // Whether to force above the background
+            ));
+        }
 }
 
 class GPU
@@ -61,9 +89,10 @@ class GPU
     private int stateClock; // Number of cycles have been in current state
     private Clock clock;
     private Display display;
+    private InterruptHandler iuptHandler;
 
-    private ubyte controlRegister;
-    private ubyte lcdStatusRegister;
+    private LCDControl controlRegister;
+    private LCDStatus lcdStatusRegister;
     private ubyte curScanline;
 
     private ubyte scanlineCompare; // Scanline to compare the curScanline with
@@ -80,13 +109,15 @@ class GPU
     private ubyte objPalette0; // FF48 Object Palette 0 Data
     private ubyte objPalette1; // FF49 Object Palette 1 Data
 
-    @safe this(Display d, Clock clk)
+    @safe this(Display d, Clock clk, InterruptHandler ih)
     {
         setState(GPUMode.HORIZ_BLANK);
         this.clock = clk;
         this.display = d;
         this.vram = new ubyte[8192];
         this.oam = new ubyte[160];
+        this.iuptHandler = ih;
+        this.controlRegister.data = 0;
 
         bgPalette = 0b00011011;
     }
@@ -110,7 +141,7 @@ class GPU
                     updateDisplay();
                     setState(GPUMode.VERT_BLANK);
 
-                    // TODO flag vblank interrupt
+                    // TODO vblank interrupt
                 }
                 else
                 { // Go to OAM read
@@ -162,7 +193,7 @@ class GPU
     @safe private void setState(in GPUMode mode)
     {
         this.state = mode;
-        this.lcdStatusRegister = (this.lcdStatusRegister & 0b11111100) | mode;
+        this.lcdStatusRegister.gpuMode = mode;
     }
 
     private void updateDisplay()
@@ -217,7 +248,12 @@ class GPU
      */
     private void updateCurLine()
     {
-        if(isControlFlagSet(LCDControlFlag.BG_DISPLAY)) {
+        // Don't worry about stuff off of the screen
+        if(curScanline > GB_DISPLAY_HEIGHT - 1) {
+            return;
+        }
+
+        if(controlRegister.bgDisplay) {
             renderBackground(curScanline);
         }
     }
@@ -244,7 +280,7 @@ class GPU
             ubyte tileCol = scrolledX / 8;
             
             // The current tile, as a 2d array of colors
-            ubyte[8][8] tile = tilemapLookup(backgroundTileMapMode, tileRow, tileCol);
+            ubyte[8][8] tile = tilemapLookup(controlRegister.bgMapSelect, tileRow, tileCol);
 
             // Render out the tile at the current scanline
             ubyte color = tile[scrolledY % 8][scrolledX % 8];
@@ -257,25 +293,17 @@ class GPU
  
     @safe bool isLCDEnabled() const
     {
-        return isControlFlagSet(LCDControlFlag.LCD_ENABLE);
-    }
-
-    /**
-     * Returns true if the flag bit is 1, false otherwise
-     */
-    @safe bool isControlFlagSet(in LCDControlFlag f) const
-    {
-        return (controlRegister & f) != 0;
+        return this.controlRegister.lcdEnable;
     }
 
     @safe @property ubyte getLCDControl() const
     {
-        return this.controlRegister;
+        return this.controlRegister.data;
     }
 
     @safe @property void setLCDControl(in ubyte val)
     {
-        this.controlRegister = val;
+        this.controlRegister.data = val;
     }
 
     @safe @property ubyte getCurScanline() const
@@ -296,7 +324,7 @@ class GPU
 
     @safe @property void setLCDStatus(in ubyte m)
     {
-        this.lcdStatusRegister = (m & 0b11111000) | (this.lcdStatusRegister & 0b111);
+        this.lcdStatusRegister.data = (m & 0b11111000) | (this.lcdStatusRegister.data & 0b111);
         this.state = to!GPUMode(m & 0b11);
     }
 
@@ -311,22 +339,9 @@ class GPU
         return this.scanlineCompare;
     }
 
-    @safe private void setLCDStatusFlag(in LCDStatusFlag f, in bool set)
-    {
-        if (set)
-        {
-            lcdStatusRegister = lcdStatusRegister | f; // ORing with the flag will set it true
-        }
-        else
-        {
-            lcdStatusRegister = lcdStatusRegister & ~f; // ANDing with the inverse of f will set the flag to 0
-        }
-    }
-
     @safe private void checkCoincidence()
     {
-        setLCDStatusFlag(LCDStatusFlag.COINCIDENCE_FLAG,
-                this.getCurScanline() == this.getScanlineCompare);
+        lcdStatusRegister.coincidenceFlag = getCurScanline() == getScanlineCompare();
 
         // TODO interrupt handing
     }
@@ -359,7 +374,11 @@ class GPU
     body
     {
         this.vram[addr] = val;
-        updateTile(addr, val);
+
+        // TODO support the 8800-97ff tile data
+        if(addr >= 0x0000 && addr <= 0x0FFF) {
+            updateTile(addr, val);
+        }
     }
 
     @safe ubyte getVRAM(in ushort addr) const
@@ -400,10 +419,6 @@ class GPU
     @safe @property ubyte backgroundPalette(ubyte bp)
     {
         return bgPalette = bp;
-    }
-
-    @safe @property TileMapDisplay backgroundTileMapMode() {
-        return isControlFlagSet(LCDControlFlag.BG_TILE_MAP_SELECT) ? TileMapDisplay.WINDOW_MAP : TileMapDisplay.BACKGROUND_MAP;
     }
 
     /**
