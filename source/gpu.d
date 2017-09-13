@@ -1,6 +1,9 @@
+// TODO sprites can be 16x16
+
 import std.conv;
 import std.stdio;
 import std.bitmanip;
+import std.algorithm.comparison;
 
 import clock, display, interrupt;
 
@@ -17,6 +20,9 @@ private const TILE_START_INDEX = 0;
 // The tiles stored at 8000-8FFF are used for background and sprites. Numbered 0 to 255.
 // The tiles stored at 8800-97FF are used for background and window display. Numbered -128 to 127.
 private const NUM_TILES = 384;
+
+// Size of sprites in pixels. Sprites are 8x8
+private const TILE_SIZE = 8;
 
 enum TileMapDisplay : bool {
     BACKGROUND_MAP = false,
@@ -72,7 +78,7 @@ enum SpritePalette : bool {
     OBP1 = true
 }
 
-struct OAMSprite {
+struct SpriteAttributes {
     align(1): // Tightly pack the bytes
         ubyte y;
         ubyte x;
@@ -263,6 +269,49 @@ class GPU
         if(controlRegister.bgDisplay) {
             renderBackground(curScanline);
         }
+        if(controlRegister.objEnable) {
+            renderSprites(curScanline);
+        }
+    }
+
+    /**
+     * Renders sprites for a specific line onto the display
+     */
+    private void renderSprites(ubyte lineNum) {
+        // TODO "Because of a limitation of hardware, only ten sprites can be displayed per scan line"
+
+        for(int i = 0; i < 40; i++) { // There are 40 different sprites
+            SpriteAttributes attrs = (cast(SpriteAttributes[]) oam)[i];
+
+            // Row on the sprite that this scanline represents
+            int tileRow = lineNum - attrs.y;
+
+            // Ensure that some part of the sprite lies on the current scanline
+            if(tileRow >= 0 && tileRow < TILE_SIZE) {
+                ubyte palette = attrs.palette == SpritePalette.OBP0 ? obp0 : obp1;
+                
+                ubyte[TILE_SIZE][TILE_SIZE] tile = tileset[attrs.tileNum];
+                ubyte[TILE_SIZE] row = tile[tileRow];
+
+                // TODO xflip and yflip
+
+                for(ubyte x = attrs.x; x < min(attrs.x + TILE_SIZE, 255); x++) {
+                    // Get the color of the pixel in the tile
+                    ubyte color = row[x - attrs.x];
+
+                    // Don't draw invisible pixels
+                    // Don't draw pixels behind the background
+                    if(color == 0 || (attrs.priority == SpritePriority.BEHIND_BACKGROUND 
+                        && display.getPixelGB(x, lineNum) != 0)) {
+                        continue;
+                    }
+
+                    // Apply the current palette
+                    color = (bgPalette >> color) & 0b11;
+                    display.setPixelGB(x, lineNum, color);
+                }
+            }
+        }
     }
 
     /**
@@ -275,7 +324,7 @@ class GPU
         // This is because the gameboy wraps at 255, not the screen width
 
         // The number of the row of the current tile
-        ubyte tileRow = scrolledY / 8; // 8 pixels per tile
+        ubyte tileRow = scrolledY / TILE_SIZE; // 8 pixels per tile
 
         // Go through the entire width of the scanline
         for(ubyte x = 0; x < GB_DISPLAY_WIDTH; x++) {
@@ -284,13 +333,13 @@ class GPU
             // This is because the gameboy wraps at 255, not the screen width
 
             // The number of the column of the current tile
-            ubyte tileCol = scrolledX / 8;
+            ubyte tileCol = scrolledX / TILE_SIZE;
             
             // The current tile, as a 2d array of colors
-            ubyte[8][8] tile = tilemapLookup(controlRegister.bgMapSelect, tileRow, tileCol);
+            ubyte[TILE_SIZE][TILE_SIZE] tile = tilemapLookup(controlRegister.bgMapSelect, tileRow, tileCol);
 
             // Render out the tile at the current scanline
-            ubyte color = tile[scrolledY % 8][scrolledX % 8];
+            ubyte color = tile[scrolledY % 8][scrolledX % TILE_SIZE];
 
             // Apply the current palette
             color = (bgPalette >> color) & 0b11;
@@ -385,6 +434,8 @@ class GPU
         // TODO support the 8800-97ff tile data
         if(addr >= 0x0000 && addr <= 0x0FFF) {
             updateTile(addr, val);
+
+            // TODO BG can have super priority
         }
     }
 
@@ -457,7 +508,7 @@ class GPU
         assert(col < 32);
     }
     body {
-        // If the background map is used, the index of the map is 0x9800.
+        // If the background map is used, the index of the map is 0x1800.
         // If the window tile map is used, the index is 0x1C00
         uint mapLocation = mapType == TileMapDisplay.BACKGROUND_MAP ? 0x1800 : 0x1C00;
         

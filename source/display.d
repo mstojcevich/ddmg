@@ -38,6 +38,7 @@ class Display {
     private GLFWwindow* window;
     
     private Color[GB_PIXEL_COUNT] pixels;
+    private ubyte [GB_PIXEL_COUNT] gbPixels;
 
     /**
      * THe color palette of the Gameboy
@@ -133,7 +134,18 @@ class Display {
         return false;
     }
 
-    @safe void setPixel(in ubyte x, in ubyte y, in Color c)
+    @safe ubyte getPixelGB(in ubyte x, in ubyte y)
+    in {
+        assert(x < GB_DISPLAY_WIDTH);
+        assert(y < GB_DISPLAY_HEIGHT);
+    }
+    body {
+        int pixelNum = ((GB_DISPLAY_HEIGHT - y - 1) * GB_DISPLAY_WIDTH) + x;
+
+        return gbPixels[pixelNum];
+    }
+
+    @safe private void setPixel(in ubyte x, in ubyte y, in Color c)
     in {
         assert(x < GB_DISPLAY_WIDTH);
         assert(y < GB_DISPLAY_HEIGHT);
@@ -150,6 +162,8 @@ class Display {
     }
     body {
         setPixel(x, y, palette[value]);
+        int pixelNum = ((GB_DISPLAY_HEIGHT - y - 1) * GB_DISPLAY_WIDTH) + x;
+        gbPixels[pixelNum] = value;
     }
 
     @property GLFWwindow* glfwWindow() {
