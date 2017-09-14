@@ -295,7 +295,8 @@ class GPU
 
                 // TODO xflip and yflip
 
-                for(ubyte x = attrs.x; x < min(attrs.x + TILE_SIZE, 255); x++) {
+                for(ubyte x = cast(ubyte) min(attrs.x, GB_DISPLAY_WIDTH); 
+                    x < min(attrs.x + TILE_SIZE, GB_DISPLAY_WIDTH - 1); x++) {
                     // Get the color of the pixel in the tile
                     ubyte color = row[x - attrs.x];
 

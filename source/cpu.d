@@ -354,7 +354,7 @@ class CPU {
         // TODO not sure if this should be done before processing the instruction or after
         foreach(iupt; EnumMembers!Interrupts) {
             if(iuptHandler.shouldHandle(iupt)) {
-                rst(iupt.address);
+                call(iupt.address);
                 iuptHandler.markHandled(iupt);
                 iuptHandler.masterToggle = false;
 
