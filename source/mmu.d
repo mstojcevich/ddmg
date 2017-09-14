@@ -32,6 +32,8 @@ private const BGP                       = 0xFF47;
 private const OBP0                      = 0xFF48;
 private const OBP1                      = 0xFF49;
 
+private const DMA_TRANSFER_ADDR         = 0xFF46;
+
 /**
  * Exception to be thrown when a caller tries to access a memory address not mapped by the MMU
  */
@@ -210,6 +212,14 @@ class MMU {
         } else if(address == OBP1) {
             gpu.obp1 = val;
 
+        } else if(address == DMA_TRANSFER_ADDR) {
+            // Transfer from RAM to OAM
+            for(ubyte i = 0x00; i <= 0x9F; i++) {
+                const ushort src = (val << 8) | i;
+                const ushort dst = 0xFE00 | i;
+                writeByte(dst, readByte(src));
+            }
+
         } else if(address == 0xFF00) { 
             keypad.writeJOYP(val);
 
@@ -221,7 +231,7 @@ class MMU {
                 writefln("UNIMPLEMENTED : Writing %02X at address %04X", val, address);
             }
 
-            //throw new UnmappedMemoryAccessException(address);
+            throw new UnmappedMemoryAccessException(address);
         }
     }
 
