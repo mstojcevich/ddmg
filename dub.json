@@ -2,7 +2,6 @@
 	"name": "ddmg",
 	"dependencies": {
         "derelict-glfw3": ">=3.1.0",
-        "derelict-gl3": ">=1.0.0",
-        "dlangui": "~>0.9.135"
+        "derelict-gl3": ">=1.0.0"
     }
 }
