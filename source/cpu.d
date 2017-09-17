@@ -3,6 +3,8 @@ import std.format;
 import std.exception;
 import std.traits;
 
+import core.bitop;
+
 import mmu;
 import registers;
 import instruction;
@@ -11,6 +13,7 @@ import cartridge;
 import gpu;
 import display;
 import interrupt;
+import keypad;
 
 private enum Flag : ubyte {
     ZERO            = 1 << 7, // Set to 1 when the result of an operation is 0
@@ -580,8 +583,9 @@ class CPU {
         regs.a = outResult;
     }
     @system unittest { // Unit test for ADD A, n
-        Clock clk =  new Clock();
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+        Clock clk = new Clock();
+        InterruptHandler ih = new InterruptHandler();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
             // Test 1, 0x3A + 0xC6
@@ -655,8 +659,9 @@ class CPU {
         regs.a = outResult;
      }
      @system unittest { // Unit test for ADC A, n
-        Clock clk =  new Clock();
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+        Clock clk = new Clock();
+        InterruptHandler ih = new InterruptHandler();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
             regs.a = 0xE1;
@@ -913,12 +918,13 @@ class CPU {
 
         immutable bool leftmostBit = regs.a >> 7;
 
-        regs.a = cast(ubyte)((regs.a << 1) + leftmostBit);
+        regs.a = rol(regs.a, 1);
         setFlag(Flag.OVERFLOW, leftmostBit);
     }
     @system unittest {  // Unit tests for RLCA
-        Clock clk =  new Clock();
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+        Clock clk = new Clock();
+        InterruptHandler ih = new InterruptHandler();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
             regs.a = 0x85;
@@ -950,8 +956,9 @@ class CPU {
         setFlag(Flag.OVERFLOW, leftmostBit);
     }
     @system unittest {  // Unit tests for RLA
-        Clock clk =  new Clock();
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+        Clock clk = new Clock();
+        InterruptHandler ih = new InterruptHandler();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
             regs.a = 0x05;
@@ -982,8 +989,9 @@ class CPU {
         setFlag(Flag.OVERFLOW, rightmostBit);
     }
     @system unittest {
-        Clock clk =  new Clock();
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+        Clock clk = new Clock();
+        InterruptHandler ih = new InterruptHandler();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
             regs.a = 0x3B;
@@ -1015,8 +1023,9 @@ class CPU {
         setFlag(Flag.OVERFLOW, rightmostBit);
     }
     @system unittest {
-        Clock clk =  new Clock();
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+        Clock clk = new Clock();
+        InterruptHandler ih = new InterruptHandler();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
             regs.a = 0x81;
@@ -1138,7 +1147,7 @@ class CPU {
         regs.pc++;
     }
 
-    /**
+    /**cast(ubyte)((regs.a << 1) + leftmostBit)
      * Save the value in register A to memory at FF00 + (8-bit immediate)
      */
     @safe private void ldhAToImmediate() {
