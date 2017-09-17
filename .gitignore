@@ -1,11 +1,16 @@
 .dub
 docs.json
 __dummy.html
+
 *.o
 *.obj
+*.dll
+*.lib
+
 /tags
 
 /ddmg
 /ddmg.exe
 
 *.gb
+*.sav
