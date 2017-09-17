@@ -1,4 +1,5 @@
 import std.traits;
+import std.typecons;
 
 private struct Interrupt {
     ubyte flagBit; // Flag bit used for interruptEnable and interruptFlags registers
@@ -23,21 +24,25 @@ class InterruptHandler {
     private bool masterEnable = true;
 
     // Whether certain interrupts should be processed
-    private ubyte interruptEnable = 0x0000;
+    private ubyte interruptEnable;
 
-    // Keeps track of if an interrupt has happened TODO not sure when this is reset
+    // Keeps track of if an interrupt signal has happened but the interrupt hasn't yet been processed
     private ubyte interruptFlags;
 
-    // Emulator-internal variable to keep track of what interrupts have been requested during the current cycle
-    // Size 5 because of 5 different interrupts
-    bool[(EnumMembers!Interrupts).length] toHandle;
-
     // Check whether an interrupt is enabled
-    @safe bool isInterruptEnabled(Interrupts iupt) {
+    @safe bool isInterruptEnabled(Interrupts iupt) const {
         return (interruptEnable & iupt.flagBit) != 0;
     }
 
-    @safe @property const ubyte interruptEnableRegister() {
+    @safe @property ubyte interruptFlagRegister() const {
+        return interruptFlags;
+    }
+
+    @safe @property void interruptFlagRegister(ubyte iflags) {
+        interruptFlags = iflags;
+    }
+
+    @safe @property ubyte interruptEnableRegister() const {
         return interruptEnable;
     }
 
@@ -49,21 +54,19 @@ class InterruptHandler {
         masterEnable = enabled;
     }
     
-    @safe @property const bool masterToggle() {
+    @safe @property bool masterToggle() const {
         return masterEnable;
     }
 
-    @safe const bool shouldHandle(Interrupts iupt) {
-        return toHandle[iupt.toHandleCode];
+    @safe bool shouldHandle(Interrupts iupt) const {
+        return masterEnable && (interruptFlags & iupt.flagBit) != 0 && isInterruptEnabled(iupt);
     }
 
     @safe void markHandled(Interrupts iupt) {
-        toHandle[iupt.toHandleCode] = false;
+        interruptFlags &= ~iupt.flagBit;
     }
     
     @safe void fireInterrupt(Interrupts iupt) {
-        if(masterEnable && isInterruptEnabled(iupt)) {
-            toHandle[iupt.toHandleCode] = true;
-        }
+        interruptFlags |= iupt.flagBit;
     }
 }

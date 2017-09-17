@@ -143,6 +143,9 @@ class MMU {
         if(address == 0xFFFF) {
             return iuptHandler.interruptEnableRegister;
         }
+        if(address == 0xFF0F) {
+            return iuptHandler.interruptFlagRegister;
+        }
 
         debug {
             writefln("UNIMPLEMENTED : Reading address %04X", address);
@@ -225,6 +228,8 @@ class MMU {
 
         } else if(address == 0xFFFF) {
             iuptHandler.interruptEnableRegister = val;
+        } else if(address == 0xFF0F) {
+            iuptHandler.interruptFlagRegister = val;
 
         } else {
             debug {
