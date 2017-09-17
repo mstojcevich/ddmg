@@ -349,7 +349,7 @@ class CPU {
             instr.impl(); // Execute the operation
             clk.spendCycles(instr.cycles);
         } else {
-            writefln("Program tried to execute instruction %s, which isn't defined", instr.disassembly);
+            writefln("Program tried to execute instruction %s at %02X, which isn't defined", instr.disassembly, regs.pc - 1);
             writefln("The execution is probably tainted");
         }
 
