@@ -434,8 +434,7 @@ class GPU
     {
         this.vram[addr] = val;
 
-        // TODO support the 8800-97ff tile data
-        if(addr >= 0x0000 && addr <= 0x0FFF) {
+        if(addr >= 0x0000 && addr <= 0x17FF) {
             updateTile(addr, val);
 
             // TODO BG can have super priority
@@ -521,7 +520,7 @@ class GPU
         // The index of the tile in the tileset. Pulled from the tilemap.
         ubyte tileIndex = vram[mapLocation + tileMapOffset];
 
-        return tileset[tileIndex];
+        return tileset[tileIndex + (controlRegister.bgDataSelect ? 0 : 128)];
     }
 
 }

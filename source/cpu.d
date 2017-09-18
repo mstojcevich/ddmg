@@ -776,7 +776,7 @@ class CPU {
     /**
      * Bitwise xor a value with register A and store in register A
      */
-    @safe private void xor(in byte src) {
+    @safe private void xor(in ubyte src) {
         regs.a ^= src;
         
         regs.setFlag(Flag.ZERO, regs.a == 0);
@@ -797,7 +797,7 @@ class CPU {
     /**
      * Bitwise or a value with register A and store in register A
      */
-    @safe private void or(in byte src) {
+    @safe private void or(in ubyte src) {
         regs.a |= src;
 
         regs.setFlag(Flag.ZERO, regs.a == 0);
@@ -818,7 +818,7 @@ class CPU {
     /**
      * Set the flags as if a number was subtracted from A, without actually storing the result of the subtraction
      */
-    @safe private void cp(in byte src) {
+    @safe private void cp(in ubyte src) {
         regs.setFlag(Flag.ZERO, regs.a == src);
         regs.setFlag(Flag.OVERFLOW, regs.a < src);
         regs.setFlag(Flag.HALF_OVERFLOW, (regs.a & 0x0F) < (src & 0x0F));
