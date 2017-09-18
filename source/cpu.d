@@ -3,6 +3,8 @@ import std.format;
 import std.exception;
 import std.traits;
 
+import core.bitop;
+
 import mmu;
 import registers;
 import instruction;
@@ -11,13 +13,7 @@ import cartridge;
 import gpu;
 import display;
 import interrupt;
-
-private enum Flag : ubyte {
-    ZERO            = 1 << 7, // Set to 1 when the result of an operation is 0
-    SUBTRACTION     = 1 << 6, // Set to 1 following the execution of the subtraction instruction
-    HALF_OVERFLOW   = 1 << 5, // Set to 1 when an operation carries from or borrows to bit 3
-    OVERFLOW        = 1 << 4  // Set to 1 when an operation carries from or borrows to bit 7
-}
+import keypad;
 
 /**
  * Implementation of the GameBoy CPU
@@ -26,7 +22,7 @@ class CPU {
 
     private Instruction[256] instructions;
 
-    private Registers regs = {};
+    private Registers regs = new Registers();
 
     private MMU mmu;
     private Clock clk;
@@ -90,7 +86,7 @@ class CPU {
             Instruction("INC (HL)",		12, &incReference),
             Instruction("DEC (HL)",		1, &decReference),
             Instruction("LD (HL),d8",	12, {storeImmediateInMemory(regs.hl);}),
-            Instruction("SCF",		    4, {setFlag(Flag.OVERFLOW, true);}),
+            Instruction("SCF",		    4, {regs.setFlag(Flag.OVERFLOW, true);}),
             Instruction("JR C,r8",		0, {jumpRelativeImmediateIfFlag(Flag.OVERFLOW, true);}),
             Instruction("ADD HL,SP",	8, {add(regs.hl, regs.sp);}),
             Instruction("LD A,(HL-)",	8, {loadReferenceMinus(regs.a);}),
@@ -346,7 +342,7 @@ class CPU {
             instr.impl(); // Execute the operation
             clk.spendCycles(instr.cycles);
         } else {
-            writefln("Program tried to execute instruction %s, which isn't defined", instr.disassembly);
+            writefln("Program tried to execute instruction %s at %02X, which isn't defined", instr.disassembly, regs.pc - 1);
             writefln("The execution is probably tainted");
         }
 
@@ -366,33 +362,7 @@ class CPU {
     // A debug function for printing the flag statuses
     @safe private void printFlags() {
         writefln("Z = %d, H = %d, N = %d, CY = %d", 
-            isFlagSet(Flag.ZERO), isFlagSet(Flag.HALF_OVERFLOW), isFlagSet(Flag.SUBTRACTION), isFlagSet(Flag.OVERFLOW));
-    }
-
-    /**
-     * Sets a flag on the flag register
-     */
-    @safe private void setFlag(in Flag f, in bool set) { // TODO make compile-time version for static flag setting
-        if(set) {
-            regs.f = regs.f | f; // ORing with the flag will set it true
-        } else {
-            regs.f = regs.f & ~f; // ANDing with the inverse of f will set the flag to 0
-        }
-    }
-
-    /**
-     * If a flag is 0 in the flag register, this will make it 1; if it is 1, this will make it 0
-     */
-    @safe private void toggleFlag(in Flag f) {
-        regs.f = regs.f ^ f; // XOR will invert the bits that are set in the input
-    }
-
-    /**
-     * Check the status of a flag in the f register
-     * If the flag is 1, returns true, else returns false
-     */
-    @safe private bool isFlagSet(in Flag f) {
-        return (regs.f & f) != 0;
+            regs.isFlagSet(Flag.ZERO), regs.isFlagSet(Flag.HALF_OVERFLOW), regs.isFlagSet(Flag.SUBTRACTION), regs.isFlagSet(Flag.OVERFLOW));
     }
 
     /**
@@ -454,17 +424,17 @@ class CPU {
     }
 
     @safe private void loadSPplusImmediateToHL() {
-        setFlag(Flag.ZERO, false);
-        setFlag(Flag.SUBTRACTION, false);
+        regs.setFlag(Flag.ZERO, false);
+        regs.setFlag(Flag.SUBTRACTION, false);
 
         immutable ubyte im = mmu.readByte(regs.pc);
         regs.pc++;
 
         immutable uint sum = regs.sp + im;
-        setFlag(Flag.OVERFLOW, sum > 0xFFFF);
+        regs.setFlag(Flag.OVERFLOW, sum > 0xFFFF);
 
         immutable ushort halfSum = (regs.sp & 0x0F) + (im & 0x0F);
-        setFlag(Flag.HALF_OVERFLOW, halfSum > 0x0F);
+        regs.setFlag(Flag.HALF_OVERFLOW, halfSum > 0x0F);
 
         regs.hl = cast(ushort) sum;
     }
@@ -535,15 +505,15 @@ class CPU {
         immutable uint result = dst + src;
         immutable ushort outResult = cast(ushort) result;
 
-        // setFlag(Flag.ZERO, outResult == 0); // The result needs to be cast to a ushort so that a overflow by 1 will still be considered 0. TODO check real hardware
+        // regs.setFlag(Flag.ZERO, outResult == 0); // The result needs to be cast to a ushort so that a overflow by 1 will still be considered 0. TODO check real hardware
 
         // If the result went outside the rightmost 16 bits, there was overflow
-        setFlag(Flag.OVERFLOW, result > 0x0000FFFF);
+        regs.setFlag(Flag.OVERFLOW, result > 0x0000FFFF);
 
         // Add the last nibbles of src and dst, and see if it overflows into the next nibble
-        setFlag(Flag.HALF_OVERFLOW, ((dst & 0x000F) + (src & 0x000F)) > 0x000F);
+        regs.setFlag(Flag.HALF_OVERFLOW, ((dst & 0x000F) + (src & 0x000F)) > 0x000F);
 
-        setFlag(Flag.SUBTRACTION, false);
+        regs.setFlag(Flag.SUBTRACTION, false);
 
         dst = outResult;
     }
@@ -554,7 +524,7 @@ class CPU {
     @safe private void offsetStackPointerImmediate() {
         add(regs.sp, cast(short)(cast(byte)(mmu.readByte(regs.pc)))); // Casting twice is so that the sign will carry over to the short
 
-        setFlag(Flag.ZERO, false);
+        regs.setFlag(Flag.ZERO, false);
 
         regs.pc += 1;
     }
@@ -566,22 +536,23 @@ class CPU {
         immutable ushort result = regs.a + src; // Storing in a short so overflow can be checked
         immutable ubyte outResult = cast(ubyte) result; // The result that actually goes into the output register
         
-        setFlag(Flag.ZERO, outResult == 0); // The result needs to be cast to a ubyte so that a overflow by 1 will still be considered 0. TODO check real hardware
+        regs.setFlag(Flag.ZERO, outResult == 0); // The result needs to be cast to a ubyte so that a overflow by 1 will still be considered 0. TODO check real hardware
 
         // If the first byte is nonzero, then there was a carry from the 7th bit
-        setFlag(Flag.OVERFLOW, result > 0x00FF);
+        regs.setFlag(Flag.OVERFLOW, result > 0x00FF);
 
         // Add the last nibbles of the src and dst, and see if it overflows into the leftmost nibble
-        setFlag(Flag.HALF_OVERFLOW, ((regs.a & 0x0F) + (src & 0x0F)) > 0x0F);
+        regs.setFlag(Flag.HALF_OVERFLOW, ((regs.a & 0x0F) + (src & 0x0F)) > 0x0F);
 
-        setFlag(Flag.SUBTRACTION, false);
+        regs.setFlag(Flag.SUBTRACTION, false);
 
         // Result with the extra bits dropped
         regs.a = outResult;
     }
     @system unittest { // Unit test for ADD A, n
-        Clock clk =  new Clock();
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+        Clock clk = new Clock();
+        InterruptHandler ih = new InterruptHandler();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
             // Test 1, 0x3A + 0xC6
@@ -590,25 +561,25 @@ class CPU {
             add(regs.b);
 
             assert(regs.a == 0x00);
-            assert(isFlagSet(Flag.ZERO));
-            assert(isFlagSet(Flag.HALF_OVERFLOW));
-            assert(!isFlagSet(Flag.SUBTRACTION));
-            assert(isFlagSet(Flag.OVERFLOW));
+            assert(regs.isFlagSet(Flag.ZERO));
+            assert(regs.isFlagSet(Flag.HALF_OVERFLOW));
+            assert(!regs.isFlagSet(Flag.SUBTRACTION));
+            assert(regs.isFlagSet(Flag.OVERFLOW));
 
             // Test 2, 0xFF + 0x33
             regs.a = 0xFF;
             regs.c = 0x33;
 
             // Set the subtraction flag to make sure it gets reset
-            setFlag(Flag.SUBTRACTION, true);
+            regs.setFlag(Flag.SUBTRACTION, true);
 
             add(c.regs.c);
 
             assert(regs.a == 0x32);
-            assert(!isFlagSet(Flag.ZERO));
-            assert(isFlagSet(Flag.HALF_OVERFLOW));
-            assert(!isFlagSet(Flag.SUBTRACTION));
-            assert(isFlagSet(Flag.OVERFLOW));
+            assert(!regs.isFlagSet(Flag.ZERO));
+            assert(regs.isFlagSet(Flag.HALF_OVERFLOW));
+            assert(!regs.isFlagSet(Flag.SUBTRACTION));
+            assert(regs.isFlagSet(Flag.OVERFLOW));
         }
     }
 
@@ -636,27 +607,28 @@ class CPU {
         // We can't just call add(src + carry) because if the ubyte overflows to 0 when adding carry, the GB's overflow bit won't get set among other problems
         // TODO check what real hardware does
 
-        immutable ubyte c = isFlagSet(Flag.OVERFLOW) ? 1 : 0;
+        immutable ubyte c = regs.isFlagSet(Flag.OVERFLOW) ? 1 : 0;
          
         immutable ushort result = regs.a + src + c; // Storing in a short so overflow can be checked
         immutable ubyte outResult = cast(ubyte) result; // The result that actually goes into the output register
 
-        setFlag(Flag.ZERO, outResult == 0); // The result needs to be cast to a ubyte so that a overflow by 1 will still be considered 0. TODO check real hardware
+        regs.setFlag(Flag.ZERO, outResult == 0); // The result needs to be cast to a ubyte so that a overflow by 1 will still be considered 0. TODO check real hardware
 
         // If the first byte is nonzero, then there was a carry from the 7th bit
-        setFlag(Flag.OVERFLOW, result > 0x00FF);
+        regs.setFlag(Flag.OVERFLOW, result > 0x00FF);
 
         // Add the last nibbles of the src, dst, and carry and see if it overflows into the leftmost nibble
-        setFlag(Flag.HALF_OVERFLOW, ((regs.a & 0x0F) + (src & 0x0F) + c) > 0x0F);
+        regs.setFlag(Flag.HALF_OVERFLOW, ((regs.a & 0x0F) + (src & 0x0F) + c) > 0x0F);
 
-        setFlag(Flag.SUBTRACTION, false);
+        regs.setFlag(Flag.SUBTRACTION, false);
 
         // Result with the extra bits dropped
         regs.a = outResult;
      }
      @system unittest { // Unit test for ADC A, n
-        Clock clk =  new Clock();
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+        Clock clk = new Clock();
+        InterruptHandler ih = new InterruptHandler();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
             regs.a = 0xE1;
@@ -664,42 +636,42 @@ class CPU {
             regs.c = 0x3B;
             regs.h = 0x1E;
 
-            setFlag(Flag.OVERFLOW, true);
+            regs.setFlag(Flag.OVERFLOW, true);
 
             adc(regs.b);
             assert(regs.a == 0xF1);
-            assert(!isFlagSet(Flag.SUBTRACTION));
-            assert(!isFlagSet(Flag.ZERO));
-            assert(isFlagSet(Flag.HALF_OVERFLOW));
-            assert(!isFlagSet(Flag.OVERFLOW));
+            assert(!regs.isFlagSet(Flag.SUBTRACTION));
+            assert(!regs.isFlagSet(Flag.ZERO));
+            assert(regs.isFlagSet(Flag.HALF_OVERFLOW));
+            assert(!regs.isFlagSet(Flag.OVERFLOW));
 
             regs.a = 0xE1;
             regs.b = 0x0F;
             regs.c = 0x3B;
             regs.h = 0x1E;
 
-            setFlag(Flag.OVERFLOW, true);
+            regs.setFlag(Flag.OVERFLOW, true);
 
             adc(regs.c);
             assert(regs.a == 0x1D);
-            assert(!isFlagSet(Flag.SUBTRACTION));
-            assert(!isFlagSet(Flag.ZERO));
-            assert(!isFlagSet(Flag.HALF_OVERFLOW));
-            assert(isFlagSet(Flag.OVERFLOW));
+            assert(!regs.isFlagSet(Flag.SUBTRACTION));
+            assert(!regs.isFlagSet(Flag.ZERO));
+            assert(!regs.isFlagSet(Flag.HALF_OVERFLOW));
+            assert(regs.isFlagSet(Flag.OVERFLOW));
 
             regs.a = 0xE1;
             regs.b = 0x0F;
             regs.c = 0x3B;
             regs.h = 0x1E;
 
-            setFlag(Flag.OVERFLOW, true);
+            regs.setFlag(Flag.OVERFLOW, true);
 
             adc(regs.h);
             assert(regs.a == 0x00);
-            assert(!isFlagSet(Flag.SUBTRACTION));
-            assert(isFlagSet(Flag.ZERO));
-            assert(isFlagSet(Flag.HALF_OVERFLOW));
-            assert(isFlagSet(Flag.OVERFLOW));
+            assert(!regs.isFlagSet(Flag.SUBTRACTION));
+            assert(regs.isFlagSet(Flag.ZERO));
+            assert(regs.isFlagSet(Flag.HALF_OVERFLOW));
+            assert(regs.isFlagSet(Flag.OVERFLOW));
         }
      }
 
@@ -719,15 +691,15 @@ class CPU {
     }
 
     @safe private void sub(ubyte src) {
-        setFlag(Flag.SUBTRACTION, true);
+        regs.setFlag(Flag.SUBTRACTION, true);
 
-        setFlag(Flag.OVERFLOW, src > regs.a); // overflow if reg > a, so subtraction would result in a neg number
+        regs.setFlag(Flag.OVERFLOW, src > regs.a); // overflow if reg > a, so subtraction would result in a neg number
 
-        setFlag(Flag.HALF_OVERFLOW, (src & 0x0F) > (regs.a & 0x0F)); // same but for the last nibble
+        regs.setFlag(Flag.HALF_OVERFLOW, (src & 0x0F) > (regs.a & 0x0F)); // same but for the last nibble
 
         regs.a -= src;
 
-        setFlag(Flag.ZERO, regs.a == 0);
+        regs.setFlag(Flag.ZERO, regs.a == 0);
     }
 
 
@@ -750,19 +722,19 @@ class CPU {
         // We can't just call sub(src + carry) because if the ubyte overflows to 0 when adding carry, the GB's overflow bit won't get set among other problems
         // TODO check what real hardware does
 
-        immutable ubyte c = isFlagSet(Flag.OVERFLOW) ? 1 : 0;
+        immutable ubyte c = regs.isFlagSet(Flag.OVERFLOW) ? 1 : 0;
 
         immutable ushort subtrahend = src + c;
         
-        setFlag(Flag.OVERFLOW, subtrahend > regs.a);
+        regs.setFlag(Flag.OVERFLOW, subtrahend > regs.a);
 
-        setFlag(Flag.HALF_OVERFLOW, (subtrahend & 0x0F) > (regs.a & 0x0F));
+        regs.setFlag(Flag.HALF_OVERFLOW, (subtrahend & 0x0F) > (regs.a & 0x0F));
 
-        setFlag(Flag.SUBTRACTION, true);
+        regs.setFlag(Flag.SUBTRACTION, true);
 
         regs.a = cast(ubyte) (regs.a - subtrahend);
 
-        setFlag(Flag.ZERO, regs.a == 0);
+        regs.setFlag(Flag.ZERO, regs.a == 0);
     }
 
     /**
@@ -786,10 +758,10 @@ class CPU {
     @safe private void and(in ubyte src) {
         regs.a &= src;
 
-        setFlag(Flag.ZERO, regs.a == 0);
-        setFlag(Flag.HALF_OVERFLOW, 1);
-        setFlag(Flag.SUBTRACTION, 0);
-        setFlag(Flag.OVERFLOW, 0);
+        regs.setFlag(Flag.ZERO, regs.a == 0);
+        regs.setFlag(Flag.HALF_OVERFLOW, 1);
+        regs.setFlag(Flag.SUBTRACTION, 0);
+        regs.setFlag(Flag.OVERFLOW, 0);
     }
 
     @safe private void andReference() {
@@ -807,10 +779,10 @@ class CPU {
     @safe private void xor(in byte src) {
         regs.a ^= src;
         
-        setFlag(Flag.ZERO, regs.a == 0);
-        setFlag(Flag.HALF_OVERFLOW, 0);
-        setFlag(Flag.SUBTRACTION, 0);
-        setFlag(Flag.OVERFLOW, 0);
+        regs.setFlag(Flag.ZERO, regs.a == 0);
+        regs.setFlag(Flag.HALF_OVERFLOW, 0);
+        regs.setFlag(Flag.SUBTRACTION, 0);
+        regs.setFlag(Flag.OVERFLOW, 0);
     }
 
     @safe private void xorReference() {
@@ -828,10 +800,10 @@ class CPU {
     @safe private void or(in byte src) {
         regs.a |= src;
 
-        setFlag(Flag.ZERO, regs.a == 0);
-        setFlag(Flag.HALF_OVERFLOW, 0);
-        setFlag(Flag.SUBTRACTION, 0);
-        setFlag(Flag.OVERFLOW, 0);
+        regs.setFlag(Flag.ZERO, regs.a == 0);
+        regs.setFlag(Flag.HALF_OVERFLOW, 0);
+        regs.setFlag(Flag.SUBTRACTION, 0);
+        regs.setFlag(Flag.OVERFLOW, 0);
     }
 
     @safe private void orReference() {
@@ -847,10 +819,10 @@ class CPU {
      * Set the flags as if a number was subtracted from A, without actually storing the result of the subtraction
      */
     @safe private void cp(in byte src) {
-        setFlag(Flag.ZERO, regs.a == src);
-        setFlag(Flag.OVERFLOW, regs.a < src);
-        setFlag(Flag.HALF_OVERFLOW, (regs.a & 0x0F) < (src & 0x0F));
-        setFlag(Flag.SUBTRACTION, true);
+        regs.setFlag(Flag.ZERO, regs.a == src);
+        regs.setFlag(Flag.OVERFLOW, regs.a < src);
+        regs.setFlag(Flag.HALF_OVERFLOW, (regs.a & 0x0F) < (src & 0x0F));
+        regs.setFlag(Flag.SUBTRACTION, true);
     }
 
     @safe private void cpReference() {
@@ -863,10 +835,10 @@ class CPU {
     }
     
     @safe private void inc(ref reg8 reg) {
-        setFlag(Flag.SUBTRACTION, true);
-        setFlag(Flag.HALF_OVERFLOW, (reg & 0x0F) == 0x0F);
+        regs.setFlag(Flag.SUBTRACTION, true);
+        regs.setFlag(Flag.HALF_OVERFLOW, (reg & 0x0F) == 0x0F);
         reg = cast(reg8) (reg + 1);
-        setFlag(Flag.ZERO, reg == 0);
+        regs.setFlag(Flag.ZERO, reg == 0);
     }
 
     /**
@@ -879,10 +851,10 @@ class CPU {
     }
 
     @safe private void dec(ref reg8 reg) {
-        setFlag(Flag.SUBTRACTION, true);
-        setFlag(Flag.HALF_OVERFLOW, (reg & 0x0F) == 0);
+        regs.setFlag(Flag.SUBTRACTION, true);
+        regs.setFlag(Flag.HALF_OVERFLOW, (reg & 0x0F) == 0);
         reg = cast(reg8) (reg - 1);
-        setFlag(Flag.ZERO, reg == 0);
+        regs.setFlag(Flag.ZERO, reg == 0);
     }
 
     /**
@@ -907,30 +879,31 @@ class CPU {
      * and to the new bit 0
      */
     @safe private void rlca() {
-        setFlag(Flag.SUBTRACTION, false);
-        setFlag(Flag.ZERO, false);
-        setFlag(Flag.HALF_OVERFLOW, false);
+        regs.setFlag(Flag.SUBTRACTION, false);
+        regs.setFlag(Flag.ZERO, false);
+        regs.setFlag(Flag.HALF_OVERFLOW, false);
 
         immutable bool leftmostBit = regs.a >> 7;
 
-        regs.a = cast(ubyte)((regs.a << 1) + leftmostBit);
-        setFlag(Flag.OVERFLOW, leftmostBit);
+        regs.a = rol(regs.a, 1);
+        regs.setFlag(Flag.OVERFLOW, leftmostBit);
     }
     @system unittest {  // Unit tests for RLCA
-        Clock clk =  new Clock();
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+        Clock clk = new Clock();
+        InterruptHandler ih = new InterruptHandler();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
             regs.a = 0x85;
-            setFlag(Flag.OVERFLOW, false);
+            regs.setFlag(Flag.OVERFLOW, false);
 
             rlca();
 
             assert(regs.a == 0x0B);
-            assert(isFlagSet(Flag.OVERFLOW));
-            assert(!isFlagSet(Flag.ZERO));
-            assert(!isFlagSet(Flag.HALF_OVERFLOW));
-            assert(!isFlagSet(Flag.SUBTRACTION));
+            assert(regs.isFlagSet(Flag.OVERFLOW));
+            assert(!regs.isFlagSet(Flag.ZERO));
+            assert(!regs.isFlagSet(Flag.HALF_OVERFLOW));
+            assert(!regs.isFlagSet(Flag.SUBTRACTION));
         }
     }
 
@@ -939,31 +912,32 @@ class CPU {
      * and the previous carry flag going to the new bit 0
      */
     @safe private void rla() {
-        setFlag(Flag.SUBTRACTION, false);
-        setFlag(Flag.ZERO, false);
-        setFlag(Flag.HALF_OVERFLOW, false);
+        regs.setFlag(Flag.SUBTRACTION, false);
+        regs.setFlag(Flag.ZERO, false);
+        regs.setFlag(Flag.HALF_OVERFLOW, false);
 
         immutable bool leftmostBit = regs.a >> 7;
-        immutable bool carryFlag = isFlagSet(Flag.OVERFLOW);
+        immutable bool carryFlag = regs.isFlagSet(Flag.OVERFLOW);
         
         regs.a = cast(ubyte)((regs.a << 1)) | carryFlag;
-        setFlag(Flag.OVERFLOW, leftmostBit);
+        regs.setFlag(Flag.OVERFLOW, leftmostBit);
     }
     @system unittest {  // Unit tests for RLA
-        Clock clk =  new Clock();
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+        Clock clk = new Clock();
+        InterruptHandler ih = new InterruptHandler();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
             regs.a = 0x05;
-            setFlag(Flag.OVERFLOW, true);
+            regs.setFlag(Flag.OVERFLOW, true);
 
             rla();
 
             assert(regs.a == 0x0B);
-            assert(!isFlagSet(Flag.OVERFLOW));
-            assert(!isFlagSet(Flag.ZERO));
-            assert(!isFlagSet(Flag.HALF_OVERFLOW));
-            assert(!isFlagSet(Flag.SUBTRACTION));
+            assert(!regs.isFlagSet(Flag.OVERFLOW));
+            assert(!regs.isFlagSet(Flag.ZERO));
+            assert(!regs.isFlagSet(Flag.HALF_OVERFLOW));
+            assert(!regs.isFlagSet(Flag.SUBTRACTION));
         }
     }
 
@@ -972,30 +946,31 @@ class CPU {
      * the new 8th bit and the carry flag
      */
     @safe private void rrca() {
-        setFlag(Flag.SUBTRACTION, false);
-        setFlag(Flag.ZERO, false);
-        setFlag(Flag.HALF_OVERFLOW, false);
+        regs.setFlag(Flag.SUBTRACTION, false);
+        regs.setFlag(Flag.ZERO, false);
+        regs.setFlag(Flag.HALF_OVERFLOW, false);
 
         immutable bool rightmostBit = regs.a & 0b1;
 
         regs.a = (regs.a >> 1) | (rightmostBit << 7);
-        setFlag(Flag.OVERFLOW, rightmostBit);
+        regs.setFlag(Flag.OVERFLOW, rightmostBit);
     }
     @system unittest {
-        Clock clk =  new Clock();
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+        Clock clk = new Clock();
+        InterruptHandler ih = new InterruptHandler();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
             regs.a = 0x3B;
-            setFlag(Flag.OVERFLOW, false);
+            regs.setFlag(Flag.OVERFLOW, false);
 
             rrca();
 
             assert(regs.a == 0x9D);
-            assert(isFlagSet(Flag.OVERFLOW));
-            assert(!isFlagSet(Flag.ZERO));
-            assert(!isFlagSet(Flag.HALF_OVERFLOW));
-            assert(!isFlagSet(Flag.SUBTRACTION));
+            assert(regs.isFlagSet(Flag.OVERFLOW));
+            assert(!regs.isFlagSet(Flag.ZERO));
+            assert(!regs.isFlagSet(Flag.HALF_OVERFLOW));
+            assert(!regs.isFlagSet(Flag.SUBTRACTION));
         }
     }
 
@@ -1004,31 +979,32 @@ class CPU {
      * and the old 0th bit going to the carry flag
      */
     @safe private void rra() {
-        setFlag(Flag.SUBTRACTION, false);
-        setFlag(Flag.ZERO, false);
-        setFlag(Flag.HALF_OVERFLOW, false);
+        regs.setFlag(Flag.SUBTRACTION, false);
+        regs.setFlag(Flag.ZERO, false);
+        regs.setFlag(Flag.HALF_OVERFLOW, false);
 
         immutable bool rightmostBit = regs.a & 0b1;
-        immutable bool carryBit = isFlagSet(Flag.OVERFLOW);
+        immutable bool carryBit = regs.isFlagSet(Flag.OVERFLOW);
         
         regs.a = (regs.a >> 1) | (carryBit << 7);
-        setFlag(Flag.OVERFLOW, rightmostBit);
+        regs.setFlag(Flag.OVERFLOW, rightmostBit);
     }
     @system unittest {
-        Clock clk =  new Clock();
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk)), clk);
+        Clock clk = new Clock();
+        InterruptHandler ih = new InterruptHandler();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
             regs.a = 0x81;
-            setFlag(Flag.OVERFLOW, false);
+            regs.setFlag(Flag.OVERFLOW, false);
 
             rra();
 
             assert(regs.a == 0x40);
-            assert(isFlagSet(Flag.OVERFLOW));
-            assert(!isFlagSet(Flag.ZERO));
-            assert(!isFlagSet(Flag.HALF_OVERFLOW));
-            assert(!isFlagSet(Flag.SUBTRACTION));
+            assert(regs.isFlagSet(Flag.OVERFLOW));
+            assert(!regs.isFlagSet(Flag.ZERO));
+            assert(!regs.isFlagSet(Flag.HALF_OVERFLOW));
+            assert(!regs.isFlagSet(Flag.SUBTRACTION));
         }
     }
 
@@ -1041,7 +1017,7 @@ class CPU {
      * Jump to the immediate address if the specified flag is set/reset (depending on second parameter)
      */
     @safe private void jumpImmediateIfFlag(in Flag f, in bool set) {
-        if(isFlagSet(f) == set) {
+        if(regs.isFlagSet(f) == set) {
             jumpImmediate();
 
             clk.spendCycles(16);
@@ -1072,7 +1048,7 @@ class CPU {
      * JR if the specified flag is set/unset
      */
     @safe private void jumpRelativeImmediateIfFlag(Flag f, bool set) {
-        if(isFlagSet(f) == set) {
+        if(regs.isFlagSet(f) == set) {
             jumpRelativeImmediate();
             
             clk.spendCycles(12);
@@ -1097,7 +1073,7 @@ class CPU {
     @safe private void complementFlag(in Flag f) {
         // You look really nice today Ms. Carry
 
-        toggleFlag(f);
+        regs.toggleFlag(f);
     }
 
     /**
@@ -1138,7 +1114,7 @@ class CPU {
         regs.pc++;
     }
 
-    /**
+    /**cast(ubyte)((regs.a << 1) + leftmostBit)
      * Save the value in register A to memory at FF00 + (8-bit immediate)
      */
     @safe private void ldhAToImmediate() {
@@ -1175,7 +1151,7 @@ class CPU {
      * Call an immediate 16-bit value if the specified flag is set/reset (depending on second argument)
      */
     @safe private void callImmediateIfFlag(in Flag f, in bool set) {
-        if(isFlagSet(f) == set) {
+        if(regs.isFlagSet(f) == set) {
             callImmediate();
 
             clk.spendCycles(24);
@@ -1197,7 +1173,7 @@ class CPU {
      * RET if the specified flag is set/reset (depending on the second parameter)
      */
     @safe private void retIfFlag(in Flag f, in bool set) {
-        if(isFlagSet(f) == set) {
+        if(regs.isFlagSet(f) == set) {
             ret();
 
             clk.spendCycles(20);

@@ -21,7 +21,9 @@ class Gameboy {
         this.gpu = new GPU(this.display, this.clock, this.iuptHandler);
         this.mmu = new MMU(this.cartridge, this.gpu, this.keypad, this.iuptHandler);
         this.cpu = new CPU(this.mmu, this.clock, this.iuptHandler);
+    }
 
+    public void run() {
         while(true) {
             cpu.step();
             gpu.step();
@@ -31,4 +33,5 @@ class Gameboy {
             }
         }
     }
+
 }

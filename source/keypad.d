@@ -24,9 +24,11 @@ class Keypad {
     private GLFWwindow* window;
 
     this(GLFWwindow* w) {
-        this.window = w;
-        
-        glfwSetKeyCallback(window, &keyCallback);
+        if(w != null) {
+            this.window = w;
+            
+            glfwSetKeyCallback(window, &keyCallback);
+        }
     }
 
     @safe bool isJOYPFlagSet(JOYPFlag flag) {
