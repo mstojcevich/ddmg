@@ -116,7 +116,7 @@ class GPU
     private ubyte[] oam;
 
     // This holds the palette number (a number from 0 to 3)
-    private ubyte[8][8][NUM_TILES] tileset;
+    private ubyte[TILE_SIZE][TILE_SIZE][NUM_TILES] tileset;
 
     private ubyte bgPalette; // FF47 BG Palette Data register
     private ubyte objPalette0; // FF48 Object Palette 0 Data
@@ -240,13 +240,13 @@ class GPU
         }
 
         // Y level of the tile being updated
-        ubyte y = cast(ubyte)(addr / 2) % 8; // 2 bytes per line
+        ubyte y = cast(ubyte)(addr / 2) % TILE_SIZE; // 2 bytes per line
 
         // The second byte contains the upper bits of the color
         // So this indicates whether this byte contains the upper or lower bits
         bool upperBits = addr % 2 == 1;
 
-        for (ubyte x = 0; x < 8; x++)
+        for (ubyte x = 0; x < TILE_SIZE; x++)
         {
             // Inverted X since the bits are read backwards
             ubyte invX = cast(ubyte)(7 - x);
@@ -342,7 +342,7 @@ class GPU
             ubyte[TILE_SIZE][TILE_SIZE] tile = tilemapLookup(controlRegister.bgMapSelect, tileRow, tileCol);
 
             // Render out the tile at the current scanline
-            ubyte color = tile[scrolledY % 8][scrolledX % TILE_SIZE];
+            ubyte color = tile[scrolledY % TILE_SIZE][scrolledX % TILE_SIZE];
 
             // Apply the current palette
             color = (bgPalette >> color) & 0b11;
@@ -505,7 +505,7 @@ class GPU
      * @parma col Column (x-value) of the tile to look up. Between 0 and 31 inclusive
      * @returns An 8x8 ubyte array representing the tile's colors
      */
-    @safe ubyte[8][8] tilemapLookup(TileMapDisplay mapType, ubyte row, ubyte col)
+    @safe ubyte[TILE_SIZE][TILE_SIZE] tilemapLookup(TileMapDisplay mapType, ubyte row, ubyte col)
     in {
         assert(row < 32);
         assert(col < 32);
