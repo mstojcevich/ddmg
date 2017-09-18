@@ -130,9 +130,11 @@ class GPU
         this.vram = new ubyte[8192];
         this.oam = new ubyte[160];
         this.iuptHandler = ih;
-        this.controlRegister.data = 0;
+        this.controlRegister.data = 0x90;
 
-        bgPalette = 0b00011011;
+        bgPalette = 0b11111100;
+        objPalette0 = 0b11111111;
+        objPalette1 = 0b11111111;
     }
 
     void step()
