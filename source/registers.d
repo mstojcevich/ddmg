@@ -9,6 +9,16 @@ alias reg16 = ushort;
 alias reg8 = ubyte;
 
 /**
+ * Flag bits in the f register
+ */
+enum Flag : ubyte {
+    ZERO            = 1 << 7, // Set to 1 when the result of an operation is 0
+    SUBTRACTION     = 1 << 6, // Set to 1 following the execution of the subtraction instruction
+    HALF_OVERFLOW   = 1 << 5, // Set to 1 when an operation carries from or borrows to bit 3
+    OVERFLOW        = 1 << 4  // Set to 1 when an operation carries from or borrows to bit 7
+}
+
+/**
  * A specific register pair (16-bit superregister)
  * that can be addressed either singularly or as a group
  */
@@ -30,7 +40,7 @@ private template Register(string firstHalf, string secondHalf) {
 /**
  * The registers of a Gameboy CPU
  */
-struct Registers {
+class Registers {
     mixin(Register!("a", "f")); // A = accum, F = flags
     mixin(Register!("b", "c")); // General registers
     mixin(Register!("d", "e")); // General registers
@@ -45,4 +55,31 @@ struct Registers {
      * Program counter, determines where the current instruction is in memory
      */
     reg16 pc;
+
+    /**
+     * Sets a flag on the flag register
+     */
+    @safe void setFlag(in Flag f, in bool set) {
+        if(set) {
+            this.f = this.f | f; // ORing with the flag will set it true
+        } else {
+            this.f = this.f & ~f; // ANDing with the inverse of f will set the flag to 0
+        }
+    }
+
+    /**
+     * Check the status of a flag in the f register
+     * If the flag is 1, returns true, else returns false
+     */
+    @safe bool isFlagSet(in Flag f) {
+        return (this.f & f) != 0;
+    }
+
+    /**
+     * If a flag is 0 in the flag register, this will make it 1; if it is 1, this will make it 0
+     */
+    @safe void toggleFlag(in Flag f) {
+        this.f = this.f ^ f; // XOR will invert the bits that are set in the input
+    }
+
 }
