@@ -310,7 +310,7 @@ class GPU
                     }
 
                     // Apply the current palette
-                    color = (bgPalette >> color) & 0b11;
+                    color = (palette >> (color * 2)) & 0b11;
                     display.setPixelGB(x, lineNum, color);
                 }
             }
@@ -345,7 +345,7 @@ class GPU
             ubyte color = tile[scrolledY % TILE_SIZE][scrolledX % TILE_SIZE];
 
             // Apply the current palette
-            color = (bgPalette >> color) & 0b11;
+            color = (bgPalette >> (color * 2)) & 0b11;
             display.setPixelGB(x, lineNum, color);
         }
     }
