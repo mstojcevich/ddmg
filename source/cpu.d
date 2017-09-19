@@ -952,7 +952,7 @@ class CPU {
 
         immutable bool rightmostBit = regs.a & 0b1;
 
-        regs.a = (regs.a >> 1) | (rightmostBit << 7);
+        regs.a = ror(regs.a, 1);
         regs.setFlag(Flag.OVERFLOW, rightmostBit);
     }
     @system unittest {
