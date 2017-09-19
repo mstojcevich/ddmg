@@ -205,9 +205,9 @@ class MMU {
         } else if(address == 0xFF41) {
             gpu.setLCDStatus(val);
         } else if(address == 0xFF42) {
-            gpu.setScrollX(val);
-        } else if(address == 0xFF43) {
             gpu.setScrollY(val);
+        } else if(address == 0xFF43) {
+            gpu.setScrollX(val);
         } else if(address == BGP) {
             gpu.backgroundPalette = val;
         } else if(address == OBP0) {
