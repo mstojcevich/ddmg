@@ -14,6 +14,7 @@ import gpu;
 import display;
 import interrupt;
 import keypad;
+import cb;
 
 /**
  * Implementation of the GameBoy CPU
@@ -27,8 +28,11 @@ class CPU {
     private MMU mmu;
     private Clock clk;
     private InterruptHandler iuptHandler;
+	private CB cbBlock;
 
     @safe this(MMU mmu, Clock clk, InterruptHandler ih) {
+		this.cbBlock = new CB(regs, mmu);
+
         // 0 in the cycle count will mean it's calculated conditionally later
         this.instructions = [
             Instruction("NOP",          4, &nop),
@@ -234,7 +238,7 @@ class CPU {
             Instruction("RET Z",		0, {retIfFlag(Flag.ZERO, true);}),
             Instruction("RET",		    16, &ret),
             Instruction("JP Z,a16",		0, {jumpImmediateIfFlag(Flag.ZERO, true);}),
-            Instruction("PREFIX CB",	4, null),
+            Instruction("PREFIX CB",	0, &cb),
             Instruction("CALL Z,a16",	0, {callImmediateIfFlag(Flag.ZERO, true);}),
             Instruction("CALL a16",		24, &callImmediate),
             Instruction("ADC A,d8",		8, &adcImmediate),
@@ -1179,6 +1183,30 @@ class CPU {
             clk.spendCycles(20);
         } else {
             clk.spendCycles(8);
+        }
+    }
+
+	@safe private void cb() {
+		immutable ubyte subop = mmu.readByte(regs.pc);
+        regs.pc += 1;
+
+		clk.spendCycles(cbBlock.handle(subop));
+	}
+    @system unittest {
+        Clock clk = new Clock();
+        InterruptHandler ih = new InterruptHandler();
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
+
+        with(c) {
+            regs.a = 0xAB;
+            regs.hl = 0xC010;
+            mmu.writeByte(regs.hl, 0xAB);
+            cbBlock.handle(0x37);
+            cbBlock.handle(0x36);
+            writefln("%02X", regs.a);
+            writefln("%02X", mmu.readByte(regs.hl));
+            assert(regs.a == 0xBA);
+            assert(mmu.readByte(regs.hl) == 0xBA);
         }
     }
 
