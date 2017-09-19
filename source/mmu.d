@@ -231,9 +231,13 @@ class MMU {
         } else if(address == 0xFF0F) {
             iuptHandler.interruptFlagRegister = val;
 
-        } else {
+        } else if(address < 0xFEA0 || address > 0xFEFF) { // Unimplemented but don't want to crash for unmapped
             debug {
                 writefln("UNIMPLEMENTED : Writing %02X at address %04X", val, address);
+            }
+        } else {
+            debug {
+                writefln("UNMAPPED : Writing %02X at address %04X", val, address);
             }
 
             throw new UnmappedMemoryAccessException(address);

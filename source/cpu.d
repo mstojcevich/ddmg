@@ -343,8 +343,18 @@ class CPU {
         regs.pc++;
 
         if(instr.impl !is null) {
-            instr.impl(); // Execute the operation
-            clk.spendCycles(instr.cycles);
+            try {
+                instr.impl(); // Execute the operation
+                clk.spendCycles(instr.cycles);
+            } catch (Exception e) {
+                writefln("Instruction failed with exception \"%s\"", e.msg);
+                writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
+                writefln("PC: %04X\tSP: %04X", regs.pc, regs.sp);
+                writefln("@ %04X: %02X -> %s", regs.pc, opcode, instr.disassembly);
+                writeln();
+
+                throw e;
+            }
         } else {
             writefln("Program tried to execute instruction %s at %02X, which isn't defined", instr.disassembly, regs.pc - 1);
             writefln("The execution is probably tainted");
