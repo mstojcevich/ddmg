@@ -328,7 +328,7 @@ class CPU {
 
         Instruction instr = instructions[opcode];
 
-        if(false) {
+        if(regs.pc >= 0xC31A && regs.pc <= 0xC32A) {
             writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
             writefln("PC: %04X\tSP: %04X", regs.pc, regs.sp);
             writefln("@ %04X: %02X -> %s", regs.pc, opcode, instr.disassembly);
@@ -849,7 +849,7 @@ class CPU {
     }
     
     @safe private void inc(ref reg8 reg) {
-        regs.setFlag(Flag.SUBTRACTION, true);
+        regs.setFlag(Flag.SUBTRACTION, false);
         regs.setFlag(Flag.HALF_OVERFLOW, (reg & 0x0F) == 0x0F);
         reg = cast(reg8) (reg + 1);
         regs.setFlag(Flag.ZERO, reg == 0);
