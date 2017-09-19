@@ -520,7 +520,7 @@ class GPU
         // The index of the tile in the tileset. Pulled from the tilemap.
         ubyte tileIndex = vram[mapLocation + tileMapOffset];
 
-        return tileset[tileIndex + (controlRegister.bgDataSelect ? 0 : 128)];
+        return tileset[controlRegister.bgDataSelect ? tileIndex : cast(byte)(tileIndex) + 256];
     }
 
 }
