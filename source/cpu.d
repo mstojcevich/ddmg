@@ -517,18 +517,14 @@ class CPU {
      * Add a 16-bit value to a 16-bit register
      */
     @safe private void add(ref reg16 dst, in ushort src) {
-        // TODO is the zero flag actually supposed to be set?
-
         immutable uint result = dst + src;
         immutable ushort outResult = cast(ushort) result;
-
-        // regs.setFlag(Flag.ZERO, outResult == 0); // The result needs to be cast to a ushort so that a overflow by 1 will still be considered 0. TODO check real hardware
 
         // If the result went outside the rightmost 16 bits, there was overflow
         regs.setFlag(Flag.OVERFLOW, result > 0x0000FFFF);
 
-        // Add the last nibbles of src and dst, and see if it overflows into the next nibble
-        regs.setFlag(Flag.HALF_OVERFLOW, ((dst & 0x000F) + (src & 0x000F)) > 0x000F);
+        // Half overflow acts kind of unexpected here and checks the overflow onto the 12th bit
+        regs.setFlag(Flag.HALF_OVERFLOW, ((dst & 0x0FFF) + (src & 0x0FFF)) > 0x0FFF);
 
         regs.setFlag(Flag.SUBTRACTION, false);
 
@@ -737,7 +733,6 @@ class CPU {
 
     @safe private void sbc(ubyte src) {
         // We can't just call sub(src + carry) because if the ubyte overflows to 0 when adding carry, the GB's overflow bit won't get set among other problems
-        // TODO check what real hardware does
 
         immutable ubyte c = regs.isFlagSet(Flag.OVERFLOW) ? 1 : 0;
 
