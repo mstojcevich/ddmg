@@ -74,7 +74,7 @@ class CPU {
             Instruction("INC H",		4, {inc(regs.h);}),
             Instruction("DEC H",		4, {dec(regs.h);}),
             Instruction("LD H,d8",		8, {loadImmediate(regs.h);}),
-            Instruction("DAA",		    4, null),
+            Instruction("DAA",		    4, &daa),
             Instruction("JR Z,r8",		0, {jumpRelativeImmediateIfFlag(Flag.ZERO, true);}),
             Instruction("ADD HL,HL",	8, {add(regs.hl, regs.hl);}),
             Instruction("LD A,(HL+)",	8, {loadReferencePlus(regs.a);}),
@@ -1221,6 +1221,39 @@ class CPU {
             assert(regs.a == 0xBA);
             assert(mmu.readByte(regs.hl) == 0xBA);
         }
+    }
+
+    /**
+     * Decimal adjusts A after operations involving multiple decimal encoded binary operations
+     * This also does some weird stuff to emulate how the GB deals with invalid decimal encoded values
+     */
+    @safe private void daa() {
+        // I apologize for the confusing and undocumented implementation.
+        // It's based on the implementation in MGBA here: https://github.com/mgba-emu/mgba/blob/master/src/lr35902/isa-lr35902.c
+
+        if(regs.isFlagSet(Flag.SUBTRACTION)) {
+            if(regs.isFlagSet(Flag.HALF_OVERFLOW)) {
+                regs.a += 0xFA;
+            }
+            if(regs.isFlagSet(Flag.OVERFLOW)) {
+                regs.a += 0xA0;
+            }
+        } else { // addition
+            int a = regs.a; // Make regs.a bigger so we don't overflow the byte
+            if((regs.a & 0xF) > 0x9 || regs.isFlagSet(Flag.HALF_OVERFLOW)) {
+                a += 0x06;
+            }
+            if((a & 0x1F0) > 0x90 || regs.isFlagSet(Flag.OVERFLOW)) {
+                a += 0x60;
+                regs.setFlag(Flag.OVERFLOW, 1);
+            } else {
+                regs.setFlag(Flag.OVERFLOW, 0);
+            }
+            regs.a = a;
+        }
+
+        regs.setFlag(Flag.HALF_OVERFLOW, 0);
+        regs.setFlag(Flag.ZERO, regs.a == 0);
     }
 
     // TODO use function templates for the functions that are the same between reg8 and reg16

@@ -35,6 +35,7 @@ enum Flag : ubyte {
 
     /**
      * Carry flag (aka "cy")
+     * Used for conditional jumps and also some instructions which consider carry
      */
     OVERFLOW        = 1 << 4  // Set to 1 when an operation carries from or borrows to bit 7
 }
