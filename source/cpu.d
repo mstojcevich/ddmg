@@ -278,7 +278,7 @@ class CPU {
             Instruction("LDH A,(a8)",	12, &ldhImmediateToA),
             Instruction("POP AF",		12, {
                 popFromStack(regs.af);
-                regs.f &= 0b0000;
+                regs.f &= 0b0000; // The last 4 bits cannot be written to and should be forced 0
             }),
             Instruction("LD A,(C)",		8, &ldAC),
             Instruction("DI",		    4, {iuptHandler.masterToggle = false;}),
