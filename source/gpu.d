@@ -286,7 +286,7 @@ class GPU
             SpriteAttributes attrs = (cast(SpriteAttributes[]) oam)[i];
 
             // Row on the sprite that this scanline represents
-            int tileRow = lineNum - attrs.y;
+            int tileRow = lineNum - attrs.y + 16;
 
             // Ensure that some part of the sprite lies on the current scanline
             if(tileRow >= 0 && tileRow < TILE_SIZE) {
@@ -311,7 +311,7 @@ class GPU
 
                     // Apply the current palette
                     color = (palette >> (color * 2)) & 0b11;
-                    display.setPixelGB(x, lineNum, color);
+                    display.setPixelGB(cast(ubyte)(x - 8), lineNum, color);
                 }
             }
         }
