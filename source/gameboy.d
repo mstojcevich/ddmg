@@ -11,8 +11,8 @@ class Gameboy {
     private Keypad keypad;
     private InterruptHandler iuptHandler;
 
-    this() {
-        this.cartridge = new Cartridge("opus5.gb");
+    this(string romPath) {
+        this.cartridge = new Cartridge(romPath);
 
         this.display = new Display();
         this.keypad = new Keypad(this.display.glfwWindow);
