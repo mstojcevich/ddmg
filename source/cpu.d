@@ -447,8 +447,9 @@ class CPU {
         immutable ubyte im = mmu.readByte(regs.pc);
         regs.pc++;
 
-        immutable uint sum = regs.sp + im;
-        regs.setFlag(Flag.OVERFLOW, sum > 0xFFFF);
+        // lots of casts for sign extension
+        immutable uint sum = regs.sp + cast(ushort)(cast(short)(cast(byte)(im)));
+        regs.setFlag(Flag.OVERFLOW, (im + (regs.sp & 0xFF)) > 0xFF);
 
         immutable ushort halfSum = (regs.sp & 0x0F) + (im & 0x0F);
         regs.setFlag(Flag.HALF_OVERFLOW, halfSum > 0x0F);
