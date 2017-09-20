@@ -12,9 +12,30 @@ alias reg8 = ubyte;
  * Flag bits in the f register
  */
 enum Flag : ubyte {
-    ZERO            = 1 << 7, // Set to 1 when the result of an operation is 0
+    /**
+     * Zero flag (aka "zf")
+     * Set to 1 when the result of certain operations is 0, unset otherwise on certain instruction
+     * Used for conditional jumps
+     */
+    ZERO            = 1 << 7,
+
+    /**
+     * Subtraction flag (aka "n")
+     * Set to 1 when subtraction occurs in certain operations, unset on many other instructions
+     * Used for decimal adjust (DAA) for binary coded decimal (BCD)
+     */
     SUBTRACTION     = 1 << 6, // Set to 1 following the execution of the subtraction instruction
+
+    /**
+     * Half carry flag (aka "h")
+     * Set to 1 when certain operations result in a carry from the right nibble to the left
+     * Used for decimal adjust (DAA) for binary coded decimal (BCD)
+     */
     HALF_OVERFLOW   = 1 << 5, // Set to 1 when an operation carries from or borrows to bit 3
+
+    /**
+     * Carry flag (aka "cy")
+     */
     OVERFLOW        = 1 << 4  // Set to 1 when an operation carries from or borrows to bit 7
 }
 
