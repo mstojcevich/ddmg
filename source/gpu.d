@@ -7,10 +7,10 @@ import std.algorithm.comparison;
 
 import clock, display, interrupt;
 
-private const CYCLES_PER_HBLANK = 204; // Cycles for a line of hblank
-private const CYCLES_PER_VBLANK = 456; // Cycles for a line of vblank
-private const CYCLES_PER_VRAM_SCAN = 172;
-private const CYCLES_PER_OAM_SCAN = 80;
+private const CYCLES_PER_OAM_SEARCH = 80; // Searching OAM RAM
+private const CYCLES_PER_DATA_TRANSFER = 172; // Transfering data to LCD driver
+private const CYCLES_PER_HBLANK = 204;
+private const CYCLES_PER_VBLANK_LINE = 456; // Cycles for a line of vblank
 
 // Index in VRAM that tiles start at
 private const TILE_START_INDEX = 0;
@@ -33,8 +33,8 @@ enum GPUMode : ubyte
 {
     HORIZ_BLANK = 0,
     VERT_BLANK = 1,
-    SCANLINE_OAM = 2,
-    SCANLINE_VRAM = 3
+    OAM_SEARCH = 2,
+    DATA_TRANSFER = 3
 }
 
 union LCDControl {
@@ -145,6 +145,26 @@ class GPU
 
         final switch (state)
         {
+        case GPUMode.OAM_SEARCH:
+            if (stateClock >= CYCLES_PER_OAM_SEARCH)
+            {
+                setState(GPUMode.DATA_TRANSFER); // Advance to next state
+                stateClock -= CYCLES_PER_OAM_SEARCH; // Reset the state clock
+            }
+            break;
+
+        case GPUMode.DATA_TRANSFER:
+            if (stateClock >= CYCLES_PER_DATA_TRANSFER)
+            {
+                setState(GPUMode.HORIZ_BLANK); // Enter HBlank
+
+                // Draw a line to the display
+                updateCurLine();
+
+                stateClock -= CYCLES_PER_DATA_TRANSFER; // Reset the state clock
+            }
+            break;
+
         case GPUMode.HORIZ_BLANK:
             if (stateClock >= CYCLES_PER_HBLANK)
             { // It's been long enough for an HBlank to finish
@@ -153,14 +173,11 @@ class GPU
 
                 if (curScanline == GB_DISPLAY_HEIGHT - 1)
                 { // Last line, enter vblank
-                    updateDisplay();
                     setState(GPUMode.VERT_BLANK);
-
-                    // TODO vblank interrupt
                 }
                 else
                 { // Go to OAM read
-                    setState(GPUMode.SCANLINE_OAM);
+                    setState(GPUMode.OAM_SEARCH);
                 }
 
                 stateClock -= CYCLES_PER_HBLANK; // Reset the state clock
@@ -168,40 +185,24 @@ class GPU
             break;
 
         case GPUMode.VERT_BLANK:
-            if (stateClock >= CYCLES_PER_VBLANK)
+            if (stateClock >= CYCLES_PER_VBLANK_LINE)
             {
                 curScanline++; // Move down a line
 
-                if (curScanline > GB_DISPLAY_HEIGHT - 1 + 10)
+                if (curScanline >= GB_DISPLAY_HEIGHT + 10)
                 { // VBlank period is between 144 and 153
                     // Restart
-                    setState(GPUMode.SCANLINE_OAM);
+                    setState(GPUMode.OAM_SEARCH);
                     curScanline = 0;
+                    
+                    updateDisplay();
+                    // TODO VBlank interrupt
                 }
                 checkCoincidence();
 
-                stateClock -= CYCLES_PER_VBLANK; // Reset the state clock
+                stateClock -= CYCLES_PER_VBLANK_LINE; // Reset the state clock
             }
             break;
-
-        case GPUMode.SCANLINE_OAM:
-            if (stateClock >= CYCLES_PER_OAM_SCAN)
-            {
-                setState(GPUMode.SCANLINE_VRAM); // Advance to next state
-                stateClock -= CYCLES_PER_OAM_SCAN; // Reset the state clock
-            }
-            break;
-
-        case GPUMode.SCANLINE_VRAM:
-            if (stateClock >= CYCLES_PER_VRAM_SCAN)
-            {
-                setState(GPUMode.HORIZ_BLANK); // Enter HBlank
-
-                // Draw a line to the display
-                updateCurLine();
-
-                stateClock -= CYCLES_PER_VRAM_SCAN; // Reset the state clock
-            }
         }
     }
 
