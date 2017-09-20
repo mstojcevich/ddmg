@@ -297,14 +297,12 @@ class GPU
                 ubyte palette = attrs.palette == SpritePalette.OBP0 ? obp0 : obp1;
                 
                 ubyte[TILE_SIZE][TILE_SIZE] tile = tileset[attrs.tileNum];
-                ubyte[TILE_SIZE] row = tile[tileRow];
-
-                // TODO xflip and yflip
+                ubyte[TILE_SIZE] row = tile[attrs.yflip ? TILE_SIZE - 1 - tileRow : tileRow];
 
                 for(ubyte x = cast(ubyte) min(attrs.x, GB_DISPLAY_WIDTH); 
                     x < min(attrs.x + TILE_SIZE, GB_DISPLAY_WIDTH - 1); x++) {
                     // Get the color of the pixel in the tile
-                    ubyte color = row[x - attrs.x];
+                    ubyte color = row[attrs.xflip ? TILE_SIZE - 1 - (x - attrs.x) : (x - attrs.x)];
 
                     // Don't draw invisible pixels
                     // Don't draw pixels behind the background
