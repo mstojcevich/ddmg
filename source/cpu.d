@@ -90,7 +90,7 @@ class CPU {
             Instruction("INC (HL)",		12, &incReference),
             Instruction("DEC (HL)",		1, &decReference),
             Instruction("LD (HL),d8",	12, {storeImmediateInMemory(regs.hl);}),
-            Instruction("SCF",		    4, {regs.setFlag(Flag.OVERFLOW, true);}),
+            Instruction("SCF",		    4, &scf),
             Instruction("JR C,r8",		0, {jumpRelativeImmediateIfFlag(Flag.OVERFLOW, true);}),
             Instruction("ADD HL,SP",	8, {add(regs.hl, regs.sp);}),
             Instruction("LD A,(HL-)",	8, {loadReferenceMinus(regs.a);}),
@@ -164,7 +164,7 @@ class CPU {
             Instruction("LD A,(HL)",	8, {loadReference(regs.a);}),
             Instruction("LD A,A",		4, {load(regs.a, regs.a);}),
             Instruction("ADD A,B",		4, {add(regs.b);}),
-            Instruction("ADD A,C",		4, {add(regs.b);}),
+            Instruction("ADD A,C",		4, {add(regs.c);}),
             Instruction("ADD A,D",		4, {add(regs.d);}),
             Instruction("ADD A,E",		4, {add(regs.e);}),
             Instruction("ADD A,H",		4, {add(regs.h);}),
@@ -1077,6 +1077,9 @@ class CPU {
      */
     @safe private void complement(ref reg8 src) {
         src = ~src;
+
+        regs.setFlag(Flag.SUBTRACTION, 1);
+        regs.setFlag(Flag.HALF_OVERFLOW, 1);
     }
 
     /**
@@ -1086,6 +1089,9 @@ class CPU {
         // You look really nice today Ms. Carry
 
         regs.toggleFlag(f);
+
+        regs.setFlag(Flag.SUBTRACTION, 0);
+        regs.setFlag(Flag.HALF_OVERFLOW, 0);
     }
 
     /**
@@ -1249,6 +1255,16 @@ class CPU {
 
         regs.setFlag(Flag.HALF_OVERFLOW, 0);
         regs.setFlag(Flag.ZERO, regs.a == 0);
+    }
+
+    /**
+     * Sets the carry flag to 1
+     */
+    @safe private void scf() {
+        regs.setFlag(Flag.OVERFLOW, true);
+
+        regs.setFlag(Flag.SUBTRACTION, 0);
+        regs.setFlag(Flag.HALF_OVERFLOW, 0);
     }
 
     // TODO use function templates for the functions that are the same between reg8 and reg16
