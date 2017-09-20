@@ -46,9 +46,9 @@ class CB {
 			Destination("H", 8, (Operation op) @safe => op(regs.h)),
 			Destination("L", 8, (Operation op) @safe => op(regs.l)),
 			Destination("(HL)", 16, (Operation op) @safe {
-				ubyte hlVal = mmu.readByte(regs.hl);
+				ubyte hlVal = this.mmu.readByte(this.regs.hl);
 				op(hlVal);
-				mmu.writeByte(regs.hl, hlVal);
+				this.mmu.writeByte(regs.hl, hlVal);
 			}),
 			Destination("A", 8, (Operation op) => op(regs.a))
 		];
