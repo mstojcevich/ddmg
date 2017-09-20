@@ -31,6 +31,9 @@ class CPU {
 	private CB cbBlock;
 
     @safe this(MMU mmu, Clock clk, InterruptHandler ih) {
+        this.mmu = mmu;
+        this.clk = clk;
+        this.iuptHandler = ih;
 		this.cbBlock = new CB(regs, mmu);
 
         // 0 in the cycle count will mean it's calculated conditionally later
@@ -310,10 +313,6 @@ class CPU {
             }
         }
         writefln("Initializing CPU with %d%% (%d / %d) regular instruction support", cast(int)((cast(float)implInstrs/totalInstrs)*100), implInstrs, totalInstrs);
-
-        this.mmu = mmu;
-        this.clk = clk;
-        this.iuptHandler = ih;
 
         // Initialize like the original bootstrap rom
         regs.sp = 0xFFFE;

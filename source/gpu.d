@@ -131,6 +131,7 @@ class GPU
         this.oam = new ubyte[160];
         this.iuptHandler = ih;
         this.controlRegister.data = 0x90;
+        this.lcdStatusRegister.data = 0x85;
 
         bgPalette = 0b11111100;
         objPalette0 = 0b11111111;
@@ -173,6 +174,9 @@ class GPU
 
                 if (curScanline == GB_DISPLAY_HEIGHT - 1)
                 { // Last line, enter vblank
+                    // TODO vblank interrupt occurs at the beginning of vblank
+                    // iuptHandler.fireInterrupt(Interrupts.VBLANK);
+
                     setState(GPUMode.VERT_BLANK);
                 }
                 else
@@ -196,7 +200,6 @@ class GPU
                     curScanline = 0;
                     
                     updateDisplay();
-                    // TODO VBlank interrupt
                 }
                 checkCoincidence();
 
