@@ -48,7 +48,7 @@ class CB {
 			Destination("(HL)", 16, (Operation op) @safe {
 				ubyte hlVal = this.mmu.readByte(this.regs.hl);
 				op(hlVal);
-				this.mmu.writeByte(regs.hl, hlVal);
+				this.mmu.writeByte(this.regs.hl, hlVal);
 			}),
 			Destination("A", 8, (Operation op) => op(regs.a))
 		];
