@@ -1249,7 +1249,7 @@ class CPU {
             } else {
                 regs.setFlag(Flag.OVERFLOW, 0);
             }
-            regs.a = a;
+            regs.a = cast(ubyte) a;
         }
 
         regs.setFlag(Flag.HALF_OVERFLOW, 0);
