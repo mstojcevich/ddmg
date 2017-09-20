@@ -535,11 +535,18 @@ class CPU {
      * Add the next 8-bit value to the stack pointer
      */
     @safe private void offsetStackPointerImmediate() {
-        add(regs.sp, cast(short)(cast(byte)(mmu.readByte(regs.pc)))); // Casting twice is so that the sign will carry over to the short
+        immutable short toAdd = cast(short)(cast(byte)(mmu.readByte(regs.pc)));
+        regs.pc += 1;
+
+        immutable ushort result = cast(ushort)(regs.sp + toAdd);
+
+        regs.setFlag(Flag.OVERFLOW, ((toAdd & 0xFF) + (regs.sp & 0xFF)) > 0xFF);
+        regs.setFlag(Flag.HALF_OVERFLOW, ((toAdd & 0xF) + (regs.sp & 0xF)) > 0xF);
+
+        regs.sp = result;
 
         regs.setFlag(Flag.ZERO, false);
-
-        regs.pc += 1;
+        regs.setFlag(Flag.SUBTRACTION, false);
     }
 
     /**
