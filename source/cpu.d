@@ -276,7 +276,10 @@ class CPU {
             Instruction("XOR d8",		8, &xorImmediate),
             Instruction("RST 28H",		16, {rst(0x28);}),
             Instruction("LDH A,(a8)",	12, &ldhImmediateToA),
-            Instruction("POP AF",		12, {popFromStack(regs.af);}),
+            Instruction("POP AF",		12, {
+                popFromStack(regs.af);
+                regs.f &= 0b0000;
+            }),
             Instruction("LD A,(C)",		8, &ldAC),
             Instruction("DI",		    4, {iuptHandler.masterToggle = false;}),
             Instruction("XX",		    0, null),
