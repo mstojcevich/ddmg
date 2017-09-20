@@ -36,14 +36,14 @@ class Keypad {
     }
 
     @safe const ubyte readJOYP() {
-        return useDirections ? cast(ubyte) joypDirections : cast(ubyte) joypButtons;
+        return ~(useDirections ? cast(ubyte) joypDirections : cast(ubyte) joypButtons);
     }
 
     @safe void writeJOYP(ubyte joyp) {
         // Since the buttons are read only, we only need to handle the directions part
 
-        bool buttons = (joyp & JOYPFlag.BUTTON_MODE) != 0;
-        bool directions = (joyp & JOYPFlag.DIRECTION_MODE) != 0;
+        bool buttons = (joyp & JOYPFlag.BUTTON_MODE) == 0;
+        bool directions = (joyp & JOYPFlag.DIRECTION_MODE) == 0;
         
         useDirections = directions;
     }
