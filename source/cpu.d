@@ -745,7 +745,7 @@ class CPU {
         
         regs.setFlag(Flag.OVERFLOW, subtrahend > regs.a);
 
-        regs.setFlag(Flag.HALF_OVERFLOW, (subtrahend & 0x0F) > (regs.a & 0x0F));
+        regs.setFlag(Flag.HALF_OVERFLOW, ((src & 0x0F) + c) > (regs.a & 0x0F));
 
         regs.setFlag(Flag.SUBTRACTION, true);
 
