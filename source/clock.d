@@ -37,6 +37,7 @@ class Clock {
     }
     body {
         this.elapsedCycles += num;
+        this.div += num;
     }
 
     /**
