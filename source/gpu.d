@@ -313,13 +313,13 @@ class GPU
                     // Don't draw invisible pixels
                     // Don't draw pixels behind the background
                     if(color == 0 || (attrs.priority == SpritePriority.BEHIND_BACKGROUND 
-                        && display.getPixelGB(x, lineNum) != 0)) {
+                        && display.getPixelGB(cast(ubyte)(x - TILE_SIZE), lineNum) != 0)) {
                         continue;
                     }
 
                     // Apply the current palette
                     color = (palette >> (color * 2)) & 0b11;
-                    display.setPixelGB(cast(ubyte)(x - 8), lineNum, color);
+                    display.setPixelGB(cast(ubyte)(x - TILE_SIZE), lineNum, color);
                 }
             }
         }
