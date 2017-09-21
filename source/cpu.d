@@ -570,8 +570,8 @@ class CPU {
         regs.a = outResult;
     }
     @system unittest { // Unit test for ADD A, n
-        Clock clk = new Clock();
         InterruptHandler ih = new InterruptHandler();
+        Clock clk = new Clock(ih);
         CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
@@ -646,8 +646,8 @@ class CPU {
         regs.a = outResult;
      }
      @system unittest { // Unit test for ADC A, n
-        Clock clk = new Clock();
         InterruptHandler ih = new InterruptHandler();
+        Clock clk = new Clock(ih);
         CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
@@ -908,8 +908,8 @@ class CPU {
         regs.setFlag(Flag.OVERFLOW, leftmostBit);
     }
     @system unittest {  // Unit tests for RLCA
-        Clock clk = new Clock();
         InterruptHandler ih = new InterruptHandler();
+        Clock clk = new Clock(ih);
         CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
@@ -942,8 +942,8 @@ class CPU {
         regs.setFlag(Flag.OVERFLOW, leftmostBit);
     }
     @system unittest {  // Unit tests for RLA
-        Clock clk = new Clock();
         InterruptHandler ih = new InterruptHandler();
+        Clock clk = new Clock(ih);
         CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
@@ -975,8 +975,8 @@ class CPU {
         regs.setFlag(Flag.OVERFLOW, rightmostBit);
     }
     @system unittest {
-        Clock clk = new Clock();
         InterruptHandler ih = new InterruptHandler();
+        Clock clk = new Clock(ih);
         CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
@@ -1009,8 +1009,8 @@ class CPU {
         regs.setFlag(Flag.OVERFLOW, rightmostBit);
     }
     @system unittest {
-        Clock clk = new Clock();
         InterruptHandler ih = new InterruptHandler();
+        Clock clk = new Clock(ih);
         CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {
@@ -1214,8 +1214,8 @@ class CPU {
 		clk.spendCycles(cbBlock.handle(subop));
 	}
     @system unittest {
-        Clock clk = new Clock();
         InterruptHandler ih = new InterruptHandler();
+        Clock clk = new Clock(ih);
         CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
 
         with(c) {

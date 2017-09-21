@@ -34,6 +34,11 @@ private const OBP1                      = 0xFF49;
 
 private const DMA_TRANSFER_ADDR         = 0xFF46;
 
+private const TIMER_DIV                 = 0xFF04;
+private const TIMER_COUNTER             = 0xFF05;
+private const TIMER_MODULO              = 0xFF06;
+private const TIMER_CONTROL             = 0xFF07;
+
 /**
  * Exception to be thrown when a caller tries to access a memory address not mapped by the MMU
  */
@@ -149,8 +154,17 @@ class MMU {
             return iuptHandler.interruptFlagRegister;
         }
 
-        if(address == 0xFF04) {
+        if(address == TIMER_DIV) {
             return clock.divider;
+        }
+        if(address == TIMER_COUNTER) {
+            return clock.timerCounter;
+        }
+        if(address == TIMER_MODULO) {
+            return clock.timerModulo;
+        }
+        if(address == TIMER_CONTROL) {
+            return clock.timerControl;
         }
 
         writefln("UNIMPLEMENTED : Reading address %04X", address);
@@ -238,8 +252,14 @@ class MMU {
         } else if(address == 0xFF0F) {
             iuptHandler.interruptFlagRegister = val;
 
-        } else if(address == 0xFF04) {
+        } else if(address == TIMER_DIV) {
             clock.resetDivider();
+        } else if(address == TIMER_COUNTER) {
+            clock.timerCounter = val;
+        } else if(address == TIMER_MODULO) {
+            clock.timerModulo = val;
+        } else if(address == TIMER_CONTROL) {
+            clock.timerControl = val;
 
         } else if(address < 0xFEA0 || address > 0xFEFF) { // Unimplemented but don't want to crash for unmapped
             debug {
