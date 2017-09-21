@@ -145,12 +145,6 @@ class GPU
 
     void step()
     {
-        // TODO does the GPU still run when LCD is disabled?
-        if(!controlRegister.lcdEnable) {
-            this.prevClock = clock.getElapsedCycles();
-            return;
-        }
-
         this.stateClock += clock.getElapsedCycles() - prevClock;
         this.prevClock = clock.getElapsedCycles();
 
@@ -185,7 +179,7 @@ class GPU
                 if (curScanline == GB_DISPLAY_HEIGHT - 1)
                 { // Last line, enter vblank
                     // TODO vblank interrupt occurs at the beginning of vblank
-                    // iuptHandler.fireInterrupt(Interrupts.VBLANK);
+                    iuptHandler.fireInterrupt(Interrupts.VBLANK);
 
                     setState(GPUMode.VERT_BLANK);
                 }
@@ -227,6 +221,10 @@ class GPU
 
     private void updateDisplay()
     {
+        if(!controlRegister.lcdEnable) {
+            return;
+        }
+
         display.drawFrame();
     }
 
@@ -279,6 +277,10 @@ class GPU
     {
         // Don't worry about stuff off of the screen
         if(curScanline > GB_DISPLAY_HEIGHT - 1) {
+            return;
+        }
+
+        if(!controlRegister.lcdEnable) {
             return;
         }
 
