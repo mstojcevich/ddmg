@@ -6,12 +6,12 @@ class Clock {
     /**
      * The numbers of cycles that have elapsed so far
      */
-    private int elapsedCycles = 0;
+    private ulong elapsedCycles = 0;
 
     /**
      * Get the number of cycles that have elapsed so far
      */
-    @safe @property public int getElapsedCycles() {
+    @safe @property public ulong getElapsedCycles() {
         return elapsedCycles;
     }
 

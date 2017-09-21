@@ -104,6 +104,11 @@ class GPU
     private Display display;
     private InterruptHandler iuptHandler;
 
+    // Previous clock cycles. Kept track of so we know
+    // how many cycles have elapsed since our last
+    // GPU cycle
+    private ulong prevClock = 0;
+
     private LCDControl controlRegister;
     private LCDStatus lcdStatusRegister;
     private ubyte curScanline;
@@ -142,7 +147,8 @@ class GPU
     {
         // TODO if LCD isn't disabled, ...
 
-        this.stateClock += clock.getElapsedCycles();
+        this.stateClock += clock.getElapsedCycles() - prevClock;
+        this.prevClock = clock.getElapsedCycles();
 
         final switch (state)
         {

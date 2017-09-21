@@ -152,6 +152,7 @@ class MMU {
             return 0;
         } else {
             throw new UnmappedMemoryAccessException(address);
+            return 0;
         }
     }
 
