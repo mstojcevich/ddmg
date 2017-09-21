@@ -145,7 +145,12 @@ class GPU
 
     void step()
     {
-        // TODO if LCD isn't disabled, ...
+        // TODO does the GPU still run when LCD is disabled?
+        if(!controlRegister.lcdEnable) {
+            writeln("LCD DISABLED");
+            this.prevClock = clock.getElapsedCycles();
+            return;
+        }
 
         this.stateClock += clock.getElapsedCycles() - prevClock;
         this.prevClock = clock.getElapsedCycles();
