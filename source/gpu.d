@@ -147,7 +147,6 @@ class GPU
     {
         // TODO does the GPU still run when LCD is disabled?
         if(!controlRegister.lcdEnable) {
-            writeln("LCD DISABLED");
             this.prevClock = clock.getElapsedCycles();
             return;
         }
