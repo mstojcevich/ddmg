@@ -1,7 +1,7 @@
 import std.conv;
 import std.stdio;
 
-import cartridge, gpu, keypad, interrupt;
+import cartridge, gpu, keypad, interrupt, clock;
 
 private const WORK_RAM_BEGIN            = 0xC000;
 private const WORK_RAM_END              = 0xDFFF;
@@ -61,12 +61,14 @@ class MMU {
     private GPU gpu;
     private Keypad keypad;
     private InterruptHandler iuptHandler;
+    private Clock clock;
 
-    @safe this(const Cartridge c, GPU g, Keypad k, InterruptHandler ih) {
+    @safe this(const Cartridge c, GPU g, Keypad k, InterruptHandler ih, Clock clk) {
         this.cartridge = c;
         this.gpu = g;
         this.keypad = k;
         this.iuptHandler = ih;
+        this.clock = clk;
     }
 
     /**
@@ -145,6 +147,10 @@ class MMU {
         }
         if(address == 0xFF0F) {
             return iuptHandler.interruptFlagRegister;
+        }
+
+        if(address == 0xFF04) {
+            return clock.divider;
         }
 
         writefln("UNIMPLEMENTED : Reading address %04X", address);
@@ -231,6 +237,9 @@ class MMU {
             iuptHandler.interruptEnableRegister = val;
         } else if(address == 0xFF0F) {
             iuptHandler.interruptFlagRegister = val;
+
+        } else if(address == 0xFF04) {
+            clock.resetDivider();
 
         } else if(address < 0xFEA0 || address > 0xFEFF) { // Unimplemented but don't want to crash for unmapped
             debug {
