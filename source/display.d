@@ -117,7 +117,12 @@ class Display {
         glDrawPixels(GB_DISPLAY_WIDTH, GB_DISPLAY_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, &pixels);
         
         glfwSwapInterval(0); // No vsync
+        
         glfwSwapBuffers(window);
+
+        // Limit framerate to 15 ms per frame to simulate gameboy
+        while(glfwGetTime() < 0.015) {}
+        glfwSetTime(0);
     }
 
     bool shouldProgramTerminate() {
