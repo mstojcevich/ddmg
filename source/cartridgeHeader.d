@@ -1,0 +1,95 @@
+/// A representation of the cartridge header for GameBoy ROMs
+union CartridgeHeader
+{
+    /// The raw data of the header. This begins at 0x0100 in the ROM.
+    ubyte[80] headerData;
+
+    struct
+    {
+        /// Entry point of the ROM: the code that runs right after the bootrom
+        ubyte[4] entryPoint;
+
+        /// Bitmap of the Nintendo Logo
+        ubyte[48] nintendoLogo;
+
+        union
+        {
+            /// Title of the game in ASCII for older games. Newer games use a shorter title area.
+            ubyte[16] oldTitle;
+
+            struct
+            {
+                /// The title of the game in ASCII for newer games. Only a portion of the old title.
+                ubyte[11] newTitle;
+
+                /// In newer cartridges this is a an ASCII manufacturer code
+                ubyte[4] manufacturerCode;
+
+                /// In newer cartridges this defines whether the game supports CGB or requires CGB
+                ubyte cgbFlag;
+            }
+        }
+
+        /// 2 character ASCII code indicating the publisher of the game (used for new games post-SGB)
+        ubyte[2] newLicenseeCode;
+
+        /// Specifies whether the game supports SGB functions
+        ubyte sgbFlag;
+
+        /// Specifies the MBC used in the cartridge and whether other hardware exists
+        ubyte cartridgeType;
+
+        /** 
+         * Specifies how large the ROM is.
+         * Size is calculated as (32KB << romSize) except for 0x52,0x53,0x54 which mean 1.1MB,1.2MB,1.5MB respectively.
+         */
+        RomSize romSize;
+
+        /// Specifies the amount of external RAM in the cartridge
+        RamSize ramSize;
+
+        /// Specifies the target market for the ROM
+        DestinationCode destCode;
+
+        /// Specifies the game's publisher. 0x33 indicates that newLicenseeCode should be used instead
+        ubyte oldLicenseeCode;
+
+        /// Specifies the version number of the game
+        ubyte versionNumber;
+
+        /// Checksum of the cartridge bytes (0x0134-0x014C). Actual hardware enforces this.
+        ubyte headerChecksum;
+
+        /// Checksum across the entire cartridge. Actual hardware ignores this.
+        ushort globalChecksum;
+    }
+}
+
+/// The size of the ROM of the cartridge
+enum RomSize : ubyte {
+    KB_32   = 0x00,
+    KB_64   = 0x01,
+    KB_128  = 0x02,
+    KB_256  = 0x03,
+    KB_512  = 0x04,
+    MB_1    = 0x05,
+    MB_2    = 0x06,
+    MB_3    = 0x07,
+    MB_1_1  = 0x52,
+    MB_1_2  = 0x53,
+    MB_1_5  = 0x54
+}
+
+/// The size of the external RAM in the cartridge
+enum RamSize : ubyte {
+    NONE    = 0x00,
+    KB_2    = 0x01,
+    KB_8    = 0x02,
+    KB_32   = 0x03
+}
+
+/// Specifies whether the game is supposed to be sold in Japan or anywhere else
+enum DestinationCode : ubyte {
+    JAPAN       = 0x00,
+    NOT_JAPAN   = 0x01
+}
