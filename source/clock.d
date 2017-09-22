@@ -102,7 +102,7 @@ class Clock {
      * Get the value of the divider register (FF04)
      */
     @safe @property public ubyte divider() const {
-        return cast(ubyte)(div & 0xFF00); // Return the upper 8 bits of the internal DIV clock
+        return cast(ubyte)((div & 0xFF00) >> 8); // Return the upper 8 bits of the internal DIV clock
     }
 
     /**
