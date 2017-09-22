@@ -94,6 +94,12 @@ class CB {
 		immutable Destination dest = destinations[destination];
 		dest.apply(ops[op]);
 
+        // Hacky fix, but it works
+        // BIT (HL) is special in that it takes 12 cycles not 16
+        if(destination == 6 && (op >= 8 && op <= 15)) {
+            return 12;
+        }
+
         return dest.cycles;
     }
 
