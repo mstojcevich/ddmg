@@ -35,7 +35,8 @@ class InterruptHandler {
     }
 
     @safe @property ubyte interruptFlagRegister() const {
-        return interruptFlags;
+        // The upper 3 bits always return 1 when read
+        return interruptFlags | 0b11100000;
     }
 
     @safe @property void interruptFlagRegister(ubyte iflags) {
@@ -67,11 +68,7 @@ class InterruptHandler {
     }
     
     @safe void fireInterrupt(Interrupts iupt) {
-        if(masterEnable && isInterruptEnabled(iupt)) {
-            interruptFlags |= iupt.flagBit;
-        }
-
-        // TODO do we need to check any sort of enabled stuff for this or
-        // do we just hold onto interrupts until they're enabled?
+        interruptFlags |= iupt.flagBit;
     }
+
 }

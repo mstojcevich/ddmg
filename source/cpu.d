@@ -17,6 +17,17 @@ import keypad;
 import cb;
 
 /**
+ * The type of halt the CPU is in
+ * This differs based on conditions when the HALT instruction was run
+ */
+enum HaltMode {
+    NO_HALT,
+    NORMAL,
+    NO_INTERRUPT_JUMP,
+    HALT_BUG
+}
+
+/**
  * Implementation of the GameBoy CPU
  */
 class CPU {
@@ -31,7 +42,7 @@ class CPU {
 	private CB cbBlock;
 
     // Whether the CPU is halted (not executing until interrupt)
-    private bool halted;
+    private HaltMode haltMode;
 
     @safe this(MMU mmu, Clock clk, InterruptHandler ih) {
         this.mmu = mmu;
@@ -328,7 +339,7 @@ class CPU {
     }
 
     @safe void step() {
-        if(!halted) {
+        if(haltMode == HaltMode.NO_HALT || haltMode == HaltMode.HALT_BUG) { // If the CPU is halted, stop execution
             // Fetch the operation in memory
             immutable ubyte opcode = mmu.readByte(regs.pc);
 
@@ -346,7 +357,11 @@ class CPU {
 
             // Increment the program counter
             // Done before instruction execution so that jumps are easier. Pretty sure that's how it's done on real hardware too.
-            regs.pc++;
+            if(haltMode != HaltMode.HALT_BUG) { // The halt bug causes the next instruction to repeat twice
+                regs.pc++;
+            } else {
+                haltMode = HaltMode.NO_HALT;
+            }
 
             if(instr.impl !is null) {
                 try {
@@ -372,13 +387,26 @@ class CPU {
         }
 
         // Handle any interrupts that were triggered
-        // TODO not sure if this should be done before processing the instruction or after
         foreach(iupt; EnumMembers!Interrupts) {
             if(iuptHandler.shouldHandle(iupt)) {
-                call(iupt.address);
-                iuptHandler.markHandled(iupt);
-                iuptHandler.masterToggle = false;
-                halted = false;
+                if(haltMode != HaltMode.NO_INTERRUPT_JUMP) {
+                    call(iupt.address);
+                    iuptHandler.markHandled(iupt);
+                    iuptHandler.masterToggle = false;
+
+                    // It takes 20 clocks to dispatch an interrupt.
+                    clk.spendCycles(20);
+
+                    if(haltMode == HaltMode.NORMAL) {
+                        // If the CPU is in HALT mode, another 4 clocks are needed
+                        clk.spendCycles(4);
+                        haltMode = HaltMode.NO_HALT;
+                    }
+                } else {
+                    // No interrupt jump halt mode continues execution but doesn't handle the interrupt
+                    haltMode = HaltMode.NO_HALT;
+                    iuptHandler.masterToggle = false;
+                }
 
                 break;
             }
@@ -1284,10 +1312,30 @@ class CPU {
         regs.setFlag(Flag.HALF_OVERFLOW, 0);
     }
 
+    /**
+     * Halt execution until an interrupt happens
+     * A power saving measure
+     */
     @safe private void halt() {
+        // The HALT instruction has different behaviors based on IME, IE, and IF
+
+        // If IME is 1 it halts CPU execution until an interrupt happens
         if(iuptHandler.masterToggle) {
-            this.halted = true;
-        } // TODO emulate halt bug
+            this.haltMode = HaltMode.NORMAL;
+        } else { // If IME is 0
+            immutable bool someInterruptReady = (iuptHandler.interruptEnableRegister & iuptHandler.interruptFlagRegister & 0b00011111) != 0;
+            if(someInterruptReady) {
+                // If there is an interrupt ready, HALT is not entered.
+                // Instead there is a bug that occurs causing the next instruction to be executed twice.
+                this.haltMode = HaltMode.HALT_BUG;
+            } else {
+                // If IME is 0 and no interrupt is ready, HALT works as normal 
+                // except when an interrupt is fired, the CPU unhalts but doesn't
+                // handle the interrupt. It also doesn't clear the IF flags.
+                this.haltMode = HaltMode.NO_INTERRUPT_JUMP;
+                iuptHandler.masterToggle = true;
+            }
+        }
     }
 
     // TODO use function templates for the functions that are the same between reg8 and reg16

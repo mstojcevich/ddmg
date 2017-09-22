@@ -181,8 +181,9 @@ class GPU
 
                 if (curScanline == GB_DISPLAY_HEIGHT - 1)
                 { // Last line, enter vblank
-                    // TODO vblank interrupt occurs at the beginning of vblank
-                    iuptHandler.fireInterrupt(Interrupts.VBLANK);
+                    if(controlRegister.lcdEnable) {
+                        iuptHandler.fireInterrupt(Interrupts.VBLANK);
+                    }
 
                     if(lcdStatusRegister.vblankInterrupt || lcdStatusRegister.oamInterrupt) {
                         iuptHandler.fireInterrupt(Interrupts.LCD_STATUS);
