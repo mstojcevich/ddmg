@@ -67,6 +67,11 @@ class InterruptHandler {
     }
     
     @safe void fireInterrupt(Interrupts iupt) {
-        interruptFlags |= iupt.flagBit;
+        if(masterEnable && isInterruptEnabled(iupt)) {
+            interruptFlags |= iupt.flagBit;
+        }
+
+        // TODO do we need to check any sort of enabled stuff for this or
+        // do we just hold onto interrupts until they're enabled?
     }
 }

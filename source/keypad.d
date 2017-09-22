@@ -3,6 +3,8 @@ import std.stdio;
 import std.exception;
 import std.typecons;
 
+import interrupt;
+
 // Flags for the JOYP register
 enum JOYPFlag : ubyte
 {
@@ -19,11 +21,14 @@ class Keypad {
     private bool useDirections;
 
     // TODO figure out what the priority is if both button and direction are selected and if neither are selected
-    // TODO handle the read only bits
 
     private GLFWwindow* window;
 
-    this(GLFWwindow* w) {
+    private InterruptHandler iuptHandler;
+
+    this(GLFWwindow* w, InterruptHandler iuptHandler) {
+        this.iuptHandler = iuptHandler;
+
         if(w != null) {
             this.window = w;
             
@@ -47,6 +52,17 @@ class Keypad {
         
         useDirections = directions;
     }
+
+    /**
+     * Checks for the keypad interrupt and fires it if necessary
+     */
+    @safe void update() {
+        if(iupt) {
+            iuptHandler.fireInterrupt(Interrupts.JOYPAD_PRESS);
+            iupt = false;
+        }
+    }
+
 }
 
 // Keep two copies of the current input, one for button selected, one for direction selected
@@ -54,32 +70,43 @@ class Keypad {
 private BitFlags!JOYPFlag joypButtons = JOYPFlag.BUTTON_MODE;
 private BitFlags!JOYPFlag joypDirections = JOYPFlag.DIRECTION_MODE;
 
+// Request for an interrupt fire
+private bool iupt;
+
 private extern(C) void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) nothrow {
     if(action == GLFW_PRESS) {
         switch(key) {
             case GLFW_KEY_Z:
                 joypButtons |= JOYPFlag.RIGHT_OR_A;
+                iupt = true;
                 break;
             case GLFW_KEY_X:
                 joypButtons |= JOYPFlag.LEFT_OR_B;
+                iupt = true;
                 break;
             case GLFW_KEY_TAB:
                 joypButtons |= JOYPFlag.UP_OR_SELECT;
+                iupt = true;
                 break;
             case GLFW_KEY_ENTER:
                 joypButtons |= JOYPFlag.DOWN_OR_START;
+                iupt = true;
                 break;
             case GLFW_KEY_LEFT:
                 joypDirections |= JOYPFlag.LEFT_OR_B;
+                iupt = true;
                 break;
             case GLFW_KEY_RIGHT:
                 joypDirections |= JOYPFlag.RIGHT_OR_A;
+                iupt = true;
                 break;
             case GLFW_KEY_UP:
                 joypDirections |= JOYPFlag.UP_OR_SELECT;
+                iupt = true;
                 break;
             case GLFW_KEY_DOWN:
                 joypDirections |= JOYPFlag.DOWN_OR_START;
+                iupt = true;
                 break;
             default:
                 break;

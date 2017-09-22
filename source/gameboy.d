@@ -15,8 +15,8 @@ class Gameboy {
         this.cartridge = new Cartridge(romPath);
 
         this.display = new Display();
-        this.keypad = new Keypad(this.display.glfwWindow);
         this.iuptHandler = new InterruptHandler();
+        this.keypad = new Keypad(this.display.glfwWindow, this.iuptHandler);
         this.clock = new Clock(this.iuptHandler);
         this.gpu = new GPU(this.display, this.clock, this.iuptHandler);
         this.mmu = new MMU(this.cartridge, this.gpu, this.keypad, this.iuptHandler, this.clock);
@@ -25,6 +25,7 @@ class Gameboy {
 
     public void run() {
         while(true) {
+            keypad.update();
             cpu.step();
             gpu.step();
 

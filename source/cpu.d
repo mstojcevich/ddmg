@@ -30,6 +30,9 @@ class CPU {
     private InterruptHandler iuptHandler;
 	private CB cbBlock;
 
+    // Whether the CPU is halted (not executing until interrupt)
+    private bool halted;
+
     @safe this(MMU mmu, Clock clk, InterruptHandler ih) {
         this.mmu = mmu;
         this.clk = clk;
@@ -156,7 +159,7 @@ class CPU {
             Instruction("LD (HL),E",	8, {storeInMemory(regs.hl, regs.e);}),
             Instruction("LD (HL),H",	8, {storeInMemory(regs.hl, regs.h);}),
             Instruction("LD (HL),L",	8, {storeInMemory(regs.hl, regs.l);}),
-            Instruction("HALT",		    4, null),
+            Instruction("HALT",		    4, &halt),
             Instruction("LD (HL),A",	8, {storeInMemory(regs.hl, regs.a);}),
             Instruction("LD A,B",		4, {load(regs.a, regs.b);}),
             Instruction("LD A,C",		4, {load(regs.a, regs.c);}),
@@ -325,41 +328,47 @@ class CPU {
     }
 
     @safe void step() {
-        // Fetch the operation in memory
-        immutable ubyte opcode = mmu.readByte(regs.pc);
+        if(!halted) {
+            // Fetch the operation in memory
+            immutable ubyte opcode = mmu.readByte(regs.pc);
 
-        Instruction instr = instructions[opcode];
+            Instruction instr = instructions[opcode];
 
-        if(false) {
-            writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
-            writefln("PC: %04X\tSP: %04X", regs.pc, regs.sp);
-            writefln("@ %04X: %02X -> %s", regs.pc, opcode, instr.disassembly);
-            writeln();
-        }
-
-        //enforce(instr.impl !is null,
-        //    format("Emulated code used unimplemented operation 0x%02X @ 0x%04X", opcode, regs.pc));
-
-        // Increment the program counter
-        // Done before instruction execution so that jumps are easier. Pretty sure that's how it's done on real hardware too.
-        regs.pc++;
-
-        if(instr.impl !is null) {
-            try {
-                instr.impl(); // Execute the operation
-                clk.spendCycles(instr.cycles);
-            } catch (Exception e) {
-                writefln("Instruction failed with exception \"%s\"", e.msg);
+            if(false) {
                 writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
                 writefln("PC: %04X\tSP: %04X", regs.pc, regs.sp);
                 writefln("@ %04X: %02X -> %s", regs.pc, opcode, instr.disassembly);
                 writeln();
-
-                throw e;
             }
-        } else {
-            writefln("Program tried to execute instruction %s at %02X, which isn't defined", instr.disassembly, regs.pc - 1);
-            writefln("The execution is probably tainted");
+
+            //enforce(instr.impl !is null,
+            //    format("Emulated code used unimplemented operation 0x%02X @ 0x%04X", opcode, regs.pc));
+
+            // Increment the program counter
+            // Done before instruction execution so that jumps are easier. Pretty sure that's how it's done on real hardware too.
+            regs.pc++;
+
+            if(instr.impl !is null) {
+                try {
+                    instr.impl(); // Execute the operation
+                    clk.spendCycles(instr.cycles);
+                } catch (Exception e) {
+                    writefln("Instruction failed with exception \"%s\"", e.msg);
+                    writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
+                    writefln("PC: %04X\tSP: %04X", regs.pc, regs.sp);
+                    writefln("@ %04X: %02X -> %s", regs.pc, opcode, instr.disassembly);
+                    writeln();
+
+                    throw e;
+                }
+            } else {
+                writefln("Program tried to execute instruction %s at %02X, which isn't defined", instr.disassembly, regs.pc - 1);
+                writefln("The execution is probably tainted");
+            }
+        } else { // halted
+            // TODO how much do we increment the clock by?
+            // Does this need to be a separate clock?
+            clk.spendCycles(1);
         }
 
         // Handle any interrupts that were triggered
@@ -369,6 +378,7 @@ class CPU {
                 call(iupt.address);
                 iuptHandler.markHandled(iupt);
                 iuptHandler.masterToggle = false;
+                halted = false;
 
                 break;
             }
@@ -572,7 +582,7 @@ class CPU {
     @system unittest { // Unit test for ADD A, n
         InterruptHandler ih = new InterruptHandler();
         Clock clk = new Clock(ih);
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(ih), ih), clk, ih);
 
         with(c) {
             // Test 1, 0x3A + 0xC6
@@ -648,7 +658,7 @@ class CPU {
      @system unittest { // Unit test for ADC A, n
         InterruptHandler ih = new InterruptHandler();
         Clock clk = new Clock(ih);
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(ih), ih), clk, ih);
 
         with(c) {
             regs.a = 0xE1;
@@ -910,7 +920,7 @@ class CPU {
     @system unittest {  // Unit tests for RLCA
         InterruptHandler ih = new InterruptHandler();
         Clock clk = new Clock(ih);
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(ih), ih), clk, ih);
 
         with(c) {
             regs.a = 0x85;
@@ -944,7 +954,7 @@ class CPU {
     @system unittest {  // Unit tests for RLA
         InterruptHandler ih = new InterruptHandler();
         Clock clk = new Clock(ih);
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(ih), ih), clk, ih);
 
         with(c) {
             regs.a = 0x05;
@@ -977,7 +987,7 @@ class CPU {
     @system unittest {
         InterruptHandler ih = new InterruptHandler();
         Clock clk = new Clock(ih);
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(ih), ih), clk, ih);
 
         with(c) {
             regs.a = 0x3B;
@@ -1011,7 +1021,7 @@ class CPU {
     @system unittest {
         InterruptHandler ih = new InterruptHandler();
         Clock clk = new Clock(ih);
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(ih), ih), clk, ih);
 
         with(c) {
             regs.a = 0x81;
@@ -1216,7 +1226,7 @@ class CPU {
     @system unittest {
         InterruptHandler ih = new InterruptHandler();
         Clock clk = new Clock(ih);
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(null), ih), clk, ih);
+        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(ih), ih), clk, ih);
 
         with(c) {
             regs.a = 0xAB;
@@ -1272,6 +1282,12 @@ class CPU {
 
         regs.setFlag(Flag.SUBTRACTION, 0);
         regs.setFlag(Flag.HALF_OVERFLOW, 0);
+    }
+
+    @safe private void halt() {
+        if(iuptHandler.masterToggle) {
+            this.halted = true;
+        } // TODO emulate halt bug
     }
 
     // TODO use function templates for the functions that are the same between reg8 and reg16

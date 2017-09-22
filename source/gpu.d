@@ -161,6 +161,9 @@ class GPU
         case GPUMode.DATA_TRANSFER:
             if (stateClock >= CYCLES_PER_DATA_TRANSFER)
             {
+                if(lcdStatusRegister.hblankInterrupt) {
+                    iuptHandler.fireInterrupt(Interrupts.LCD_STATUS);
+                }
                 setState(GPUMode.HORIZ_BLANK); // Enter HBlank
 
                 // Draw a line to the display
@@ -181,10 +184,18 @@ class GPU
                     // TODO vblank interrupt occurs at the beginning of vblank
                     iuptHandler.fireInterrupt(Interrupts.VBLANK);
 
+                    if(lcdStatusRegister.vblankInterrupt || lcdStatusRegister.oamInterrupt) {
+                        iuptHandler.fireInterrupt(Interrupts.LCD_STATUS);
+                    }
+
                     setState(GPUMode.VERT_BLANK);
                 }
                 else
                 { // Go to OAM read
+                    if(lcdStatusRegister.oamInterrupt) {
+                        iuptHandler.fireInterrupt(Interrupts.LCD_STATUS);
+                    }
+
                     setState(GPUMode.OAM_SEARCH);
                 }
 
@@ -200,6 +211,9 @@ class GPU
                 if (curScanline >= GB_DISPLAY_HEIGHT + 10)
                 { // VBlank period is between 144 and 153
                     // Restart
+                    if(lcdStatusRegister.oamInterrupt) {
+                        iuptHandler.fireInterrupt(Interrupts.LCD_STATUS);
+                    }
                     setState(GPUMode.OAM_SEARCH);
                     curScanline = 0;
                     
@@ -416,7 +430,10 @@ class GPU
     {
         lcdStatusRegister.coincidenceFlag = getCurScanline() == getScanlineCompare();
 
-        // TODO interrupt handing
+        // TODO is this right? There's something about LYC00 or something
+        if(lcdStatusRegister.coincidenceInterrupt) {
+            iuptHandler.fireInterrupt(Interrupts.LCD_STATUS);
+        }
     }
 
     @safe @property ubyte getScrollX() const
