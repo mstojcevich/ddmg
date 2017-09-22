@@ -5,12 +5,6 @@ import interrupt;
 // TODO verify behavior with http://gbdev.gg8.se/wiki/articles/Timer_Obscure_Behaviour
 
 /**
- * The amount to divide the clock by to get the divider
- * register value.
- */
-private const uint DIVIDER_AMT = 256;
-
-/**
  * Specifies the rate at which TIMA should increase
  * Stored in TAC
  */
@@ -45,10 +39,10 @@ class Clock {
 
     /**
      * The divider register, incremented at 1/256th the rate of the clock.
-     * Internally we keep the true value of the clock (except reset whenever div resets).
-     * this is so that it's easier to incrememnt it properly;
+     * Internally this is stored as a 16 bit number which increments at the regular clock rate.
+     * The upper 8 bits are used as the value of DIV.
      */
-    private ulong div = 0;
+    private ushort div = 0;
 
     /**
      * The timer counter register.
@@ -108,7 +102,7 @@ class Clock {
      * Get the value of the divider register (FF04)
      */
     @safe @property public ubyte divider() const {
-        return cast(ubyte)(div / DIVIDER_AMT);
+        return cast(ubyte)(div & 0xFF00); // Return the upper 8 bits of the internal DIV clock
     }
 
     /**
