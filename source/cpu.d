@@ -105,7 +105,7 @@ class CPU {
             Instruction("LD (HL-),A",	8, &storeAInMemoryHLMinus),
             Instruction("INC SP",		8, {inc(regs.sp);}),
             Instruction("INC (HL)",		12, &incReference),
-            Instruction("DEC (HL)",		1, &decReference),
+            Instruction("DEC (HL)",		12, &decReference),
             Instruction("LD (HL),d8",	12, {storeImmediateInMemory(regs.hl);}),
             Instruction("SCF",		    4, &scf),
             Instruction("JR C,r8",		0, {jumpRelativeImmediateIfFlag(Flag.OVERFLOW, true);}),
