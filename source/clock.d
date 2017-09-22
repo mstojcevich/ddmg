@@ -72,6 +72,7 @@ class Clock {
      */
     this(InterruptHandler iuptHandler) {
         this.iuptHandler = iuptHandler;
+        reset();
     }
 
     /**
@@ -201,6 +202,13 @@ class Clock {
             case ClockRate.HZ_16384:
             return 256;
         }
+    }
+
+    public void reset() {
+        // Initial internal counter value for DIV is 0xABCC
+        // This differs between DMG and GBC (GBC is 0x1EA0)
+        // This is due to different boot roms probably
+        div = 0xABCC;
     }
 
 }
