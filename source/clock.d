@@ -117,7 +117,7 @@ class Clock {
      * Set the timer control (TAC) register (FF07)
      */
     @safe @property void timerControl(ubyte newTac) {
-        this.tac.data = newTac;
+        this.tac.data = newTac & 0b111; // Only the lower 3 bits can be written
     }
 
     /**
