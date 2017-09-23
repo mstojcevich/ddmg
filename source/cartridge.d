@@ -16,12 +16,13 @@ class Cartridge {
 
         header.headerData = beginning[0x100 .. 0x0150];
 
-
         // Load in the ROM data
         cartridgeROM = cast(const(ubyte[])) read(filePath, 32_768);  // 32,768 bytes is the max size of a cartridge ROM without bank switching
         // TODO check checksums
 
-        writefln("Loaded ROM: %s - %d bytes large", cast(const char[11]) header.newTitle, cartridgeROM.length);
+        writefln("Loaded ROM: %s - %d bytes large - type %d", 
+                cast(const char[11]) header.newTitle, 
+                cartridgeROM.length, header.cartridgeType);
     }
 
     @safe public this() {
