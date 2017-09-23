@@ -167,11 +167,12 @@ class MMU {
             return clock.timerControl;
         }
 
-        writefln("UNIMPLEMENTED : Reading address %04X", address);
         debug {
+            writefln("UNIMPLEMENTED : Reading address %04X", address);
             return 0;
         } else {
-            throw new UnmappedMemoryAccessException(address);
+            // Silently fail
+            return 0;
         }
     }
 
@@ -265,11 +266,11 @@ class MMU {
                 writefln("UNIMPLEMENTED : Writing %02X at address %04X", val, address);
             }
         } else {
-            writefln("UNMAPPED : Writing %02X at address %04X", val, address);
             debug {
+                writefln("UNMAPPED : Writing %02X at address %04X", val, address);
                 return;
             } else {
-                throw new UnmappedMemoryAccessException(address);
+                // Silently fail
             }
         }
     }
