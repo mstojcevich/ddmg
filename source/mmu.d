@@ -17,7 +17,6 @@ private const EXTERNAL_RAM_END          = 0xBFFF;
 
 private const CARTRIDGE_BANK_0_BEGIN    = 0x0000;
 private const CARTRIDGE_BANK_0_END      = 0x3FFF;
-private const CARTRIDGE_BANK_0_SIZE     = (CARTRIDGE_BANK_0_END - CARTRIDGE_BANK_0_BEGIN) + 1;
 
 private const CARTRIDGE_BANK_1_BEGIN    = 0x4000;
 private const CARTRIDGE_BANK_1_END      = 0x7FFF;
@@ -100,11 +99,11 @@ class MMU {
         }
 
         if(CARTRIDGE_BANK_0_BEGIN <= address && address <= CARTRIDGE_BANK_0_END) {
-            return cartridge.readROM(address - CARTRIDGE_BANK_0_BEGIN);
+            return cartridge.readBank0(address - CARTRIDGE_BANK_0_BEGIN);
         }
 
         if(CARTRIDGE_BANK_1_BEGIN <= address && address <= CARTRIDGE_BANK_1_END) {
-            return cartridge.readROM(address - CARTRIDGE_BANK_1_BEGIN + CARTRIDGE_BANK_0_SIZE);
+            return cartridge.readBank1(address - CARTRIDGE_BANK_1_BEGIN);
         }
 
         if(VRAM_BEGIN <= address && address <= VRAM_END) {

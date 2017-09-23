@@ -1,3 +1,5 @@
+module cartridge.header;
+
 /// A representation of the cartridge header for GameBoy ROMs
 union CartridgeHeader
 {
@@ -74,10 +76,28 @@ enum RomSize : ubyte {
     KB_512  = 0x04,
     MB_1    = 0x05,
     MB_2    = 0x06,
-    MB_3    = 0x07,
-    MB_1_1  = 0x52,
-    MB_1_2  = 0x53,
-    MB_1_5  = 0x54
+    MB_3    = 0x07
+}
+
+@safe public size_t sizeBytes(RomSize rs) {
+    final switch(rs) {
+        case RomSize.KB_32:
+            return 32_768;
+        case RomSize.KB_64:
+            return 32_768 << 1;
+        case RomSize.KB_128:
+            return 32_768 << 2;
+        case RomSize.KB_256:
+            return 32_768 << 3;
+        case RomSize.KB_512:
+            return 32_768 << 4;
+        case RomSize.MB_1:
+            return 32_768 << 5;
+        case RomSize.MB_2:
+            return 32_768 << 6;
+        case RomSize.MB_3:
+            return 32_768 << 7;
+    }
 }
 
 /// The size of the external RAM in the cartridge
