@@ -11,7 +11,7 @@ import cartridge.mbc;
 class Cartridge {
     
     private const CartridgeHeader header;
-    private const MBC mbc;
+    private MBC mbc;
 
     @safe public this(string filePath) {
         // Read enough of the ROM to know more about it
@@ -40,6 +40,11 @@ class Cartridge {
     /// Read data at addr in bank 1
     @safe public ubyte readBank1(size_t addr) const {
         return mbc.readBank1(addr);
+    }
+
+    /// Write a value to an address in ROM (used for MBC control)
+    @safe public void writeROM(size_t addr, ubyte val) {
+        mbc.writeROM(addr, val);
     }
 
 }

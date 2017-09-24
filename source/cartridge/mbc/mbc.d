@@ -33,4 +33,7 @@ abstract class MBC {
     /// Read the data at addr in bank 1
     @safe ubyte readBank1(size_t addr) const;
 
+    /// Write a value to an address in ROM (used for MBC control)
+    @safe void writeROM(size_t addr, ubyte val);
+
 }

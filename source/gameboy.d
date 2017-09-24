@@ -6,7 +6,7 @@ class Gameboy {
     private MMU mmu;
     private CPU cpu;
     private GPU gpu;
-    private const Cartridge cartridge;
+    private Cartridge cartridge;
     private Display display;
     private Keypad keypad;
     private InterruptHandler iuptHandler;

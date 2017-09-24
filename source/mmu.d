@@ -61,13 +61,13 @@ class MMU {
     // Not sure if this should be here or in a cartridge class...
     private ubyte[EXTERNAL_RAM_END - EXTERNAL_RAM_BEGIN + 1] externalRAM;
 
-    private const Cartridge cartridge;
+    private Cartridge cartridge;
     private GPU gpu;
     private Keypad keypad;
     private InterruptHandler iuptHandler;
     private Clock clock;
 
-    @safe this(const Cartridge c, GPU g, Keypad k, InterruptHandler ih, Clock clk) {
+    @safe this(Cartridge c, GPU g, Keypad k, InterruptHandler ih, Clock clk) {
         this.cartridge = c;
         this.gpu = g;
         this.keypad = k;
@@ -214,6 +214,10 @@ class MMU {
         
         if(OAM_BEGIN <= address && address <= OAM_END) {
             gpu.setOAM(cast(ushort)(address - OAM_BEGIN), val);
+        } else
+
+        if(CARTRIDGE_BANK_0_BEGIN <= address && address <= CARTRIDGE_BANK_1_END) {
+            cartridge.writeROM(address - CARTRIDGE_BANK_0_BEGIN, val);
         } else
 
         if(address == 0xFF40) {

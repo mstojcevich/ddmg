@@ -17,6 +17,10 @@ class MBCNone : MBC {
         @safe ubyte readBank1(size_t addr) const {
             return romData[addr + BANK_1_BEGIN];
         }
+
+        @safe public void writeROM(size_t addr, ubyte val) {
+            // ROM is ready only and there's no control stuff
+        }
     }
 
 }
