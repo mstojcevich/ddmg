@@ -30,6 +30,8 @@ private const OAM_END                   = 0xFE9F;
 private const BGP                       = 0xFF47;
 private const OBP0                      = 0xFF48;
 private const OBP1                      = 0xFF49;
+private const WINDOW_Y                  = 0xFF4A;
+private const WINDOW_X                  = 0xFF4B;
 
 private const DMA_TRANSFER_ADDR         = 0xFF46;
 
@@ -127,6 +129,12 @@ class MMU {
         }
         if(address == 0xFF43) {
             return gpu.getScrollX();
+        }
+        if(address == WINDOW_Y) {
+            return gpu.windowY;
+        }
+        if(address == WINDOW_X) {
+            return gpu.windowX;
         }
         if(address == BGP) {
             return gpu.backgroundPalette;
@@ -228,6 +236,10 @@ class MMU {
             gpu.setScrollY(val);
         } else if(address == 0xFF43) {
             gpu.setScrollX(val);
+        } else if(address == WINDOW_Y) {
+            gpu.windowY = val;
+        } else if(address == WINDOW_X) {
+            gpu.windowX = val;
         } else if(address == BGP) {
             gpu.backgroundPalette = val;
         } else if(address == OBP0) {

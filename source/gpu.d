@@ -46,7 +46,7 @@ union LCDControl {
         TileMapDisplay, "bgMapSelect", 1,
         bool, "bgDataSelect", 1,
         bool, "windowEnable", 1,
-        bool, "windowMapSelect", 1,
+        TileMapDisplay, "windowMapSelect", 1,
         bool, "lcdEnable", 1
     ));
 }
@@ -116,6 +116,9 @@ class GPU
     private ubyte scanlineCompare; // Scanline to compare the curScanline with
 
     private ubyte scrollY, scrollX;
+
+    /// The position of the window on screen
+    private ubyte wX, wY;
 
     private ubyte[] vram;
     private ubyte[] oam;
@@ -302,6 +305,9 @@ class GPU
         if(controlRegister.bgDisplay) {
             renderBackground(curScanline);
         }
+        if(controlRegister.windowEnable) {
+            renderWindow(curScanline);
+        }
         if(controlRegister.objEnable) {
             renderSprites(curScanline);
         }
@@ -342,6 +348,30 @@ class GPU
                     color = (palette >> (color * 2)) & 0b11;
                     display.setPixelGB(cast(ubyte)(x - TILE_SIZE), lineNum, color);
                 }
+            }
+        }
+    }
+
+    /// Renders the window at the current scanline
+    private void renderWindow(ubyte lineNum) {
+        // Check if the window is visible at the scanline
+        if(lineNum >= wY && lineNum < wY + GB_DISPLAY_HEIGHT) {
+            ubyte tileRow = cast(ubyte)(lineNum - wY) / TILE_SIZE;
+
+            // Go through the entire width of the scanline
+            for(ubyte x = 0; x < GB_DISPLAY_WIDTH; x++) {
+                // The number of the column of the current tile
+                ubyte tileCol = x / TILE_SIZE;
+                
+                // The current tile, as a 2d array of colors
+                ubyte[TILE_SIZE][TILE_SIZE] tile = tilemapLookup(controlRegister.windowMapSelect, tileRow, tileCol);
+
+                // Render out the tile at the current scanline
+                ubyte color = tile[lineNum % TILE_SIZE][x % TILE_SIZE];
+
+                // Apply the current palette
+                color = (bgPalette >> (color * 2)) & 0b11;
+                display.setPixelGB(cast(ubyte)(x + wX - 7), lineNum, color);
             }
         }
     }
@@ -455,6 +485,22 @@ class GPU
     @safe @property void setScrollY(in ubyte val)
     {
         this.scrollY = val;
+    }
+
+    @safe @property void windowX(in ubyte val) {
+        this.wX = val;
+    }
+
+    @safe @property ubyte windowX() const {
+        return this.wX;
+    }
+
+    @safe @property void windowY(in ubyte val) {
+        this.wY = val;
+    }
+
+    @safe @property ubyte windowY() const {
+        return this.wY;
     }
 
     @safe void setVRAM(in ushort addr, in ubyte val)
