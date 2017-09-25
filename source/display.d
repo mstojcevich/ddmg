@@ -116,7 +116,7 @@ class Display {
 
         glDrawPixels(GB_DISPLAY_WIDTH, GB_DISPLAY_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, &pixels);
         
-        glfwSwapInterval(1); // No vsync
+        glfwSwapInterval(1); // Use vsync
         
         glfwSwapBuffers(window);
 
