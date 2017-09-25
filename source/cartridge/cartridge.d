@@ -20,7 +20,22 @@ class Cartridge {
         header.headerData = beginning[0x100 .. 0x0150];
 
         // Load in the ROM data
-        mbc = new MBC3(filePath, header);
+        if(header.cartridgeType == CartridgeType.ROM_ONLY) {
+            mbc = new MBCNone(filePath, header);
+        } else if(header.cartridgeType == CartridgeType.MBC1
+                || header.cartridgeType == CartridgeType.MBC1_RAM
+                || header.cartridgeType == CartridgeType.MBC1_RAM_BATTERY) {
+            mbc = new MBC1(filePath, header);
+        } else if(header.cartridgeType == CartridgeType.MBC3
+                || header.cartridgeType == CartridgeType.MBC3_RAM
+                || header.cartridgeType == CartridgeType.MBC3_TIMER_RAM_BATTERY
+                || header.cartridgeType == CartridgeType.MBC3_RAM_BATTERY
+                || header.cartridgeType == CartridgeType.MBC3_TIMER_BATTERY) {
+            mbc = new MBC3(filePath, header);
+        } else {
+            writefln("Unknown MBC type 0x%02X. Using MBC1. Problems will almost surely occur.", header.cartridgeType);
+            mbc = new MBC1(filePath, header);
+        }
 
         writefln("Loaded ROM: %s (type %02X)", 
                 cast(const char[11]) header.newTitle,
