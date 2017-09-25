@@ -60,7 +60,7 @@ class MBC1 : MBC {
         return num;
     }
 
-    @safe private size_t getBankedMemoryAddr(size_t addr) const {
+    @safe private size_t getBankedRamAddr(size_t addr) const {
         if(mode == BankingMode.ROM_BANKING_MODE) {
             // RAM banking not enabled
             return addr;
@@ -82,7 +82,7 @@ class MBC1 : MBC {
                 return;
             }
 
-            size_t bankedAddr = getBankedMemoryAddr(addr);
+            size_t bankedAddr = getBankedRamAddr(addr);
 
             if(bankedAddr < extRAM.length) {
                 extRAM[bankedAddr] = val;
@@ -94,7 +94,7 @@ class MBC1 : MBC {
                 return 0;
             }
 
-            size_t bankedAddr = getBankedMemoryAddr(addr);
+            size_t bankedAddr = getBankedRamAddr(addr);
 
             if(bankedAddr < extRAM.length) {
                 return extRAM[bankedAddr];
