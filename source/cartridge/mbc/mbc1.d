@@ -50,10 +50,48 @@ class MBC1 : MBC {
                 return bankNum & 0b111111; // Lower 6 bits only
         }
     }
+
+    @safe private size_t getBankedMemoryAddr(size_t addr) const {
+        if(mode == BankingMode.ROM_BANKING_MODE) {
+            // RAM banking not enabled
+            return addr;
+        } else {
+            // The top two bits represent the memory bank
+            immutable ubyte bank = bankNum >> 6;
+
+            return (0x2000 * bank) + addr;
+        }
+    }
     
     override {
         @safe ubyte readBank1(size_t addr) const {
             return romData[addr + (0x4000 * romBankNum())];
+        }
+
+        @safe void writeExtRAM(size_t addr, ubyte val) {
+            if(!ramEnabled) {
+                return;
+            }
+
+            size_t bankedAddr = getBankedMemoryAddr(addr);
+
+            if(bankedAddr < extRAM.length) {
+                extRAM[bankedAddr] = val;
+            }
+        }
+
+        @safe ubyte readExtRAM(size_t addr) const {
+            if(!ramEnabled) {
+                return 0;
+            }
+
+            size_t bankedAddr = getBankedMemoryAddr(addr);
+
+            if(bankedAddr < extRAM.length) {
+                return extRAM[bankedAddr];
+            } else {
+                return 0;
+            }
         }
 
         @safe public void writeROM(size_t addr, ubyte val) {

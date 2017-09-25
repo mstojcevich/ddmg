@@ -20,7 +20,7 @@ class Cartridge {
         header.headerData = beginning[0x100 .. 0x0150];
 
         // Load in the ROM data
-        mbc = new MBCNone(filePath, header);
+        mbc = new MBC1(filePath, header);
 
         writefln("Loaded ROM: %s", 
                 cast(const char[11]) header.newTitle);
@@ -45,6 +45,16 @@ class Cartridge {
     /// Write a value to an address in ROM (used for MBC control)
     @safe public void writeROM(size_t addr, ubyte val) {
         mbc.writeROM(addr, val);
+    }
+
+    /// Read a value from external RAM
+    @safe ubyte readExtRAM(size_t addr) const {
+        return mbc.readExtRAM(addr);
+    }
+
+    /// Write a value to external RAM
+    @safe void writeExtRAM(size_t addr, ubyte val) {
+        mbc.writeExtRAM(addr, val);
     }
 
 }

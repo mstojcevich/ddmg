@@ -18,8 +18,22 @@ class MBCNone : MBC {
             return romData[addr + BANK_1_BEGIN];
         }
 
-        @safe public void writeROM(size_t addr, ubyte val) {
-            // ROM is ready only and there's no control stuff
+        @safe void writeExtRAM(size_t addr, ubyte val) {
+            if(addr < extRAM.length) {
+                extRAM[addr] = val;
+            }
+        }
+
+        @safe ubyte readExtRAM(size_t addr) const {
+            if(addr >= extRAM.length) {
+                return 0;
+            }
+
+            return extRAM[addr];
+        }
+
+        @safe void writeROM(size_t addr, ubyte val) {
+            // ROM is read only and there's no special control values
         }
     }
 

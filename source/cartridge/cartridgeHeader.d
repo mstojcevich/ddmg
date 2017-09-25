@@ -100,6 +100,19 @@ enum RomSize : ubyte {
     }
 }
 
+@safe public size_t sizeBytes(RamSize rs) {
+    final switch(rs) {
+        case RamSize.NONE:
+            return 0;
+        case RamSize.KB_2:
+            return 2048;
+        case RamSize.KB_8:
+            return 8192;
+        case RamSize.KB_32:
+            return 32_768;
+    }
+}
+
 /// The size of the external RAM in the cartridge
 enum RamSize : ubyte {
     NONE    = 0x00,

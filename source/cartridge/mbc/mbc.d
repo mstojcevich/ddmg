@@ -12,6 +12,9 @@ abstract class MBC {
     /// The data read from the ROM file
     protected const ubyte[] romData;
 
+    /// The external RAM of the cartridge
+    protected ubyte[] extRAM;
+
     /**
      * Creates an MBC for a ROM at the given path
      * with the given header
@@ -22,6 +25,8 @@ abstract class MBC {
         } else {
             romData = cast(const(ubyte[])) read(filePath, sizeBytes(header.romSize));
         }
+
+        extRAM = new ubyte[sizeBytes(header.ramSize)];
     }
 
     /// Read the data at addr in bank 0
@@ -35,5 +40,11 @@ abstract class MBC {
 
     /// Write a value to an address in ROM (used for MBC control)
     @safe void writeROM(size_t addr, ubyte val);
+
+    /// Read a value from external RAM
+    @safe ubyte readExtRAM(size_t addr) const;
+
+    /// Write a value to external RAM
+    @safe void writeExtRAM(size_t addr, ubyte val);
 
 }

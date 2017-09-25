@@ -57,10 +57,6 @@ class MMU {
 
     private ubyte[ZERO_PAGE_END - ZERO_PAGE_BEGIN + 1] zeroPage;
 
-    // External RAM provided by the cartridge
-    // Not sure if this should be here or in a cartridge class...
-    private ubyte[EXTERNAL_RAM_END - EXTERNAL_RAM_BEGIN + 1] externalRAM;
-
     private Cartridge cartridge;
     private GPU gpu;
     private Keypad keypad;
@@ -95,7 +91,7 @@ class MMU {
         }
 
         if(EXTERNAL_RAM_BEGIN <= address && address <= EXTERNAL_RAM_END) {
-            return externalRAM[address - EXTERNAL_RAM_BEGIN];
+            return cartridge.readExtRAM(address - EXTERNAL_RAM_BEGIN);
         }
 
         if(CARTRIDGE_BANK_0_BEGIN <= address && address <= CARTRIDGE_BANK_0_END) {
@@ -205,7 +201,7 @@ class MMU {
         } else
 
         if(EXTERNAL_RAM_BEGIN <= address && address <= EXTERNAL_RAM_END) {
-            externalRAM[address - EXTERNAL_RAM_BEGIN] = val;
+            cartridge.writeExtRAM(address - EXTERNAL_RAM_BEGIN, val);
         } else 
 
         if(VRAM_BEGIN <= address && address <= VRAM_END) {

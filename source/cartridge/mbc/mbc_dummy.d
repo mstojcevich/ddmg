@@ -17,8 +17,12 @@ class DummyMBC : MBC {
             return 0;
         }
 
-        @safe public void writeROM(size_t addr, ubyte val) {
-            // ROM is ready only and there's no control stuff
+        @safe public void writeROM(size_t addr, ubyte val) {}
+
+        @safe void writeExtRAM(size_t addr, ubyte val) {}
+
+        @safe ubyte readExtRAM(size_t addr) const {
+            return 0;
         }
     }
 
