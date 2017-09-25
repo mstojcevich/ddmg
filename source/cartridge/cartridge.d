@@ -20,10 +20,11 @@ class Cartridge {
         header.headerData = beginning[0x100 .. 0x0150];
 
         // Load in the ROM data
-        mbc = new MBC1(filePath, header);
+        mbc = new MBC3(filePath, header);
 
-        writefln("Loaded ROM: %s", 
-                cast(const char[11]) header.newTitle);
+        writefln("Loaded ROM: %s (type %02X)", 
+                cast(const char[11]) header.newTitle,
+                header.cartridgeType);
     }
 
     @safe public this() {

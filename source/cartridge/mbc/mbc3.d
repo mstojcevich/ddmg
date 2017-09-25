@@ -1,4 +1,4 @@
-module cartridge.mbc.mbc1;
+module cartridge.mbc.mbc3;
 
 import std.stdio;
 import cartridge.mbc.generic;
@@ -8,8 +8,8 @@ private const size_t RAM_ENABLE_BEGIN           = 0x0000;
 private const size_t RAM_ENABLE_END             = 0x1FFF;
 private const size_t ROM_BANK_SEL_LOWER_BEGIN   = 0x2000;
 private const size_t ROM_BANK_SEL_LOWER_END     = 0x3FFF;
-private const size_t ROM_BANK_SEL_UPPER_BEGIN   = 0x4000;
-private const size_t ROM_BANK_SEL_UPPER_END     = 0x5FFF;
+private const size_t RAM_BANK_SEL_BEGIN         = 0x4000;
+private const size_t RAM_BANK_SEL_END           = 0x5FFF;
 private const size_t ROMRAM_MODE_SELECT_BEGIN   = 0x4000;
 private const size_t ROMRAM_MODE_SELECT_END     = 0x5FFF;
 
@@ -20,10 +20,11 @@ private enum BankingMode {
 }
 
 /// An MBC for a rom without an MBC chip
-class MBC1 : MBC {
+class MBC3 : MBC {
 
     private bool ramEnabled;
     private ubyte bankNum = 1;
+    private ubyte ramBank = 0;
     private BankingMode mode = BankingMode.ROM_BANKING_MODE;
 
     /// Creates an MBC for a ROM at the specified path with the specified header
@@ -53,7 +54,7 @@ class MBC1 : MBC {
                 num = bankNum & 0b111111; // Lower 6 bits only
                 break;
         }
-        if(bankNum == 0x00 || bankNum == 0x20 || bankNum == 0x40 || bankNum == 0x60) {
+        if(bankNum == 0x00) {
             num = cast(ubyte)(num + 1);
         }
 
@@ -82,6 +83,15 @@ class MBC1 : MBC {
                 return;
             }
 
+            // When a RAM bank in the range 0x00-0x07 is selected,
+            // that RAM bank in the cartridge will be mapped to this area.
+            // When RAM banks in the range 0x09-0x0C are selected, a single RTC
+            // register will be mapped instead.
+            if(ramBank > 0x07) {
+                // TODO realtime clock
+                return;
+            }
+
             size_t bankedAddr = getBankedMemoryAddr(addr);
 
             if(bankedAddr < extRAM.length) {
@@ -91,6 +101,15 @@ class MBC1 : MBC {
 
         @safe ubyte readExtRAM(size_t addr) const {
             if(!ramEnabled) {
+                return 0;
+            }
+
+            // When a RAM bank in the range 0x00-0x07 is selected,
+            // that RAM bank in the cartridge will be mapped to this area.
+            // When RAM banks in the range 0x09-0x0C are selected, a single RTC
+            // register will be mapped instead.
+            if(ramBank > 0x07) {
+                // TODO realtime clock
                 return 0;
             }
 
@@ -116,16 +135,16 @@ class MBC1 : MBC {
             }
 
             if(ROM_BANK_SEL_LOWER_BEGIN <= addr && addr <= ROM_BANK_SEL_LOWER_END) {
-                ubyte selection = val & 0b11111; // Lower 5 bits
+                immutable ubyte selection = val & 0b1111111; // Lower 7 bits
 
-                bankNum = (bankNum & 0b11100000) | selection;
+                bankNum = (bankNum & 0b10000000) | selection;
 
                 return;
             }
 
             // Can either select RAM bank or upper 2 bits of ROM bank
-            if(ROM_BANK_SEL_UPPER_BEGIN <= addr && addr <= ROM_BANK_SEL_UPPER_END) {
-                bankNum = cast(ubyte)((bankNum & 0b00111111) | ((val & 0b11) << 6));
+            if(RAM_BANK_SEL_BEGIN <= addr && addr <= RAM_BANK_SEL_END) {
+                ramBank = val;
             }
 
             if(ROMRAM_MODE_SELECT_BEGIN <= addr && addr <= ROMRAM_MODE_SELECT_END) {
@@ -141,5 +160,7 @@ class MBC1 : MBC {
 
     // TODO I'm not sure what this means: "If other ROM bank is selected, ROM bank will be changed to the corresponding in 01h-1Fh by clearing the upper 2 bits."
     // TODO are previous rom upper bits preserved or are the same bits used for RAM
+
+    // TODO real time clock
 
 }
