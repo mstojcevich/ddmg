@@ -23,7 +23,8 @@ private enum BankingMode {
 class MBC1 : MBC {
 
     private bool ramEnabled;
-    private ubyte bankNum = 1;
+    private ubyte romBank = 1;
+    private ubyte ramBank = 0;
     private BankingMode mode = BankingMode.ROM_BANKING_MODE;
 
     /// Creates an MBC for a ROM at the specified path with the specified header
@@ -36,40 +37,20 @@ class MBC1 : MBC {
             case BankingMode.ROM_BANKING_MODE:
                 return 0;
             case BankingMode.RAM_BANKING_MODE:
-                return bankNum >> 6;
+                return ramBank;
         }
     }
 
     @safe private ubyte romBankNum() const {
-        // When in RAM mode, the upper 2 bits of the ROM bank
-        // are used instead to specify the RAM bank
-
-        ubyte num;
-        final switch(mode) {
-            case BankingMode.ROM_BANKING_MODE:
-                num = bankNum;
-                break;
-            case BankingMode.RAM_BANKING_MODE:
-                num = bankNum & 0b111111; // Lower 6 bits only
-                break;
-        }
-        if(bankNum == 0x00 || bankNum == 0x20 || bankNum == 0x40 || bankNum == 0x60) {
-            num = cast(ubyte)(num + 1);
+        if((romBank & 0b00011111) == 0) {
+            return romBank | 0b00000001;
         }
 
-        return num;
+        return romBank;
     }
 
     @safe private size_t getBankedRamAddr(size_t addr) const {
-        if(mode == BankingMode.ROM_BANKING_MODE) {
-            // RAM banking not enabled
-            return addr;
-        } else {
-            // The top two bits represent the memory bank
-            immutable ubyte bank = bankNum >> 6;
-
-            return (0x2000 * bank) + addr;
-        }
+        return (0x2000 * ramBankNum()) + addr;
     }
     
     override {
@@ -116,16 +97,24 @@ class MBC1 : MBC {
             }
 
             if(ROM_BANK_SEL_LOWER_BEGIN <= addr && addr <= ROM_BANK_SEL_LOWER_END) {
-                ubyte selection = val & 0b11111; // Lower 5 bits
+                immutable ubyte selection = val & 0b11111; // Lower 5 bits
 
-                bankNum = (bankNum & 0b11100000) | selection;
+                if(mode == BankingMode.ROM_BANKING_MODE) {
+                    romBank = (romBank & 0b01100000) | selection;
+                } else {
+                    romBank = selection;
+                }
 
                 return;
             }
 
-            // Can either select RAM bank or upper 2 bits of ROM bank
-            if(ROM_BANK_SEL_UPPER_BEGIN <= addr && addr <= ROM_BANK_SEL_UPPER_END) {
-                bankNum = cast(ubyte)((bankNum & 0b00111111) | ((val & 0b11) << 6));
+            // Can either select RAM bank or bits 5 and 6 of ROM bank
+            if(ROM_BANK_SEL_UPPER_BEGIN <= addr && addr <= ROM_BANK_SEL_UPPER_END) {                
+                if(mode == BankingMode.ROM_BANKING_MODE) {
+                    romBank = (romBank & 0b00011111) | ((val & 0b11) << 5);
+                } else {
+                    ramBank = val & 0b11;
+                }
             }
 
             if(ROMRAM_MODE_SELECT_BEGIN <= addr && addr <= ROMRAM_MODE_SELECT_END) {

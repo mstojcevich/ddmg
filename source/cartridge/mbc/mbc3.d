@@ -33,9 +33,6 @@ class MBC3 : MBC {
     }
 
     @safe private ubyte romBankNum() const {
-        // When in RAM mode, the upper 2 bits of the ROM bank
-        // are used instead to specify the RAM bank
-
         if(bankNum == 0x00) {
             return 0x01;
         }
