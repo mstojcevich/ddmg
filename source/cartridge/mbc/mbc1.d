@@ -55,7 +55,9 @@ class MBC1 : MBC {
     
     override {
         @safe ubyte readBank1(size_t addr) const {
-            return romData[addr + (0x4000 * romBankNum())];
+            size_t absolute = (addr + (0x4000 * romBankNum())) % romData.length;
+
+            return romData[absolute];
         }
 
         @safe void writeExtRAM(size_t addr, ubyte val) {
