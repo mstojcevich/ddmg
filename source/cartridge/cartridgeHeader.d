@@ -8,6 +8,8 @@ union CartridgeHeader
 
     struct
     {
+        align(1):  // Pack the bytes right next to each other
+
         /// Entry point of the ROM: the code that runs right after the bootrom
         ubyte[4] entryPoint;
 
@@ -21,6 +23,8 @@ union CartridgeHeader
 
             struct
             {
+                align(1): // Pack the bytes right next to each other
+
                 /// The title of the game in ASCII for newer games. Only a portion of the old title.
                 ubyte[11] newTitle;
 
