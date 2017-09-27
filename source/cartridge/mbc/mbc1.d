@@ -82,9 +82,7 @@ class MBC1 : MBC {
 
             size_t bankedAddr = getBankedRamAddr(addr);
 
-            if(bankedAddr < extRAM.length) {
-                extRAM[bankedAddr] = val;
-            }
+            extRAM[bankedAddr % extRAM.length] = val;
         }
 
         @safe ubyte readExtRAM(size_t addr) const {
@@ -95,11 +93,7 @@ class MBC1 : MBC {
 
             size_t bankedAddr = getBankedRamAddr(addr);
 
-            if(bankedAddr < extRAM.length) {
-                return extRAM[bankedAddr];
-            } else {
-                return 0;
-            }
+            return extRAM[bankedAddr % extRAM.length];
         }
 
         @safe public void writeROM(size_t addr, ubyte val) {

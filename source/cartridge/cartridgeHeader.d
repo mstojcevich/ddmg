@@ -114,6 +114,10 @@ enum RomSize : ubyte {
             return 8192;
         case RamSize.KB_32:
             return 32_768;
+        case RamSize.KB_64:
+            return 65_536;
+        case RamSize.KB_128:
+            return 131_072;
     }
 }
 
@@ -122,7 +126,9 @@ enum RamSize : ubyte {
     NONE    = 0x00,
     KB_2    = 0x01,
     KB_8    = 0x02,
-    KB_32   = 0x03
+    KB_32   = 0x03,
+    KB_128  = 0x04,
+    KB_64   = 0x05
 }
 
 /// Specifies whether the game is supposed to be sold in Japan or anywhere else
