@@ -134,7 +134,6 @@ class MBC1 : MBC {
                 if((val & 0b1) == 1) {
                     mode = BankingMode.ALL;
                 } else {
-                    writeln("ROM1 MODE");
                     mode = BankingMode.ROM1_ONLY;
                 }
             }
