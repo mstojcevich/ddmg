@@ -16,7 +16,7 @@ private enum BankingMode {
     RAM_BANKING_MODE
 }
 
-/// An MBC for a rom without an MBC chip
+/// An MBC for a rom with an MBC3 chip
 class MBC3 : MBC {
 
     private bool ramEnabled;
