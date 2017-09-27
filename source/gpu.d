@@ -334,6 +334,10 @@ class GPU
 
                 for(ubyte x = cast(ubyte) min(attrs.x, GB_DISPLAY_WIDTH); 
                     x < min(attrs.x + TILE_SIZE, GB_DISPLAY_WIDTH - 1); x++) {
+                    if(cast(ubyte)(x - TILE_SIZE) >= GB_DISPLAY_WIDTH) {
+                        continue;
+                    } 
+
                     // Get the color of the pixel in the tile
                     ubyte color = row[attrs.xflip ? TILE_SIZE - 1 - (x - attrs.x) : (x - attrs.x)];
 
@@ -371,7 +375,11 @@ class GPU
 
                 // Apply the current palette
                 color = (bgPalette >> (color * 2)) & 0b11;
-                display.setPixelGB(cast(ubyte)(x + wX - 7), lineNum, color);
+
+                ubyte effX = cast(ubyte)(x + wX - 7);
+                if(effX < GB_DISPLAY_WIDTH) {
+                    display.setPixelGB(effX, lineNum, color);
+                }
             }
         }
     }
