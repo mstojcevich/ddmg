@@ -15,17 +15,20 @@ private const size_t ROMRAM_MODE_SELECT_END     = 0x5FFF;
 
 
 private enum BankingMode {
-    ROM_BANKING_MODE,
-    RAM_BANKING_MODE
+    ROM1_ONLY,
+    ALL
 }
 
 /// An MBC for a rom without an MBC chip
 class MBC1 : MBC {
 
     private bool ramEnabled;
-    private ubyte romBank = 1;
-    private ubyte ramBank = 0;
-    private BankingMode mode = BankingMode.ROM_BANKING_MODE;
+    private BankingMode mode = BankingMode.ROM1_ONLY;
+
+    /// The bank number
+    /// Either the whole thing represents the ROM bank,
+    /// or bits 5 and 6 represent the RAM bank
+    private ubyte bankNum = 0b00000001;
 
     /// Creates an MBC for a ROM at the specified path with the specified header
     @safe this(string filename, CartridgeHeader header) {
@@ -34,19 +37,26 @@ class MBC1 : MBC {
 
     @safe private ubyte ramBankNum() const {
         final switch(mode) {
-            case BankingMode.ROM_BANKING_MODE:
-                return 0;
-            case BankingMode.RAM_BANKING_MODE:
-                return ramBank;
+            case BankingMode.ROM1_ONLY:
+                return 0; // Memory banking is not applied in this case
+            case BankingMode.ALL:
+                return bankNum >> 5; // Bits 5 and 6 represent RAM bank
         }
     }
 
-    @safe private ubyte romBankNum() const {
-        if((romBank & 0b00011111) == 0) {
-            return romBank | 0b00000001;
+    @safe private ubyte rom0BankNum() const {
+        // If mode is BankingMode.ALL, the first section of ROM is banked
+        // using bits 5 and 6 of the bankNum
+        final switch(mode) {
+            case BankingMode.ROM1_ONLY:
+                return 0; // ROM0 banking is not applied in this case
+            case BankingMode.ALL:
+                return bankNum & 0b01100000; // Bits 5 and 6 represent ROM0 bank
         }
+    }
 
-        return romBank;
+    @safe private ubyte rom1BankNum() const {
+        return bankNum;
     }
 
     @safe private size_t getBankedRamAddr(size_t addr) const {
@@ -54,14 +64,19 @@ class MBC1 : MBC {
     }
     
     override {
-        @safe ubyte readBank1(size_t addr) const {
-            size_t absolute = (addr + (0x4000 * romBankNum())) % romData.length;
+        @safe ubyte readBank0(size_t addr) const {
+            size_t absolute = (addr + (0x4000 * rom0BankNum())) % romData.length;
+            return romData[absolute];
+        }
 
+        @safe ubyte readBank1(size_t addr) const {
+            size_t absolute = (addr + (0x4000 * rom1BankNum())) % romData.length;
             return romData[absolute];
         }
 
         @safe void writeExtRAM(size_t addr, ubyte val) {
             if(!ramEnabled) {
+                // When ram is disabled, all writes are ignored
                 return;
             }
 
@@ -74,7 +89,8 @@ class MBC1 : MBC {
 
         @safe ubyte readExtRAM(size_t addr) const {
             if(!ramEnabled) {
-                return 0;
+                // When RAM is disabled, reads return 0xFF
+                return 0xFF;
             }
 
             size_t bankedAddr = getBankedRamAddr(addr);
@@ -99,38 +115,30 @@ class MBC1 : MBC {
             }
 
             if(ROM_BANK_SEL_LOWER_BEGIN <= addr && addr <= ROM_BANK_SEL_LOWER_END) {
-                immutable ubyte selection = val & 0b11111; // Lower 5 bits
-
-                if(mode == BankingMode.ROM_BANKING_MODE) {
-                    romBank = (romBank & 0b01100000) | selection;
-                } else {
-                    romBank = selection;
+                ubyte selection = val & 0b11111; // Lower 5 bits
+                if(selection == 0b00000) { // 00, 20, 40, 60 should be 01, 21, 41, 61
+                    selection = 0b00001;
                 }
 
+                bankNum = (bankNum & 0b01100000) | selection;
+                
                 return;
             }
 
             // Can either select RAM bank or bits 5 and 6 of ROM bank
             if(ROM_BANK_SEL_UPPER_BEGIN <= addr && addr <= ROM_BANK_SEL_UPPER_END) {                
-                if(mode == BankingMode.ROM_BANKING_MODE) {
-                    romBank = (romBank & 0b00011111) | ((val & 0b11) << 5);
-                } else {
-                    ramBank = val & 0b11;
-                }
+                bankNum = (bankNum & 0b00011111) | ((val & 0b11) << 5);
             }
 
             if(ROMRAM_MODE_SELECT_BEGIN <= addr && addr <= ROMRAM_MODE_SELECT_END) {
                 if((val & 0b1) == 1) {
-                    mode = BankingMode.RAM_BANKING_MODE;
+                    mode = BankingMode.ALL;
                 } else {
-                    mode = BankingMode.ROM_BANKING_MODE;
+                    writeln("ROM1 MODE");
+                    mode = BankingMode.ROM1_ONLY;
                 }
             }
         }
     }
-
-
-    // TODO I'm not sure what this means: "If other ROM bank is selected, ROM bank will be changed to the corresponding in 01h-1Fh by clearing the upper 2 bits."
-    // TODO are previous rom upper bits preserved or are the same bits used for RAM
 
 }
