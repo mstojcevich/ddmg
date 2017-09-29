@@ -21,7 +21,7 @@ private union ChannelEnableRegister {
         bool, "rightSound2", 1,  // Output sound 2 to the right
         bool, "rightSound3", 1,  // Output sound 3 to the right
         bool, "rightSound4", 1,  // Output sound 4 to the right
-        bool, "leftSoundl1",  1, // Output sound 1 to the left
+        bool, "leftSound1",  1,  // Output sound 1 to the left
         bool, "leftSound2",  1,  // Output sound 2 to the left
         bool, "leftSound3",  1,  // Output sound 3 to the left
         bool, "leftSound4",  1,  // Output sound 4 to the left
