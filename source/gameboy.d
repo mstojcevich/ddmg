@@ -1,4 +1,4 @@
-import mmu, cpu, clock, cartridge, display, gpu, keypad, interrupt;
+import mmu, cpu, clock, cartridge, graphics, keypad, interrupt;
 import std.stdio;
 
 class Gameboy {

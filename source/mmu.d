@@ -1,7 +1,7 @@
 import std.conv;
 import std.stdio;
 
-import cartridge, gpu, keypad, interrupt, clock;
+import cartridge, graphics, keypad, interrupt, clock;
 
 private const WORK_RAM_BEGIN            = 0xC000;
 private const WORK_RAM_END              = 0xDFFF;

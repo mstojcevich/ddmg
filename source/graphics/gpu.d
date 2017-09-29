@@ -1,11 +1,13 @@
-// TODO sprites can be 16x16
+module graphics.gpu;
+
+// TODO sprites can be 16x8
 
 import std.conv;
 import std.stdio;
 import std.bitmanip;
 import std.algorithm.comparison;
 
-import clock, display, interrupt;
+import clock, graphics.display, interrupt;
 
 private const CYCLES_PER_OAM_SEARCH = 80; // Searching OAM RAM
 private const CYCLES_PER_DATA_TRANSFER = 172; // Transfering data to LCD driver

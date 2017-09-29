@@ -1,3 +1,5 @@
+module graphics.display;
+
 import derelict.opengl3.gl;
 import derelict.glfw3.glfw3;
 import std.exception;
