@@ -34,8 +34,8 @@ private union SweepControl {
 private union DutyControl {
     ubyte data;
     mixin(bitfields!(
-        ubyte, "soundLength", 6, // The length of the sound: ((64 - soundLength) / 256) seconds
-        DutyCycle, "dutyCycle", 2 // The waveform duty cycle
+        ubyte,     "soundLength", 6, // The length of the sound: ((64 - soundLength) / 256) seconds
+        DutyCycle, "dutyCycle",   2 // The waveform duty cycle
     ));
 }
 
@@ -43,8 +43,39 @@ private union DutyControl {
 private union EnvelopeControl {
     ubyte data;
     mixin(bitfields!(
-        ubyte,     "stepLength", 3, // Length of each envelope step: (stepLength / 64) seconds
-        EnvelopeMode, "envelopeMode",  1, // Whether volume should decrease or increase on envelope
-        ubyte,     "defaultValue",  4, // The default value for the envelope
+        ubyte,        "stepLength",   3, // Length of each envelope step: (stepLength / 64) seconds
+        EnvelopeMode, "envelopeMode", 1, // Whether volume should decrease or increase on envelope
+        ubyte,        "defaultValue", 4, // The default value for the envelope
     ));
+}
+
+private union NR14 {
+    ubyte data;
+    mixin(bitfields!(
+        ubyte, "higherFreq",  3, // High bits of frequency
+        ubyte, "",            3,
+        bool,  "counter",     1, // If false, output continuously regardless of NR11's soundLength
+        bool,  "initialize",  1, // Settings this to 1 restarts sound
+    ));
+}
+
+/// The sound1 gameboy sound. Square wave with sweep and envelope.
+public class Sound1 {
+
+    private SweepControl sweepCtrl;
+    private DutyControl dutyCtrl;
+    private EnvelopeControl envelopeCtrl;
+    private ubyte lowerFreq; // Low bits of frequency
+    private NR14 nr14;
+
+    /// Tick the sweep as if 1/128th of a second has occurred
+    void sweepTick() {
+
+    }
+
+    /// Tick the envelope as if 1/64th of a second has occurred
+    void envelopeTick() {
+        
+    }
+
 }
