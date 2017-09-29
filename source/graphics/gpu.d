@@ -326,8 +326,8 @@ class GPU
                 ubyte[TILE_SIZE][TILE_SIZE] tile = tileset[attrs.tileNum];
                 ubyte[TILE_SIZE] row = tile[attrs.yflip ? TILE_SIZE - 1 - tileRow : tileRow];
 
-                for(ubyte x = cast(ubyte) min(attrs.x, GB_DISPLAY_WIDTH); 
-                    x < min(attrs.x + TILE_SIZE, GB_DISPLAY_WIDTH - 1); x++) {
+                for(ubyte x = cast(ubyte) min(attrs.x, GB_DISPLAY_WIDTH + TILE_SIZE); 
+                    x < min(attrs.x + TILE_SIZE, GB_DISPLAY_WIDTH + TILE_SIZE); x++) {
                     if(cast(ubyte)(x - TILE_SIZE) >= GB_DISPLAY_WIDTH) {
                         continue;
                     } 
