@@ -339,7 +339,7 @@ class CPU {
         // TODO the rom disable I/O register at memory address 0xFF50 should be set to 1
     }
 
-    void step() {
+    @safe void step() {
         uint numCycles;
 
         if(haltMode == HaltMode.NO_HALT || haltMode == HaltMode.HALT_BUG) { // If the CPU is halted, stop execution
@@ -1082,7 +1082,7 @@ class CPU {
     /**
      * Jump to the immediate address if the specified flag is set/reset (depending on second parameter)
      */
-    private void jumpImmediateIfFlag(in Flag f, in bool set) {
+    @safe private void jumpImmediateIfFlag(in Flag f, in bool set) {
         if(regs.isFlagSet(f) == set) {
             jumpImmediate();
 
@@ -1113,7 +1113,7 @@ class CPU {
     /**
      * JR if the specified flag is set/unset
      */
-    private void jumpRelativeImmediateIfFlag(Flag f, bool set) {
+    @safe private void jumpRelativeImmediateIfFlag(Flag f, bool set) {
         if(regs.isFlagSet(f) == set) {
             jumpRelativeImmediate();
             
@@ -1222,7 +1222,7 @@ class CPU {
     /**
      * Call an immediate 16-bit value if the specified flag is set/reset (depending on second argument)
      */
-    private void callImmediateIfFlag(in Flag f, in bool set) {
+    @safe private void callImmediateIfFlag(in Flag f, in bool set) {
         if(regs.isFlagSet(f) == set) {
             callImmediate();
 
@@ -1244,7 +1244,7 @@ class CPU {
     /**
      * RET if the specified flag is set/reset (depending on the second parameter)
      */
-    private void retIfFlag(in Flag f, in bool set) {
+    @safe private void retIfFlag(in Flag f, in bool set) {
         if(regs.isFlagSet(f) == set) {
             ret();
 
@@ -1254,7 +1254,7 @@ class CPU {
         }
     }
 
-	private void cb() {
+	@safe private void cb() {
 		immutable ubyte subop = mmu.readByte(regs.pc);
         regs.pc += 1;
 

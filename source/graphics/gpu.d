@@ -141,7 +141,7 @@ class GPU
         objPalette1 = 0b11111111;
     }
 
-    void step(uint cyclesElapsed)
+    @safe void step(uint cyclesElapsed)
     {
         this.stateClock += cyclesElapsed;
 
@@ -231,7 +231,7 @@ class GPU
         this.lcdStatusRegister.gpuMode = mode;
     }
 
-    private void updateDisplay()
+    @safe private void updateDisplay()
     {
         if(!controlRegister.lcdEnable) {
             return;
@@ -285,7 +285,7 @@ class GPU
     /**
      * Update the current line on the display
      */
-    private void updateCurLine()
+    @safe private void updateCurLine()
     {
         // Don't worry about stuff off of the screen
         if(curScanline > GB_DISPLAY_HEIGHT - 1) {
@@ -310,7 +310,7 @@ class GPU
     /**
      * Renders sprites for a specific line onto the display
      */
-    private void renderSprites(ubyte lineNum) {
+    @safe private void renderSprites(ubyte lineNum) {
         // TODO "Because of a limitation of hardware, only ten sprites can be displayed per scan line"
 
         for(int i = 0; i < 40; i++) { // There are 40 different sprites
@@ -351,7 +351,7 @@ class GPU
     }
 
     /// Renders the window at the current scanline
-    private void renderWindow(ubyte lineNum) {
+    @safe private void renderWindow(ubyte lineNum) {
         // Check if the window is visible at the scanline
         if(lineNum >= wY && lineNum < wY + GB_DISPLAY_HEIGHT) {
             ubyte tileRow = cast(ubyte)(lineNum - wY) / TILE_SIZE;
@@ -381,7 +381,7 @@ class GPU
     /**
      * Renders the background for a specific line onto the display
      */
-    private void renderBackground(ubyte lineNum) {
+    @safe private void renderBackground(ubyte lineNum) {
         // The current Y position, shifted by the scroll register
         ubyte scrolledY = cast(ubyte)(lineNum + scrollY);
         // Because the ubyte cast will wrap past 255, we don't need to manually wrap it

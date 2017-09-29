@@ -52,7 +52,7 @@ class Display {
         {0, 0, 0}
     ];
 
-    this() {
+    @safe this() {
         pixels = new Color[GB_PIXEL_COUNT];
 
         Color white = {255, 255, 255};
@@ -63,6 +63,20 @@ class Display {
             }
         }
 
+        initGLFW();
+    }
+
+    @trusted ~this() {
+        /* 
+        Even if the application is terminated and the OS frees resources, 
+        the GLFW docs state that system properties may be altered, so
+        glfwTerminate needs to be explicitely called 
+        */
+
+        glfwTerminate(); // Also frees allocated memory such as the window
+    }
+
+    @trusted private void initGLFW() {
         DerelictGLFW3.load(); // Load in the GLFW3 dynamic library
         DerelictGL.load(); // Load GL core and compatibility. TODO change to DerelictGL3 and remove deprecated calls 
 
@@ -90,17 +104,7 @@ class Display {
         DerelictGL.reload(); // Need to reload for full support
     }
 
-    ~this() {
-        /* 
-        Even if the application is terminated and the OS frees resources, 
-        the GLFW docs state that system properties may be altered, so
-        glfwTerminate needs to be explicitely called 
-        */
-
-        glfwTerminate(); // Also frees allocated memory such as the window
-    }
-
-    void resetFrameBuffer() {
+    @safe void resetFrameBuffer() {
         Color white = {255, 255, 255};
 
         // Initialize the pixels all to white
@@ -111,7 +115,7 @@ class Display {
         }
     }
 
-    void drawFrame() {
+    @trusted void drawFrame() {
         glfwPollEvents();
 
         glPixelZoom(DISPLAY_WIDTH / GB_DISPLAY_WIDTH, DISPLAY_HEIGHT / GB_DISPLAY_HEIGHT);
@@ -127,7 +131,7 @@ class Display {
         glfwSetTime(0);
     }
 
-    bool shouldProgramTerminate() {
+    @trusted bool shouldProgramTerminate() {
         // Terminate the program if escape was pressed
         if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
             return true;
@@ -173,7 +177,7 @@ class Display {
         gbPixels[pixelNum] = value;
     }
 
-    @property GLFWwindow* glfwWindow() {
+    @safe @property GLFWwindow* glfwWindow() {
         return window;
     }
 }

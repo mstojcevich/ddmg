@@ -26,7 +26,7 @@ class Keypad {
 
     private InterruptHandler iuptHandler;
 
-    this(GLFWwindow* w, InterruptHandler iuptHandler) {
+    @trusted this(GLFWwindow* w, InterruptHandler iuptHandler) {
         this.iuptHandler = iuptHandler;
 
         if(w != null) {

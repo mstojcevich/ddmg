@@ -12,7 +12,7 @@ class Gameboy {
     private InterruptHandler iuptHandler;
     private Bus bus;
 
-    this(string romPath) {
+    @safe this(string romPath) {
         this.cartridge = new Cartridge(romPath);
 
         this.display = new Display();
@@ -25,7 +25,7 @@ class Gameboy {
         this.cpu = new CPU(this.mmu, this.bus, this.iuptHandler);
     }
 
-    public void run() {
+    @safe public void run() {
         while(true) {
             keypad.update();
             cpu.step();

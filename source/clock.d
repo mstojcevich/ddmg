@@ -70,7 +70,7 @@ class Clock {
      * Params:
      *  iuptHandler = Interrupt handler to flag the timer overflow iupt with
      */
-    this(InterruptHandler iuptHandler) {
+    @safe this(InterruptHandler iuptHandler) {
         this.iuptHandler = iuptHandler;
         reset();
     }
@@ -204,7 +204,7 @@ class Clock {
         }
     }
 
-    public void reset() {
+    @safe public void reset() {
         // Initial internal counter value for DIV is 0xABCC
         // This differs between DMG and GBC (GBC is 0x1EA0)
         // This is due to different boot roms probably
