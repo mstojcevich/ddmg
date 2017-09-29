@@ -1,3 +1,5 @@
+module cpu.cpu;
+
 import std.stdio;
 import std.format;
 import std.exception;
@@ -14,7 +16,7 @@ import gpu;
 import display;
 import interrupt;
 import keypad;
-import cb;
+import cpu.cb;
 
 /**
  * The type of halt the CPU is in

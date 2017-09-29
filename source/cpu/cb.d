@@ -1,3 +1,5 @@
+module cpu.cb;
+
 import core.bitop;
 
 import registers;
