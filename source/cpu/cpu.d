@@ -369,7 +369,10 @@ class CPU {
             if(instr.impl !is null) {
                 try {
                     instr.impl(); // Execute the operation
-                    bus.update(instr.cycles);
+
+                    if(instr.cycles != 0) {
+                        bus.update(instr.cycles);
+                    }
                 } catch (Exception e) {
                     writefln("Instruction failed with exception \"%s\"", e.msg);
                     writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
