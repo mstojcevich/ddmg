@@ -6,10 +6,10 @@ import std.bitmanip;
 private union VolumeControlRegister {
     ubyte data;
     mixin(bitfields!(
-        ubyte, "rightVol", 3, // Right channel volume
-        ubyte, "vinRight", 1, // Audio input from the cartridge
-        ubyte, "leftVol", 3,  // Left channel volume
-        bool, "vinLeft", 1,   // Audio input from the cartridge
+        ubyte, "rightVol", 3,  // Right channel volume
+        ubyte, "vinRight", 1,  // Audio input from the cartridge
+        ubyte, "leftVol",  3,  // Left channel volume
+        bool,  "vinLeft",  1,  // Audio input from the cartridge
     ));
 }
 
@@ -17,24 +17,25 @@ private union VolumeControlRegister {
 private union ChannelEnableRegister {
     ubyte data;
     mixin(bitfields!(
-        bool, "rightChannel1", 1, // Output channel 1 to the right
-        bool, "rightChannel2", 1, // Output channel 2 to the right
-        bool, "rightChannel3", 1, // Output channel 3 to the right
-        bool, "rightChannel4", 1, // Output channel 4 to the right
-        bool, "leftChannel1",  1, // Output channel 1 to the left
-        bool, "leftChannel2",  1, // Output channel 2 to the left
-        bool, "leftChannel3",  1, // Output channel 3 to the left
-        bool, "leftChannel4",  1, // Output channel 4 to the left
+        bool, "rightSound1", 1,  // Output sound 1 to the right
+        bool, "rightSound2", 1,  // Output sound 2 to the right
+        bool, "rightSound3", 1,  // Output sound 3 to the right
+        bool, "rightSound4", 1,  // Output sound 4 to the right
+        bool, "leftSoundl1",  1, // Output sound 1 to the left
+        bool, "leftSound2",  1,  // Output sound 2 to the left
+        bool, "leftSound3",  1,  // Output sound 3 to the left
+        bool, "leftSound4",  1,  // Output sound 4 to the left
     ));
 }
 
+/// Representation of the NR52 register
 private union SoundEnableRegister {
     ubyte data;
     mixin(bitfields!(
-        bool, "channel1Enable", 1, // Whether channel 1 is enabled
-        bool, "channel2Enable", 1, // Whether channel 2 is enabled
-        bool, "channel3Enable", 1, // Whether channel 3 is enabled
-        bool, "channel4Enable", 1, // Whether channel 4 is enabled
+        bool, "sound1Enable", 1, // Whether sound 1 is enabled
+        bool, "sound2Enable", 1, // Whether sound 2 is enabled
+        bool, "sound3Enable", 1, // Whether sound 3 is enabled
+        bool, "sound4Enable", 1, // Whether sound 4 is enabled
         ubyte, "",  3,
         bool, "masterEnable",   1, // Whether sound as a whole should be enabled
     ));
@@ -45,6 +46,6 @@ class APU {
 
     private VolumeControlRegister volumes;
     private ChannelEnableRegister enabledChannels;
-    private SoundEnableRegister enableStatus;
+    private SoundEnableRegister enabledSounds;
 
 }
