@@ -10,12 +10,12 @@ import core.bitop;
 import mmu;
 import cpu.registers;
 import cpu.instruction;
-import clock;
 import cartridge;
 import graphics;
 import interrupt;
 import keypad;
 import cpu.cb;
+import bus;
 
 /**
  * The type of halt the CPU is in
@@ -38,16 +38,16 @@ class CPU {
     private Registers regs = new Registers();
 
     private MMU mmu;
-    private Clock clk;
+    private Bus bus;
     private InterruptHandler iuptHandler;
 	private CB cbBlock;
 
     // Whether the CPU is halted (not executing until interrupt)
     private HaltMode haltMode;
 
-    @safe this(MMU mmu, Clock clk, InterruptHandler ih) {
+    @safe this(MMU mmu, Bus bus, InterruptHandler ih) {
         this.mmu = mmu;
-        this.clk = clk;
+        this.bus = bus;
         this.iuptHandler = ih;
 		this.cbBlock = new CB(regs, mmu);
 
@@ -339,7 +339,9 @@ class CPU {
         // TODO the rom disable I/O register at memory address 0xFF50 should be set to 1
     }
 
-    @safe void step() {
+    void step() {
+        uint numCycles;
+
         if(haltMode == HaltMode.NO_HALT || haltMode == HaltMode.HALT_BUG) { // If the CPU is halted, stop execution
             // Fetch the operation in memory
             immutable ubyte opcode = mmu.readByte(regs.pc);
@@ -367,7 +369,7 @@ class CPU {
             if(instr.impl !is null) {
                 try {
                     instr.impl(); // Execute the operation
-                    clk.spendCycles(instr.cycles);
+                    bus.update(instr.cycles);
                 } catch (Exception e) {
                     writefln("Instruction failed with exception \"%s\"", e.msg);
                     writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
@@ -382,11 +384,14 @@ class CPU {
                 writefln("The execution is probably tainted");
             }
         } else { // halted
-            // TODO how much do we increment the clock by?
+            // TODO how many cycles??
             // Does this need to be a separate clock?
-            clk.spendCycles(1);
+            bus.update(4);
         }
 
+        // TODO move everything from here on down in this fucntion
+        // to its own interrupthandler method
+        
         // Handle any interrupts that were triggered
         foreach(iupt; EnumMembers!Interrupts) {
             if(iuptHandler.shouldHandle(iupt)) {
@@ -396,11 +401,11 @@ class CPU {
                     iuptHandler.masterToggle = false;
 
                     // It takes 20 clocks to dispatch an interrupt.
-                    clk.spendCycles(20);
+                    bus.update(20);
 
                     if(haltMode == HaltMode.NORMAL) {
                         // If the CPU is in HALT mode, another 4 clocks are needed
-                        clk.spendCycles(4);
+                        bus.update(4);
                         haltMode = HaltMode.NO_HALT;
                     }
                 } else {
@@ -1074,15 +1079,15 @@ class CPU {
     /**
      * Jump to the immediate address if the specified flag is set/reset (depending on second parameter)
      */
-    @safe private void jumpImmediateIfFlag(in Flag f, in bool set) {
+    private void jumpImmediateIfFlag(in Flag f, in bool set) {
         if(regs.isFlagSet(f) == set) {
             jumpImmediate();
 
-            clk.spendCycles(16);
+            bus.update(16);
         } else { // Update PC to account for theoretically reading a 16-bit immediate
             regs.pc += 2;
 
-            clk.spendCycles(12);
+            bus.update(12);
         }
     }
 
@@ -1105,15 +1110,15 @@ class CPU {
     /**
      * JR if the specified flag is set/unset
      */
-    @safe private void jumpRelativeImmediateIfFlag(Flag f, bool set) {
+    private void jumpRelativeImmediateIfFlag(Flag f, bool set) {
         if(regs.isFlagSet(f) == set) {
             jumpRelativeImmediate();
             
-            clk.spendCycles(12);
+            bus.update(12);
         } else {
             regs.pc += 1;
 
-            clk.spendCycles(8);
+            bus.update(8);
         }
     }
 
@@ -1214,15 +1219,15 @@ class CPU {
     /**
      * Call an immediate 16-bit value if the specified flag is set/reset (depending on second argument)
      */
-    @safe private void callImmediateIfFlag(in Flag f, in bool set) {
+    private void callImmediateIfFlag(in Flag f, in bool set) {
         if(regs.isFlagSet(f) == set) {
             callImmediate();
 
-            clk.spendCycles(24);
+            bus.update(24);
         } else {
             regs.pc += 2; // Compensate for theoretically reading an immediate short
             
-            clk.spendCycles(12);
+            bus.update(12);
         }
     }
 
@@ -1236,21 +1241,21 @@ class CPU {
     /**
      * RET if the specified flag is set/reset (depending on the second parameter)
      */
-    @safe private void retIfFlag(in Flag f, in bool set) {
+    private void retIfFlag(in Flag f, in bool set) {
         if(regs.isFlagSet(f) == set) {
             ret();
 
-            clk.spendCycles(20);
+            bus.update(20);
         } else {
-            clk.spendCycles(8);
+            bus.update(8);
         }
     }
 
-	@safe private void cb() {
+	private void cb() {
 		immutable ubyte subop = mmu.readByte(regs.pc);
         regs.pc += 1;
 
-		clk.spendCycles(cbBlock.handle(subop));
+		bus.update(cbBlock.handle(subop));
 	}
     @system unittest {
         InterruptHandler ih = new InterruptHandler();

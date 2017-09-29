@@ -7,7 +7,7 @@ import std.stdio;
 import std.bitmanip;
 import std.algorithm.comparison;
 
-import clock, graphics.display, interrupt;
+import graphics.display, interrupt;
 
 private const CYCLES_PER_OAM_SEARCH = 80; // Searching OAM RAM
 private const CYCLES_PER_DATA_TRANSFER = 172; // Transfering data to LCD driver
@@ -102,14 +102,8 @@ class GPU
 {
     private GPUMode state;
     private int stateClock; // Number of cycles have been in current state
-    private Clock clock;
     private Display display;
     private InterruptHandler iuptHandler;
-
-    // Previous clock cycles. Kept track of so we know
-    // how many cycles have elapsed since our last
-    // GPU cycle
-    private ulong prevClock = 0;
 
     private LCDControl controlRegister;
     private LCDStatus lcdStatusRegister;
@@ -132,10 +126,9 @@ class GPU
     private ubyte objPalette0; // FF48 Object Palette 0 Data
     private ubyte objPalette1; // FF49 Object Palette 1 Data
 
-    @safe this(Display d, Clock clk, InterruptHandler ih)
+    @safe this(Display d, InterruptHandler ih)
     {
         setState(GPUMode.HORIZ_BLANK);
-        this.clock = clk;
         this.display = d;
         this.vram = new ubyte[8192];
         this.oam = new ubyte[160];
@@ -148,10 +141,9 @@ class GPU
         objPalette1 = 0b11111111;
     }
 
-    void step()
+    void step(uint cyclesElapsed)
     {
-        this.stateClock += clock.getElapsedCycles() - prevClock;
-        this.prevClock = clock.getElapsedCycles();
+        this.stateClock += cyclesElapsed;
 
         final switch (state)
         {
