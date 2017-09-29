@@ -431,7 +431,17 @@ class GPU
 
     @safe @property void setLCDControl(in ubyte val)
     {
+        bool lcdWasOn = this.controlRegister.lcdEnable;
+
         this.controlRegister.data = val;
+
+        /*
+        When the LCD is turned on, the controller goes to
+        the beginning of the first scanline.
+         */
+        if(!lcdWasOn && this.controlRegister.lcdEnable) {
+            resetCurScanline();
+        }
     }
 
     @safe @property ubyte getCurScanline() const
@@ -443,6 +453,10 @@ class GPU
     {
         this.curScanline = 0;
         checkCoincidence();
+
+        // Start one clock cycle into the line
+        setState(GPUMode.OAM_SEARCH);
+        stateClock = 4;
     }
 
     @safe @property GPUMode getLCDStatus() const
