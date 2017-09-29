@@ -2,8 +2,8 @@ module cpu.cb;
 
 import core.bitop;
 
-import registers;
-import instruction;
+import cpu.registers;
+import cpu.instruction;
 import mmu;
 
 // Portion of the CPU to deal with CB prefix instructions -

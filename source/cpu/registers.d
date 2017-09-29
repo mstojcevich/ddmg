@@ -1,3 +1,5 @@
+module cpu.registers;
+
 /**
  * Type for a 16-bit register
  */

@@ -8,8 +8,8 @@ import std.traits;
 import core.bitop;
 
 import mmu;
-import registers;
-import instruction;
+import cpu.registers;
+import cpu.instruction;
 import clock;
 import cartridge;
 import graphics;
