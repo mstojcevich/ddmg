@@ -107,7 +107,7 @@ class CPU {
             Instruction("INC SP",		8, {inc(regs.sp);}),
             Instruction("INC (HL)",		12, &incReference),
             Instruction("DEC (HL)",		12, &decReference),
-            Instruction("LD (HL),d8",	12, {storeImmediateInMemory(regs.hl);}),
+            Instruction("LD (HL),d8",	8 /*remaining 4 spent in op itself*/, {storeImmediateInMemory(regs.hl);}),
             Instruction("SCF",		    4, &scf),
             Instruction("JR C,r8",		0, {jumpRelativeImmediateIfFlag(Flag.OVERFLOW, true);}),
             Instruction("ADD HL,SP",	8, {add(regs.hl, regs.sp);}),
@@ -277,7 +277,7 @@ class CPU {
             Instruction("XX",		    0, null),
             Instruction("SBC A,d8",		8, &sbcImmediate),
             Instruction("RST 18H",		16, {rst(0x18);}),
-            Instruction("LDH (a8),A",	12, &ldhAToImmediate),
+            Instruction("LDH (a8),A",	8 /*remaining 4 spent in instruction itself*/, &ldhAToImmediate),
             Instruction("POP HL",		12, {popFromStack(regs.hl);}),
             Instruction("LD (C),A",		8, &ldCA),
             Instruction("XX",		    0, null),
@@ -287,7 +287,7 @@ class CPU {
             Instruction("RST 20H",		16, {rst(0x20);}),
             Instruction("ADD SP,r8",	16, &offsetStackPointerImmediate),
             Instruction("JP (HL)",		4, &jumpHL),
-            Instruction("LD (a16),A",	16, {storeInImmediateReference(regs.a);}),
+            Instruction("LD (a16),A",	8 /* remaining 8 spent in op itself */, {storeInImmediateReference(regs.a);}),
             Instruction("XX",		    0, null),
             Instruction("XX",		    0, null),
             Instruction("XX",		    0, null),
@@ -530,11 +530,13 @@ class CPU {
      * Store an 8-bit immediate value into memory at the address specified
      */
     @safe private void storeImmediateInMemory(in ushort addr) {
+        bus.update(4);
         storeInMemory(addr, mmu.readByte(regs.pc));
         regs.pc++;
     }
 
     @safe private void storeInImmediateReference(in reg8 src) {
+        bus.update(8);
         storeInMemory(mmu.readShort(regs.pc), src);
         regs.pc += 2;
     }
@@ -1192,6 +1194,7 @@ class CPU {
      * Save the value in register A to memory at FF00 + (8-bit immediate)
      */
     @safe private void ldhAToImmediate() {
+        bus.update(4);
         storeInMemory(0xFF00 + mmu.readByte(regs.pc), regs.a);
         regs.pc++;
     }
