@@ -81,7 +81,7 @@ class MBC1 : MBC {
             }
 
             if(extRAM.length == 0) {
-                writefln("Game tried to write to external RAM address %04X, but said there was no ext RAM");
+                writefln("Game tried to write to external RAM address %04X, but said there was no ext RAM", addr);
                 return;
             }
 
@@ -97,7 +97,7 @@ class MBC1 : MBC {
             }
 
             if(extRAM.length == 0) {
-                writefln("Game tried to read to external RAM address %04X, but said there was no ext RAM");
+                writefln("Game tried to read to external RAM address %04X, but said there was no ext RAM", addr);
                 return 0xFF;
             }
 
