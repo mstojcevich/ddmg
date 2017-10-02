@@ -22,15 +22,15 @@ Because of these goals, there are times where I will sacrifice performance for r
 - Gameboy camera
 - Gameboy printer
 
-## Tests
+# Tests
 These are DDMG's results on different test ROMs. I'll add more in the future.
 
-### Blargg's Tests
+## Blargg's Tests
 Blargg has several test ROMs mostly revolving around cpu timings and sound along with the OAM and HALT bugs.
 
 None of the Blargg sound tests are included in this README as sound is not implemented.
 
-#### cpu_instrs
+### cpu_instrs
 
 | Test name             | Status |
 |-----------------------|:--------:|
