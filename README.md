@@ -31,7 +31,7 @@ Blargg has several test ROMs mostly revolving around cpu timings and sound along
 **cgb_sound** (note: cgb and sound both aren't implemented yet)
 
 | Test name                | Status | Details                                                                    |
-|--------------------------|--------|----------------------------------------------------------------------------|
+|--------------------------|:--------:|----------------------------------------------------------------------------|
 | 01-registers             | :x:      | NR10-NR51 and wave RAM write/read. Failed #2                               |
 | 02-len ctr               | :x:      | Length becoming 0 should clear status. Failed #2                           |
 | 03-trigger               | :x:      | Enabling in second half of length period shouldn't clock length. Failed #2 |
@@ -50,7 +50,7 @@ Blargg has several test ROMs mostly revolving around cpu timings and sound along
 **cpu_instrs**
 
 | Test name             | Status |
-|-----------------------|--------|
+|-----------------------|:--------:|
 | 01-special            | :white_check_mark: |
 | 02-interrupts         | :white_check_mark: |
 | 03-op sp,hl           | :white_check_mark: |
