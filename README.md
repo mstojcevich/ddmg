@@ -47,3 +47,15 @@ None of the Blargg sound tests are included in this README as sound is not imple
 | 11-op a,(hl)          | :white_check_mark: |
 
 ### halt_bug :white_check_mark:
+
+### instr_timing :white_check_mark:
+
+### interrupt_time :x:
+
+### mem_timing-2
+
+| Test name             | Status |
+|-----------------------|:--------:|
+| 01-read_timing        | :x: |
+| 02-write_timing       | :x: |
+| 03-modify_timing      | :x: |
