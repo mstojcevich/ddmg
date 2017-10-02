@@ -20,12 +20,12 @@ private enum DutyCycle : ubyte {
 }
 
 // TODO verify
-const bool[4][8] dutyCycles = {
-    {false, false, false, true, false, false, false}, // 12.5%
-    {false, false, true, true, false, false, false, false}, // 25%
-    {false, false, true, true, true, true, false, false}, // 50%
-    {true, true, false, false, true, true, true, true}, // 75%
-};
+immutable bool[8][4] dutyCycles = [
+    [false, false, false, true, false, false, false], // 12.5%
+    [false, false, true, true, false, false, false, false], // 25%
+    [false, false, true, true, true, true, false, false], // 50%
+    [true, true, false, false, true, true, true, true], // 75%
+];
 
 // Representation of the NR10 register
 private union SweepControl {
@@ -79,8 +79,34 @@ public class Sound1 {
     private int frequency; // Frequency data as defined by NR13 and NR14
     private int realFrequency; // Frequency in Hz
 
-    ushort[] outBuffer; // The buffer of sound data to output
-    size_t outIndex; // Current position in outBuffer
+    // 2048 is the amount of precision we need for the highest frequency. Each unit is 1048576hz
+    private ushort[2048] outBuffer; // The buffer of sound data to output
+
+    private bool[8] dutyCycle = dutyCycles[0];
+
+    private ushort volume = 65535;
+
+    /// The current location in the duty cycle
+    private int dutyLocation;
+
+    // Called 512 times a second to update. Returns the samples for the time.
+    ushort[2048] tick() {
+        // Update 1/512th a second worth of audio
+
+        immutable ushort unitsPerDuty = cast(ushort)(8 * (frequency / 512));
+        
+        ushort curAmplitude = dutyCycle[dutyLocation] ? volume : 0;
+        for(int i = 0; i < 2048; i++) {
+            outBuffer[i] = curAmplitude;
+
+            if(i % unitsPerDuty == 0) {
+                dutyLocation = (dutyLocation + 1) % 8;
+                curAmplitude = dutyCycle[dutyLocation] ? volume : 0;
+            }
+        }
+        
+        return outBuffer;
+    }
 
     /// Tick the sweep as if 1/128th of a second has occurred
     void sweepTick() {
@@ -105,9 +131,9 @@ public class Sound1 {
         recalcFrequency();
     }
 
-    /// Calculate the real frequency from the frequency datas
+    /// Calculate the real frequency from the frequency data
     private void recalcFrequency() {
-        realFrequency = 4_194_304 / (4 * 2 * (2048 * frequency));
+        realFrequency = 4_194_304 / (4 * 4 * 2 * (2048 * frequency));
     }
 
 }

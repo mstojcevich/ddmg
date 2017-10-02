@@ -1,6 +1,7 @@
 module sound.apu;
 
 import std.bitmanip;
+import sound.sound1;
 
 /// Representation of the NR50 register
 private union VolumeControlRegister {
@@ -47,5 +48,15 @@ class APU {
     private VolumeControlRegister volumes;
     private ChannelEnableRegister enabledChannels;
     private SoundEnableRegister enabledSounds;
+
+    private Sound1 sound1;
+
+    this() {
+        sound1 = new Sound1();
+    }
+    
+    ~this() {
+        
+    }
 
 }
