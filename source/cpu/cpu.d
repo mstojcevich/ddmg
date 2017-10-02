@@ -105,8 +105,8 @@ class CPU {
             Instruction("LD SP,d16",	12, {loadImmediate(regs.sp);}),
             Instruction("LD (HL-),A",	8, &storeAInMemoryHLMinus),
             Instruction("INC SP",		8, {inc(regs.sp);}),
-            Instruction("INC (HL)",		12, &incReference),
-            Instruction("DEC (HL)",		12, &decReference),
+            Instruction("INC (HL)",		8 /*remaining 4 spent in op itself*/, &incReference),
+            Instruction("DEC (HL)",		8 /*remaining 4 spent in op itself*/, &decReference),
             Instruction("LD (HL),d8",	8 /*remaining 4 spent in op itself*/, {storeImmediateInMemory(regs.hl);}),
             Instruction("SCF",		    4, &scf),
             Instruction("JR C,r8",		0, {jumpRelativeImmediateIfFlag(Flag.OVERFLOW, true);}),
@@ -916,6 +916,7 @@ class CPU {
     @safe private void incReference() {
         ubyte mem = mmu.readByte(regs.hl);
         inc(mem);
+        bus.update(4);
         mmu.writeByte(regs.hl, mem);
     }
 
@@ -932,6 +933,7 @@ class CPU {
     @safe private void decReference() {
         ubyte mem = mmu.readByte(regs.hl);
         dec(mem);
+        bus.update(4);
         mmu.writeByte(regs.hl, mem);
     }
 

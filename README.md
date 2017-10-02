@@ -58,4 +58,4 @@ None of the Blargg sound tests are included in this README as sound is not imple
 |-----------------------|:--------:|
 | 01-read_timing        | :white_check_mark: |
 | 02-write_timing       | :white_check_mark: |
-| 03-modify_timing      | :x: |
+| 03-modify_timing      | :white_check_mark: |

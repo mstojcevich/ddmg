@@ -50,10 +50,11 @@ class CB {
 			Destination("E", 8, (Operation op) @safe => op(regs.e)),
 			Destination("H", 8, (Operation op) @safe => op(regs.h)),
 			Destination("L", 8, (Operation op) @safe => op(regs.l)),
-			Destination("(HL)", 12 /*remaining 4 spent in op itself*/, (Operation op) @safe {
+			Destination("(HL)", 8 /*remaining 8 spent in op itself*/, (Operation op) @safe {
 				this.bus.update(4);
                 ubyte hlVal = this.mmu.readByte(this.regs.hl);
 				op(hlVal);
+                this.bus.update(4);
 				this.mmu.writeByte(this.regs.hl, hlVal);
 			}),
 			Destination("A", 8, (Operation op) => op(regs.a))
