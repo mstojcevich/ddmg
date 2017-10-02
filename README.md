@@ -48,6 +48,7 @@ Blargg has several test ROMs mostly revolving around cpu timings and sound along
 
 
 **cpu_instrs**
+
 | Test name             | Status |
 |-----------------------|--------|
 | 01-special            | :ballot_box_with_check: |
