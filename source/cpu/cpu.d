@@ -49,7 +49,7 @@ class CPU {
         this.mmu = mmu;
         this.bus = bus;
         this.iuptHandler = ih;
-		this.cbBlock = new CB(regs, mmu);
+		this.cbBlock = new CB(regs, mmu, bus);
 
         // 0 in the cycle count will mean it's calculated conditionally later
         this.instructions = [
@@ -293,7 +293,7 @@ class CPU {
             Instruction("XX",		    0, null),
             Instruction("XOR d8",		8, &xorImmediate),
             Instruction("RST 28H",		16, {rst(0x28);}),
-            Instruction("LDH A,(a8)",	12, &ldhImmediateToA),
+            Instruction("LDH A,(a8)",	8 /* remaining 4 spent in op itself*/, &ldhImmediateToA),
             Instruction("POP AF",		12, {
                 popFromStack(regs.af);
                 regs.f &= 0b11110000; // The last 4 bits cannot be written to and should be forced 0
@@ -306,7 +306,7 @@ class CPU {
             Instruction("RST 30H",		16, {rst(0x30);}),
             Instruction("LD HL,SP+r8",	12, &loadSPplusImmediateToHL),
             Instruction("LD SP,HL",		8, {load(regs.sp, regs.hl);}),
-            Instruction("LD A,(a16)",	16, {loadFromImmediateReference(regs.a);}),
+            Instruction("LD A,(a16)",	8 /*remaining 8 spent in op itself*/, {loadFromImmediateReference(regs.a);}),
             Instruction("EI",		    4, {iuptHandler.masterToggle = true;}),
             Instruction("XX",		    0, null),
             Instruction("XX",		    0, null),
@@ -544,6 +544,7 @@ class CPU {
     }
 
     @safe private void loadFromImmediateReference(out reg8 dst) {
+        bus.update(8);
         loadFromMemory(dst, mmu.readShort(regs.pc));
         regs.pc += 2;
     }
@@ -1182,6 +1183,7 @@ class CPU {
      * Load the value in memory at FF00 + (8-bit immediate) to register A
      */
     @safe private void ldhImmediateToA() {
+        bus.update(4);
         loadFromMemory(regs.a, 0xFF00 + mmu.readByte(regs.pc));
         regs.pc++;
     }

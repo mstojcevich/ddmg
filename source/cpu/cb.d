@@ -5,6 +5,7 @@ import core.bitop;
 import cpu.registers;
 import cpu.instruction;
 import mmu;
+import bus;
 
 // Portion of the CPU to deal with CB prefix instructions -
 // a set of instructions that deals with bit operations
@@ -29,6 +30,7 @@ class CB {
 
     private Registers regs;
 	private MMU mmu;
+    private Bus bus;
 
 	// Lookup tables for op and destination
 	// Probably a perf penalty but at least I don't have to write a 256 item long table again
@@ -36,7 +38,8 @@ class CB {
 	private @safe Operation[32] ops;
 	private @safe Destination[8] destinations;
 
-    @safe this(ref Registers registers, ref MMU mmu) {
+    @safe this(ref Registers registers, ref MMU mmu, ref Bus bus) {
+        this.bus = bus;
         this.regs = registers;
 		this.mmu = mmu;
 
@@ -47,8 +50,9 @@ class CB {
 			Destination("E", 8, (Operation op) @safe => op(regs.e)),
 			Destination("H", 8, (Operation op) @safe => op(regs.h)),
 			Destination("L", 8, (Operation op) @safe => op(regs.l)),
-			Destination("(HL)", 16, (Operation op) @safe {
-				ubyte hlVal = this.mmu.readByte(this.regs.hl);
+			Destination("(HL)", 12 /*remaining 4 spent in op itself*/, (Operation op) @safe {
+				this.bus.update(4);
+                ubyte hlVal = this.mmu.readByte(this.regs.hl);
 				op(hlVal);
 				this.mmu.writeByte(this.regs.hl, hlVal);
 			}),
