@@ -28,26 +28,9 @@ These are DDMG's results on different test ROMs. I'll add more in the future.
 ### Blargg's Tests
 Blargg has several test ROMs mostly revolving around cpu timings and sound along with the OAM and HALT bugs.
 
-**cgb_sound** (note: cgb and sound both aren't implemented yet)
+None of the Blargg sound tests are included in this README as sound is not implemented.
 
-| Test name                | Status | Details                                                                    |
-|--------------------------|:--------:|----------------------------------------------------------------------------|
-| 01-registers             | :x:      | NR10-NR51 and wave RAM write/read. Failed #2                               |
-| 02-len ctr               | :x:      | Length becoming 0 should clear status. Failed #2                           |
-| 03-trigger               | :x:      | Enabling in second half of length period shouldn't clock length. Failed #2 |
-| 04-sweep                 | :x:      | If shift=0, doesn't calculate on trigger. Failed #3                        |
-| 05-sweep details         | :x:      | Timer treats period 0 as 8. Failed #2                                      |
-| 06-overflow on trigger   | :x:      | 7FFF 7FFF 7FFF 7FFF 7FFF 7FFF Failed                                       |
-| 07-len sweep period sync | :x:      | Length period is wrong. Failed #2                                          |
-| 08-len ctr during power  | :x:      | 00 00 00 00 Failed                                                         |
-| 09-wave read while on    | :x:      | Lots of 00. Last byte is 7A. Failed                                        |
-| 10-wave trigger while on | :x:      | Lots of 00. Failed                                                         |
-| 11-regs after power      | :x:      | Powering off should clear NR13. Failed #3                                  |
-| 12-wave                  | :x:      | Hangs, never finishes                                                      |
-
-
-
-**cpu_instrs**
+#### cpu_instrs
 
 | Test name             | Status |
 |-----------------------|:--------:|
@@ -62,3 +45,5 @@ Blargg has several test ROMs mostly revolving around cpu timings and sound along
 | 09-op r,r             | :white_check_mark: |
 | 10-bit ops            | :white_check_mark: |
 | 11-op a,(hl)          | :white_check_mark: |
+
+### halt_bug :white_check_mark:
