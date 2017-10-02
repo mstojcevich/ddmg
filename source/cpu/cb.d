@@ -104,7 +104,7 @@ class CB {
         // Hacky fix, but it works
         // BIT (HL) is special in that it takes 12 cycles not 16
         if(destination == 6 && (op >= 8 && op <= 15)) {
-            return 12;
+            return 4;
         }
 
         return dest.cycles;
