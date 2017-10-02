@@ -80,6 +80,11 @@ class MBC1 : MBC {
                 return;
             }
 
+            if(extRAM.length == 0) {
+                writefln("Game tried to write to external RAM address %04X, but said there was no ext RAM");
+                return;
+            }
+
             size_t bankedAddr = getBankedRamAddr(addr);
 
             extRAM[bankedAddr % extRAM.length] = val;
@@ -88,6 +93,11 @@ class MBC1 : MBC {
         @safe ubyte readExtRAM(size_t addr) const {
             if(!ramEnabled) {
                 // When RAM is disabled, reads return 0xFF
+                return 0xFF;
+            }
+
+            if(extRAM.length == 0) {
+                writefln("Game tried to read to external RAM address %04X, but said there was no ext RAM");
                 return 0xFF;
             }
 
