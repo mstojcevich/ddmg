@@ -52,6 +52,8 @@ None of the Blargg sound tests are included in this README as sound is not imple
 
 ### interrupt_time :x:
 
+This fails because CGB double-speed mode is not implemented. It should work once CGB support is added.
+
 ### mem_timing-2
 
 | Test name             | Status |
