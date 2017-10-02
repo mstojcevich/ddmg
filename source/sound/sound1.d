@@ -19,6 +19,14 @@ private enum DutyCycle : ubyte {
     PCT_75   = 0x11    // 75%
 }
 
+// TODO verify
+const bool[4][8] dutyCycles = {
+    {false, false, false, true, false, false, false}, // 12.5%
+    {false, false, true, true, false, false, false, false}, // 25%
+    {false, false, true, true, true, true, false, false}, // 50%
+    {true, true, false, false, true, true, true, true}, // 75%
+};
+
 // Representation of the NR10 register
 private union SweepControl {
     ubyte data;
@@ -68,6 +76,12 @@ public class Sound1 {
     private ubyte lowerFreq; // Low bits of frequency
     private NR14 nr14;
 
+    private int frequency; // Frequency data as defined by NR13 and NR14
+    private int realFrequency; // Frequency in Hz
+
+    ushort[] outBuffer; // The buffer of sound data to output
+    size_t outIndex; // Current position in outBuffer
+
     /// Tick the sweep as if 1/128th of a second has occurred
     void sweepTick() {
 
@@ -76,6 +90,24 @@ public class Sound1 {
     /// Tick the envelope as if 1/64th of a second has occurred
     void envelopeTick() {
         
+    }
+
+    /// Set the lower frequency data (NR13)
+    void setLowerFreq(ubyte data) {
+        frequency = (frequency & 0xFFFFFF00) | data;
+        recalcFrequency();
+    }
+
+    /// Set the content of the NR14 register
+    void setNR14(ubyte data) {
+        nr14.data = data;
+        frequency = (frequency & 0xFF) | (nr14.higherFreq << 8);
+        recalcFrequency();
+    }
+
+    /// Calculate the real frequency from the frequency datas
+    private void recalcFrequency() {
+        realFrequency = 4_194_304 / (4 * 2 * (2048 * frequency));
     }
 
 }
