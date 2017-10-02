@@ -51,14 +51,14 @@ Blargg has several test ROMs mostly revolving around cpu timings and sound along
 
 | Test name             | Status |
 |-----------------------|--------|
-| 01-special            | :ballot_box_with_check: |
-| 02-interrupts         | :ballot_box_with_check: |
-| 03-op sp,hl           | :ballot_box_with_check: |
-| 04-op r,imm           | :ballot_box_with_check: |
-| 05-op rp              | :ballot_box_with_check: |
-| 06-ld r,r             | :ballot_box_with_check: |
-| 07-jr,jp,call,ret,rst | :ballot_box_with_check: |
-| 08-misc instrs        | :ballot_box_with_check: |
-| 09-op r,r             | :ballot_box_with_check: |
-| 10-bit ops            | :ballot_box_with_check: |
-| 11-op a,(hl)          | :ballot_box_with_check: |
+| 01-special            | :white_check_mark: |
+| 02-interrupts         | :white_check_mark: |
+| 03-op sp,hl           | :white_check_mark: |
+| 04-op r,imm           | :white_check_mark: |
+| 05-op rp              | :white_check_mark: |
+| 06-ld r,r             | :white_check_mark: |
+| 07-jr,jp,call,ret,rst | :white_check_mark: |
+| 08-misc instrs        | :white_check_mark: |
+| 09-op r,r             | :white_check_mark: |
+| 10-bit ops            | :white_check_mark: |
+| 11-op a,(hl)          | :white_check_mark: |
