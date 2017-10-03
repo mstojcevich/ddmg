@@ -348,7 +348,7 @@ class CPU {
 
             Instruction instr = instructions[opcode];
 
-            if(false) {
+            if(true) {
                 writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
                 writefln("PC: %04X\tSP: %04X", regs.pc, regs.sp);
                 writefln("@ %04X: %02X -> %s", regs.pc, opcode, instr.disassembly);
@@ -368,11 +368,9 @@ class CPU {
 
             if(instr.impl !is null) {
                 try {
-                    instr.impl(); // Execute the operation
+                    bus.update(4); // Instruction decode cycles
 
-                    if(instr.cycles != 0) {
-                        bus.update(instr.cycles);
-                    }
+                    instr.impl(); // Execute the operation
                 } catch (Exception e) {
                     writefln("Instruction failed with exception \"%s\"", e.msg);
                     writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
@@ -444,7 +442,7 @@ class CPU {
      * Load the next 8-bit value (after the opcode) into a register
      */
     @safe private void loadImmediate(ref reg8 dest) {
-        dest = mmu.readByte(regs.pc);
+        dest = readByte(regs.pc);
         regs.pc += 1;
     }
 
@@ -452,7 +450,7 @@ class CPU {
      * Load the next 16-bit value (after the opcode) into a register
      */
     @safe private void loadImmediate(ref reg16 dest) {
-        dest = mmu.readShort(regs.pc);
+        readShort(regs.pc, dest);
         regs.pc += 2;
     }
 
@@ -490,7 +488,7 @@ class CPU {
         regs.setFlag(Flag.ZERO, false);
         regs.setFlag(Flag.SUBTRACTION, false);
 
-        immutable ubyte im = mmu.readByte(regs.pc);
+        immutable ubyte im = readByte(regs.pc);
         regs.pc++;
 
         // lots of casts for sign extension
@@ -501,13 +499,15 @@ class CPU {
         regs.setFlag(Flag.HALF_OVERFLOW, halfSum > 0x0F);
 
         regs.hl = cast(ushort) sum;
+
+        bus.update(4); // Not sure where these come from
     }
 
     /**
      * Store an 8-bit value into memory at the address specified
      */
     @safe private void storeInMemory(in ushort addr, in reg8 src) {
-        mmu.writeByte(addr, src);
+        writeByte(addr, src);
     }
 
     /**
@@ -530,36 +530,40 @@ class CPU {
      * Store an 8-bit immediate value into memory at the address specified
      */
     @safe private void storeImmediateInMemory(in ushort addr) {
-        bus.update(4);
-        storeInMemory(addr, mmu.readByte(regs.pc));
+        storeInMemory(addr, readByte(regs.pc));
         regs.pc++;
     }
 
     @safe private void storeInImmediateReference(in reg8 src) {
-        bus.update(8);
-        storeInMemory(mmu.readShort(regs.pc), src);
+        // TODO timing
+        ushort storeAddr;
+        readShort(regs.pc, storeAddr);
+        storeInMemory(storeAddr, src);
         regs.pc += 2;
     }
 
     @safe private void loadFromMemory(out reg8 dst, in ushort addr) {
-        dst = mmu.readByte(addr);
+        dst = readByte(addr);
     }
 
     @safe private void loadFromImmediateReference(out reg8 dst) {
-        bus.update(8);
-        loadFromMemory(dst, mmu.readShort(regs.pc));
+        ushort loadAddr;
+        readShort(regs.pc, loadAddr);
+        loadFromMemory(dst, loadAddr);
         regs.pc += 2;
     }
 
     @safe private void storeInMemory(in ushort addr, in reg16 src) {
-        mmu.writeShort(addr, src);
+        writeShort(addr, src);
     }
 
     /**
      * Store the value of a 16-bit register at the address specified in the immediate 16-bit address
      */
     @safe private void storeInImmediateReference(in reg16 src) {
-        storeInMemory(mmu.readShort(regs.pc), src);
+        ushort toStore;
+        readShort(regs.pc, toStore);
+        storeInMemory(toStore, src);
         regs.pc += 2;
     }
 
@@ -585,7 +589,7 @@ class CPU {
      * Add the next 8-bit value to the stack pointer
      */
     @safe private void offsetStackPointerImmediate() {
-        immutable short toAdd = cast(short)(cast(byte)(mmu.readByte(regs.pc)));
+        immutable short toAdd = cast(short)(cast(byte)(readByte(regs.pc)));
         regs.pc += 1;
 
         immutable ushort result = cast(ushort)(regs.sp + toAdd);
@@ -597,6 +601,8 @@ class CPU {
 
         regs.setFlag(Flag.ZERO, false);
         regs.setFlag(Flag.SUBTRACTION, false);
+        
+        bus.update(8); // No idea where these come from
     }
 
     /**
@@ -657,14 +663,14 @@ class CPU {
      * Add the 8-bit value stored in memory at the address stored in register HL to register A
      */
     @safe private void addReference() {
-        add(mmu.readByte(regs.hl));
+        add(readByte(regs.hl));
     }
 
     /**
      * Add the next 8-bit value (after the opcode) to register A
      */
     @safe private void addImmediate() {
-        add(mmu.readByte(regs.pc));
+        add(readByte(regs.pc));
         regs.pc++;
     }
 
@@ -749,14 +755,14 @@ class CPU {
      * Adc the 8-bit value stored in memory at the address stored in register HL to register A
      */
     @safe private void adcReference() {
-        adc(mmu.readByte(regs.hl));
+        adc(readByte(regs.hl));
     }
 
     /**
      * Adc the next 8-bit value (after the opcode) to register A
      */
     @safe private void adcImmediate() {
-        adc(mmu.readByte(regs.pc));
+        adc(readByte(regs.pc));
         regs.pc++;
     }
 
@@ -777,14 +783,14 @@ class CPU {
      * Subtract the 8-bit value stored in memory at the address stored in register HL from register A
      */
     @safe private void subReference() {
-        sub(mmu.readByte(regs.hl));
+        sub(readByte(regs.hl));
     }
 
     /**
      * Subtract the 8-bit immediate value from register A
      */
     @safe private void subImmediate() {
-        sub(mmu.readByte(regs.pc));
+        sub(readByte(regs.pc));
         regs.pc++;
     }
 
@@ -810,14 +816,14 @@ class CPU {
      * SBC the 8-bit value stored in memory at the address stored in register HL from register A
      */
     @safe private void sbcReference() {
-        sbc(mmu.readByte(regs.hl));
+        sbc(readByte(regs.hl));
     }
 
     /**
      * SBC the 8-bit immediate value from register A
      */
     @safe private void sbcImmediate() {
-        sbc(mmu.readByte(regs.pc));
+        sbc(readByte(regs.pc));
         regs.pc++;
     }
 
@@ -834,11 +840,11 @@ class CPU {
     }
 
     @safe private void andReference() {
-        and(mmu.readByte(regs.hl));
+        and(readByte(regs.hl));
     }
 
     @safe private void andImmediate() {
-        and(mmu.readByte(regs.pc));
+        and(readByte(regs.pc));
         regs.pc++;
     }
 
@@ -855,11 +861,11 @@ class CPU {
     }
 
     @safe private void xorReference() {
-        xor(mmu.readByte(regs.hl));
+        xor(readByte(regs.hl));
     }
 
     @safe private void xorImmediate() {
-        xor(mmu.readByte(regs.pc));
+        xor(readByte(regs.pc));
         regs.pc++;
     }
 
@@ -876,11 +882,11 @@ class CPU {
     }
 
     @safe private void orReference() {
-        or(mmu.readByte(regs.hl));
+        or(readByte(regs.hl));
     }
 
     @safe private void orImmediate() {
-        or(mmu.readByte(regs.pc));
+        or(readByte(regs.pc));
         regs.pc++;
     }
 
@@ -895,11 +901,11 @@ class CPU {
     }
 
     @safe private void cpReference() {
-        cp(mmu.readByte(regs.hl));
+        cp(readByte(regs.hl));
     }
 
     @safe private void cpImmediate() {
-        cp(mmu.readByte(regs.pc));
+        cp(readByte(regs.pc));
         regs.pc++;
     }
     
@@ -914,10 +920,9 @@ class CPU {
      * Increment the value of the memory pointed at by the address in HL
      */
     @safe private void incReference() {
-        ubyte mem = mmu.readByte(regs.hl);
+        ubyte mem = readByte(regs.hl);
         inc(mem);
-        bus.update(4);
-        mmu.writeByte(regs.hl, mem);
+        writeByte(regs.hl, mem);
     }
 
     @safe private void dec(ref reg8 reg) {
@@ -931,10 +936,9 @@ class CPU {
      * Decrement the value of the memory pointed at by the address in HL
      */
     @safe private void decReference() {
-        ubyte mem = mmu.readByte(regs.hl);
+        ubyte mem = readByte(regs.hl);
         dec(mem);
-        bus.update(4);
-        mmu.writeByte(regs.hl, mem);
+        writeByte(regs.hl, mem);
     }
 
     @safe private void inc(ref reg16 reg) {
@@ -1080,8 +1084,10 @@ class CPU {
     }
 
     @safe private void jumpImmediate() {
-        regs.pc = mmu.readShort(regs.pc);
+        readShort(regs.pc, regs.pc);
         // No need to increment pc to compensate for the immediate value because we jumped
+
+        bus.update(4); // No idea where these come from
     }
 
     /**
@@ -1090,12 +1096,10 @@ class CPU {
     @safe private void jumpImmediateIfFlag(in Flag f, in bool set) {
         if(regs.isFlagSet(f) == set) {
             jumpImmediate();
-
-            bus.update(16);
         } else { // Update PC to account for theoretically reading a 16-bit immediate
             regs.pc += 2;
 
-            bus.update(12);
+            bus.update(8); // Pretend to read an immediate short
         }
     }
 
@@ -1112,7 +1116,9 @@ class CPU {
      * Add the immediate 8-bit value (interpreted as signed two's complement) to the PC
      */
     @safe private void jumpRelativeImmediate() {
-        regs.pc += cast(byte)(mmu.readByte(regs.pc)) + 1; // Casting to signed
+        regs.pc += cast(byte)(readByte(regs.pc)) + 1; // Casting to signed
+
+        bus.update(4); // Not sure where these come from
     }
 
     /**
@@ -1121,12 +1127,10 @@ class CPU {
     @safe private void jumpRelativeImmediateIfFlag(Flag f, bool set) {
         if(regs.isFlagSet(f) == set) {
             jumpRelativeImmediate();
-            
-            bus.update(12);
         } else {
             regs.pc += 1;
 
-            bus.update(8);
+            bus.update(4); // Pretend to read an immediate byte
         }
     }
 
@@ -1158,14 +1162,16 @@ class CPU {
      */
     @safe private void pushToStack(in ushort src) {
         regs.sp -= 2;
-        mmu.writeShort(regs.sp, src);
+        writeShort(regs.sp, src);
+
+        bus.update(4); // Not sure where this comes from
     }
 
     /**
      * Read a 16-bit value from the stack into a register, then increment the stack pointer by 2
      */
     @safe private void popFromStack(out reg16 dest) {
-        dest = mmu.readShort(regs.sp);
+        readShort(regs.sp, dest);
         regs.sp += 2;
     }
 
@@ -1187,18 +1193,20 @@ class CPU {
      * Load the value in memory at FF00 + (8-bit immediate) to register A
      */
     @safe private void ldhImmediateToA() {
-        bus.update(4);
-        loadFromMemory(regs.a, 0xFF00 + mmu.readByte(regs.pc));
+        loadFromMemory(regs.a, 0xFF00 + readByte(regs.pc));
         regs.pc++;
+
+        bus.update(4); // Not sure where these come from
     }
 
-    /**cast(ubyte)((regs.a << 1) + leftmostBit)
+    /**
      * Save the value in register A to memory at FF00 + (8-bit immediate)
      */
     @safe private void ldhAToImmediate() {
-        bus.update(4);
-        storeInMemory(0xFF00 + mmu.readByte(regs.pc), regs.a);
+        storeInMemory(0xFF00 + readByte(regs.pc), regs.a);
         regs.pc++;
+
+        bus.update(4); // No idea where these come from
     }
 
     /**
@@ -1221,7 +1229,8 @@ class CPU {
      * Push the PC of the next instruction to the stack, then jump to 16-bit immediate address
      */
     @safe private void callImmediate() {
-        immutable ushort toCall = mmu.readShort(regs.pc);
+        ushort toCall;
+        readShort(regs.pc, toCall);
         regs.pc += 2; // Compensate for reading an immediate short
         call(toCall);
     }
@@ -1232,12 +1241,10 @@ class CPU {
     @safe private void callImmediateIfFlag(in Flag f, in bool set) {
         if(regs.isFlagSet(f) == set) {
             callImmediate();
-
-            bus.update(24);
         } else {
             regs.pc += 2; // Compensate for theoretically reading an immediate short
             
-            bus.update(12);
+            bus.update(8); // spend time to read the immediate even though we don't
         }
     }
 
@@ -1255,9 +1262,9 @@ class CPU {
         if(regs.isFlagSet(f) == set) {
             ret();
 
-            bus.update(20);
+            bus.update(8); // Not sure where this came from
         } else {
-            bus.update(8);
+            bus.update(4); // Not sure where this came from
         }
     }
 
@@ -1352,6 +1359,31 @@ class CPU {
                 iuptHandler.masterToggle = true;
             }
         }
+    }
+
+    @safe private ubyte readByte(ushort addr) {
+        immutable ubyte read = mmu.readByte(addr);
+        bus.update(4); // 4 cycles to read a byte
+        return read;
+    }
+
+    @safe private void writeByte(ushort addr, ubyte val) {
+        mmu.writeByte(addr, val);
+        bus.update(4);
+    }
+
+    @safe private void readShort(ushort addr, out ushort dst) {
+        dst = mmu.readByte(addr);
+        bus.update(4);
+        dst |= mmu.readByte(addr + 1) << 8;
+        bus.update(4);
+    }
+
+    @safe private void writeShort(ushort addr, ushort toWrite) {
+        mmu.writeByte(addr, toWrite & 0xFF);
+        bus.update(4);
+        mmu.writeByte(addr + 1, toWrite >> 8);
+        bus.update(4);
     }
 
     // TODO use function templates for the functions that are the same between reg8 and reg16
