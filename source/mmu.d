@@ -115,15 +115,6 @@ class MMU {
                         break;
                     }
                 }
-                // if(oamCycleAccum >= 640) {
-                //     oamCycleAccum -= 640;
-
-                //     // Copy over all of the OAM
-                //     for(int to = OAM_BEGIN; to <= OAM_END; to++) {
-                //         writeByte(to, readByte(oamTransferFromAddr + (to - OAM_BEGIN)));
-                //     }
-                //     oamTransferState = OamTransferState.NO_TRANSFER;
-                // }
                 break;
         }
     }
