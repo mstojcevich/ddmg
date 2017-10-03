@@ -348,7 +348,7 @@ class CPU {
 
             Instruction instr = instructions[opcode];
 
-            if(true) {
+            if(false) {
                 writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
                 writefln("PC: %04X\tSP: %04X", regs.pc, regs.sp);
                 writefln("@ %04X: %02X -> %s", regs.pc, opcode, instr.disassembly);
@@ -402,7 +402,7 @@ class CPU {
                     iuptHandler.masterToggle = false;
 
                     // It takes 20 clocks to dispatch an interrupt.
-                    bus.update(20);
+                    bus.update(8);
 
                     if(haltMode == HaltMode.NORMAL) {
                         // If the CPU is in HALT mode, another 4 clocks are needed
