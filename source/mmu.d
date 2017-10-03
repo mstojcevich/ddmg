@@ -40,6 +40,12 @@ private const TIMER_COUNTER             = 0xFF05;
 private const TIMER_MODULO              = 0xFF06;
 private const TIMER_CONTROL             = 0xFF07;
 
+private enum OamTransferState {
+    NO_TRANSFER,
+    SETUP,
+    TRANSFER
+}
+
 /**
  * Exception to be thrown when a caller tries to access a memory address not mapped by the MMU
  */
@@ -65,12 +71,49 @@ class MMU {
     private InterruptHandler iuptHandler;
     private Clock clock;
 
+    private OamTransferState oamTransferState;
+    private uint oamCycleAccum; // Leftover cycles since the last transfered bytes
+    private ushort oamTransferToAddr; // The current address to transfer to
+    private ushort oamTransferFromAddr; // The current address to transfer from
+
     @safe this(Cartridge c, GPU g, Keypad k, InterruptHandler ih, Clock clk) {
         this.cartridge = c;
         this.gpu = g;
         this.keypad = k;
         this.iuptHandler = ih;
         this.clock = clk;
+    }
+
+    /// Simulate n cycles of the MMU running. Currently used for simulating OAM transfer
+    @safe void step(uint cyclesElapsed) {
+        if(oamTransferState != OamTransferState.NO_TRANSFER) {
+            oamCycleAccum += cyclesElapsed;
+        }
+
+        final switch(oamTransferState) {
+            case OamTransferState.NO_TRANSFER:
+                break;
+            case OamTransferState.SETUP:
+                // TODO The OAM transfer takes 4 cycles to setup. Not sure why I need to spend 8
+                if(oamCycleAccum >= 8) {
+                    oamCycleAccum -= 8;
+                    oamTransferState = OamTransferState.TRANSFER;
+                    goto case OamTransferState.TRANSFER;
+                }
+
+                break;
+            case OamTransferState.TRANSFER:
+                if(oamCycleAccum >= 640) {
+                    oamCycleAccum -= 640;
+
+                    // Copy over all of the OAM
+                    for(int to = OAM_BEGIN; to <= OAM_END; to++) {
+                        writeByte(to, readByte(oamTransferFromAddr + (to - OAM_BEGIN)));
+                    }
+                    oamTransferState = OamTransferState.NO_TRANSFER;
+                }
+                break;
+        }
     }
 
     /**
@@ -249,12 +292,10 @@ class MMU {
 
         } else if(address == DMA_TRANSFER_ADDR) {
             // Transfer from RAM to OAM
-            for(ubyte i = 0x00; i <= 0x9F; i++) {
-                const ushort src = (val << 8) | i;
-                const ushort dst = 0xFE00 | i;
-                writeByte(dst, readByte(src));
-            }
-
+            oamCycleAccum = 0;
+            oamTransferFromAddr = val << 8;
+            oamTransferToAddr = OAM_BEGIN;
+            oamTransferState = OamTransferState.SETUP;
         } else if(address == 0xFF00) { 
             keypad.writeJOYP(val);
 

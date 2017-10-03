@@ -131,7 +131,12 @@ class GPU
         setState(GPUMode.HORIZ_BLANK);
         this.display = d;
         this.vram = new ubyte[8192];
+
         this.oam = new ubyte[160];
+        for(int i = 0; i < 160; i++) {
+            this.oam[i] = 0xFF;
+        }
+
         this.iuptHandler = ih;
         this.controlRegister.data = 0x90;
         this.lcdStatusRegister.data = 0x85;
