@@ -7,11 +7,12 @@ Because of these goals, there are times where I will sacrifice performance for r
 ### Completed Features
 - Boots and runs commercial games
 - Video output
-- CPU instructions are pretty accurate in results (not timing yet)
+- CPU instructions are pretty accurate in results
 
 ### Unfinished Features (vaguely in order of importance)
-- Memory timing
 - Sound
+- Ability to use bootrom dumps
+- More accurate initial hwio values
 - Improved MBC accuracy (requires hardware to test)
 - Save states
 - Battery saves
