@@ -61,3 +61,43 @@ This fails because CGB double-speed mode is not implemented. It should work once
 | 01-read_timing        | :white_check_mark: |
 | 02-write_timing       | :white_check_mark: |
 | 03-modify_timing      | :white_check_mark: |
+
+## Gekkio's Tests
+Gekkio has many acceptance tests he's written for his emulator [mooneye-gb](https://github.com/Gekkio/mooneye-gb). These cover many different areas.
+
+### acceptance tests
+
+| Test name            | Status |
+|----------------------|:------:|
+| add sp e timing          | :white_check_mark: |
+| boot hwio dmg0           | :x: |
+| boot hwio dmgABCXmgb     | :x: |
+| boot regs dmg0           | :x: |
+| boot regs dmgABCX        | :white_check_mark: |
+| call timing              | :white_check_mark: |
+| call timing 2            | :white_check_mark: |
+| call cc timing           | :white_check_mark: |
+| call cc timing 2         | :white_check_mark: |
+| di timing GS             | :x: |
+| div timing               | :white_check_mark: |
+| ei timing                | :x: |
+| halt ime0 ei             | :white_check_mark: |
+| halt ime0 noinstr timing | :x: |
+| halt ime1 timing         | :white_check_mark: |
+| halt ime1 timing2 GS     | :x: |
+| if ie registers          | :white_check_mark: |
+| intr timing              | :white_check_mark: |
+| jp cc timing             | :white_check_mark: |
+| jp timing                | :white_check_mark: |
+| ld hl sp e timing        | :white_check_mark: |
+| oam dma restart          | :white_check_mark: |
+| oam dma start            | :x: |
+| oam dma timing           | :white_check_mark: |
+| pop timing               | :white_check_mark: |
+| push timing              | :white_check_mark: |
+| rapid di ei              | :x: |
+| ret cc timing            | :white_check_mark: |
+| ret timing               | :white_check_mark: |
+| reti intr timing         | :x: |
+| reti timing              | :white_check_mark: |
+| rst timing               | :white_check_mark: |
