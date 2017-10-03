@@ -1260,12 +1260,10 @@ class CPU {
      * RET if the specified flag is set/reset (depending on the second parameter)
      */
     @safe private void retIfFlag(in Flag f, in bool set) {
+        bus.update(4); // Internal delay
+        
         if(regs.isFlagSet(f) == set) {
             ret();
-
-            bus.update(4); // Not sure where this came from
-        } else {
-            bus.update(4); // Not sure where this came from
         }
     }
 
