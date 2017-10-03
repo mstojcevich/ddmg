@@ -56,11 +56,24 @@ This fails because CGB double-speed mode is not implemented. It should work once
 
 ### mem_timing-2
 
-| Test name             | Status |
+| Test name             | Status   |
 |-----------------------|:--------:|
 | 01-read_timing        | :white_check_mark: |
 | 02-write_timing       | :white_check_mark: |
 | 03-modify_timing      | :white_check_mark: |
+
+### oam_bug
+
+| Test name         | Status             |
+|-------------------|:------------------:|
+| 1-lcd_sync        | :white_check_mark: |
+| 2-causes          | :x: |
+| 3-non_causes      | :white_check_mark: |
+| 4-scanline_timing | :x: |
+| 5-timing_bug      | :x: |
+| 6-timing_no_bug   | :white_check_mark: |
+| 7-timing_effect   | :x: |
+| 8-instr_effect    | :x: |
 
 ## Gekkio's Tests
 Gekkio has many acceptance tests he's written for his emulator [mooneye-gb](https://github.com/Gekkio/mooneye-gb). These cover many different areas.
