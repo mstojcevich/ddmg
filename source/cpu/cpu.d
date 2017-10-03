@@ -1165,10 +1165,10 @@ class CPU {
      * Decrement the stack pointer by 2, then write a 16-bit value to the stack
      */
     @safe private void pushToStack(in ushort src) {
-        regs.sp -= 2;
-        writeShort(regs.sp, src);
+        bus.update(4); // Internal delay comes before write
 
-        bus.update(4); // Not sure where this comes from
+        regs.sp -= 2;
+        writeShortBackwards(regs.sp, src);
     }
 
     /**
@@ -1384,6 +1384,13 @@ class CPU {
         mmu.writeByte(addr, toWrite & 0xFF);
         bus.update(4);
         mmu.writeByte(addr + 1, toWrite >> 8);
+        bus.update(4);
+    }
+
+    @safe private void writeShortBackwards(ushort addr, ushort toWrite) {
+        mmu.writeByte(addr + 1, toWrite >> 8);
+        bus.update(4);
+        mmu.writeByte(addr, toWrite & 0xFF);
         bus.update(4);
     }
 
