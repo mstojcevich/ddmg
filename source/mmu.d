@@ -103,15 +103,27 @@ class MMU {
 
                 break;
             case OamTransferState.TRANSFER:
-                if(oamCycleAccum >= 640) {
-                    oamCycleAccum -= 640;
+                while(oamCycleAccum >= 4) {
+                    oamCycleAccum -= 4;
 
-                    // Copy over all of the OAM
-                    for(int to = OAM_BEGIN; to <= OAM_END; to++) {
-                        writeByte(to, readByte(oamTransferFromAddr + (to - OAM_BEGIN)));
+                    gpu.setOAM(cast(ushort)(oamTransferToAddr - OAM_BEGIN), readByte(oamTransferFromAddr));
+                    oamTransferToAddr++;
+                    oamTransferFromAddr++;
+
+                    if(oamTransferToAddr > OAM_END) {
+                        oamTransferState = OamTransferState.NO_TRANSFER;
+                        break;
                     }
-                    oamTransferState = OamTransferState.NO_TRANSFER;
                 }
+                // if(oamCycleAccum >= 640) {
+                //     oamCycleAccum -= 640;
+
+                //     // Copy over all of the OAM
+                //     for(int to = OAM_BEGIN; to <= OAM_END; to++) {
+                //         writeByte(to, readByte(oamTransferFromAddr + (to - OAM_BEGIN)));
+                //     }
+                //     oamTransferState = OamTransferState.NO_TRANSFER;
+                // }
                 break;
         }
     }
@@ -124,6 +136,11 @@ class MMU {
         assert(address <= 0xFFFF);
     }
     body {
+        // Cancel out certain reads if OAM DMA is occurring
+        if(oamTransferState == OamTransferState.TRANSFER && address >= OAM_BEGIN && address <= OAM_END) {
+            return 0xFF;
+        }
+
         if(ZERO_PAGE_BEGIN <= address && address <= ZERO_PAGE_END) {
             return zeroPage[address - ZERO_PAGE_BEGIN];
         }
@@ -240,6 +257,11 @@ class MMU {
         assert(address <= 0xFFFF);
     }
     body {
+        // Cancel out certain writes if OAM DMA is occurring
+        if(oamTransferState == OamTransferState.TRANSFER && address >= OAM_BEGIN && address <= OAM_END) {
+            return;
+        }
+
         if(ZERO_PAGE_BEGIN <= address && address <= ZERO_PAGE_END) {
             zeroPage[address - ZERO_PAGE_BEGIN] = val;
         } else
