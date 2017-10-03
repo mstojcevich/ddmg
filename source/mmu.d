@@ -94,6 +94,7 @@ class MMU {
             case OamTransferState.NO_TRANSFER:
                 break;
             case OamTransferState.SETUP:
+                // TODO this should maybe start after the CPU finishes an instruction
                 // TODO The OAM transfer takes 4 cycles to setup. Not sure why I need to spend 8
                 if(oamCycleAccum >= 8) {
                     oamCycleAccum -= 8;

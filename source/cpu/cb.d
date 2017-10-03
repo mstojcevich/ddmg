@@ -20,7 +20,7 @@ private struct Destination {
 	uint cycles;
 
 	// How to apply an operation to the destination
-	@safe void delegate(Operation op) apply;
+	@safe void delegate(Operation op, ubyte opcode) apply;
 }
 
 class CB {
@@ -44,20 +44,26 @@ class CB {
 		this.mmu = mmu;
 
 		this.destinations = [
-			Destination("B", 8, (Operation op) @safe => op(regs.b)),
-			Destination("C", 8, (Operation op) @safe => op(regs.c)),
-			Destination("D", 8, (Operation op) @safe => op(regs.d)),
-			Destination("E", 8, (Operation op) @safe => op(regs.e)),
-			Destination("H", 8, (Operation op) @safe => op(regs.h)),
-			Destination("L", 8, (Operation op) @safe => op(regs.l)),
-			Destination("(HL)", 8 /*remaining 8 spent in op itself*/, (Operation op) @safe {
-				this.bus.update(4);
+			Destination("B", 4, (Operation op, ubyte opcode) @safe => op(regs.b)),
+			Destination("C", 4, (Operation op, ubyte opcode) @safe => op(regs.c)),
+			Destination("D", 4, (Operation op, ubyte opcode) @safe => op(regs.d)),
+			Destination("E", 4, (Operation op, ubyte opcode) @safe => op(regs.e)),
+			Destination("H", 4, (Operation op, ubyte opcode) @safe => op(regs.h)),
+			Destination("L", 4, (Operation op, ubyte opcode) @safe => op(regs.l)),
+			Destination("(HL)", 4 /*remaining 8 spent in op itself*/, (Operation op, ubyte opcode) @safe {
                 ubyte hlVal = this.mmu.readByte(this.regs.hl);
-				op(hlVal);
                 this.bus.update(4);
+				op(hlVal);
+
+                // HACK: BIT operation doesn't need to write
+                if(opcode >= 8 && opcode <= 15) {
+                    return;
+                }
+
 				this.mmu.writeByte(this.regs.hl, hlVal);
+                this.bus.update(4);
 			}),
-			Destination("A", 8, (Operation op) => op(regs.a))
+			Destination("A", 4, (Operation op, ubyte opcode) @safe => op(regs.a))
 		];
 
 		this.ops = [
@@ -99,13 +105,7 @@ class CB {
 		immutable ubyte op = instruction >> 3;
 
 		immutable Destination dest = destinations[destination];
-		dest.apply(ops[op]);
-
-        // Hacky fix, but it works
-        // BIT (HL) is special in that it takes 12 cycles not 16
-        if(destination == 6 && (op >= 8 && op <= 15)) {
-            return 4;
-        }
+		dest.apply(ops[op], op);
 
         return dest.cycles;
     }
