@@ -105,9 +105,9 @@ class CPU {
             Instruction("LD SP,d16",	12, {loadImmediate(regs.sp);}),
             Instruction("LD (HL-),A",	8, &storeAInMemoryHLMinus),
             Instruction("INC SP",		8, {inc(regs.sp);}),
-            Instruction("INC (HL)",		8 /*remaining 4 spent in op itself*/, &incReference),
-            Instruction("DEC (HL)",		8 /*remaining 4 spent in op itself*/, &decReference),
-            Instruction("LD (HL),d8",	8 /*remaining 4 spent in op itself*/, {storeImmediateInMemory(regs.hl);}),
+            Instruction("INC (HL)",		12, &incReference),
+            Instruction("DEC (HL)",		12, &decReference),
+            Instruction("LD (HL),d8",	12, {storeImmediateInMemory(regs.hl);}),
             Instruction("SCF",		    4, &scf),
             Instruction("JR C,r8",		0, {jumpRelativeImmediateIfFlag(Flag.OVERFLOW, true);}),
             Instruction("ADD HL,SP",	8, {add(regs.hl, regs.sp);}),
@@ -277,7 +277,7 @@ class CPU {
             Instruction("XX",		    0, null),
             Instruction("SBC A,d8",		8, &sbcImmediate),
             Instruction("RST 18H",		16, {rst(0x18);}),
-            Instruction("LDH (a8),A",	8 /*remaining 4 spent in instruction itself*/, &ldhAToImmediate),
+            Instruction("LDH (a8),A",	12, &ldhAToImmediate),
             Instruction("POP HL",		12, {popFromStack(regs.hl);}),
             Instruction("LD (C),A",		8, &ldCA),
             Instruction("XX",		    0, null),
@@ -287,13 +287,13 @@ class CPU {
             Instruction("RST 20H",		16, {rst(0x20);}),
             Instruction("ADD SP,r8",	16, &offsetStackPointerImmediate),
             Instruction("JP (HL)",		4, &jumpHL),
-            Instruction("LD (a16),A",	8 /* remaining 8 spent in op itself */, {storeInImmediateReference(regs.a);}),
+            Instruction("LD (a16),A",	16, {storeInImmediateReference(regs.a);}),
             Instruction("XX",		    0, null),
             Instruction("XX",		    0, null),
             Instruction("XX",		    0, null),
             Instruction("XOR d8",		8, &xorImmediate),
             Instruction("RST 28H",		16, {rst(0x28);}),
-            Instruction("LDH A,(a8)",	8 /* remaining 4 spent in op itself*/, &ldhImmediateToA),
+            Instruction("LDH A,(a8)",	12, &ldhImmediateToA),
             Instruction("POP AF",		12, {
                 popFromStack(regs.af);
                 regs.f &= 0b11110000; // The last 4 bits cannot be written to and should be forced 0
@@ -306,7 +306,7 @@ class CPU {
             Instruction("RST 30H",		16, {rst(0x30);}),
             Instruction("LD HL,SP+r8",	12, &loadSPplusImmediateToHL),
             Instruction("LD SP,HL",		8, {load(regs.sp, regs.hl);}),
-            Instruction("LD A,(a16)",	8 /*remaining 8 spent in op itself*/, {loadFromImmediateReference(regs.a);}),
+            Instruction("LD A,(a16)",	16, {loadFromImmediateReference(regs.a);}),
             Instruction("EI",		    4, {iuptHandler.masterToggle = true;}),
             Instruction("XX",		    0, null),
             Instruction("XX",		    0, null),
@@ -340,8 +340,6 @@ class CPU {
     }
 
     @safe void step() {
-        uint numCycles;
-
         if(haltMode == HaltMode.NO_HALT || haltMode == HaltMode.HALT_BUG) { // If the CPU is halted, stop execution
             // Fetch the operation in memory
             immutable ubyte opcode = mmu.readByte(regs.pc);
@@ -368,7 +366,7 @@ class CPU {
 
             if(instr.impl !is null) {
                 try {
-                    bus.update(4); // Instruction decode cycles
+                    bus.update(4); // Decode
 
                     instr.impl(); // Execute the operation
                 } catch (Exception e) {
@@ -387,7 +385,7 @@ class CPU {
         } else { // halted
             // TODO how many cycles??
             // Does this need to be a separate clock?
-            bus.update(4);
+           bus.update(4);
         }
 
         // TODO move everything from here on down in this fucntion
@@ -401,7 +399,7 @@ class CPU {
                     iuptHandler.markHandled(iupt);
                     iuptHandler.masterToggle = false;
 
-                    // It takes 20 clocks to dispatch an interrupt.
+                    // It takes 20 clocks to dispatch an interrupt. 8 if you account for the CALL 
                     bus.update(8);
 
                     if(haltMode == HaltMode.NORMAL) {
@@ -482,6 +480,8 @@ class CPU {
      */
     @safe private void load(ref reg16 dest, in reg16 src) {
         dest = src;
+
+        bus.update(4);
     }
 
     @safe private void loadSPplusImmediateToHL() {
@@ -583,6 +583,8 @@ class CPU {
         regs.setFlag(Flag.SUBTRACTION, false);
 
         dst = outResult;
+
+        bus.update(4); // 16-bit math takes time. Not sure where this goes.
     }
 
     /**
@@ -943,10 +945,12 @@ class CPU {
 
     @safe private void inc(ref reg16 reg) {
         reg++;
+        bus.update(4); // Takes time to do 16 bit math. Not sure where this goes.
     }
 
     @safe private void dec(ref reg16 reg) {
         reg--;
+        bus.update(4); // Takes time to do 16 bit math. Not sure where this goes.
     }
 
     /**
@@ -1195,8 +1199,6 @@ class CPU {
     @safe private void ldhImmediateToA() {
         loadFromMemory(regs.a, 0xFF00 + readByte(regs.pc));
         regs.pc++;
-
-        bus.update(4); // Not sure where these come from
     }
 
     /**
@@ -1205,8 +1207,6 @@ class CPU {
     @safe private void ldhAToImmediate() {
         storeInMemory(0xFF00 + readByte(regs.pc), regs.a);
         regs.pc++;
-
-        bus.update(4); // No idea where these come from
     }
 
     /**
@@ -1253,6 +1253,7 @@ class CPU {
      */
     @safe private void ret() {
         popFromStack(regs.pc);
+        bus.update(4); // Not sure where these come from
     }
 
     /**
@@ -1262,17 +1263,17 @@ class CPU {
         if(regs.isFlagSet(f) == set) {
             ret();
 
-            bus.update(8); // Not sure where this came from
+            bus.update(4); // Not sure where this came from
         } else {
             bus.update(4); // Not sure where this came from
         }
     }
 
 	@safe private void cb() {
-		immutable ubyte subop = mmu.readByte(regs.pc);
+		immutable ubyte subop = readByte(regs.pc);
         regs.pc += 1;
 
-		bus.update(cbBlock.handle(subop));
+		cbBlock.handle(subop);
 	}
     @system unittest {
         InterruptHandler ih = new InterruptHandler();
