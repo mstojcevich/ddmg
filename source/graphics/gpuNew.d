@@ -3,18 +3,30 @@ ACCURACY WARNING
 
 This is not particularly accurate as far as timing goes.
 
-All of the interupts and such should be timed correctly,
-but because reads from VRAM are not properly timed there
-may be some visual discrepencies with real hardware, but
-only if games try to do some weird tricks or rely on the timing
-in some other way.
- */
+I don't emulate the exact cycles that things are read.
+This is because the CPU isn't alowed to read/write while the
+GPU is transferring stuff to the LCD controller.
 
- import std.bitmanip;
+I need to do more research into what happens during the
+OAM_SEARCH mode, since I do all of the reading during
+DATA_TRANSFER.
+*/
+
+import std.bitmanip;
 
 /// The size of the background in pixels. This is both the width and the height of the background.
 private const BG_SIZE = 256;
 
+/// The size of tiles in the background and window in pixels. This is both the width and the height of a given tile.
+private const BG_TILE_SIZE = 8;
+
+/// The size of the background in tiles. This is both the width and the height.
+private const BG_SIZE_TILES = BG_SIZE / BG_TILE_SIZE;
+
+/**
+ * The GPU takes information from VRAM+OAM and processes it.
+ * It prepares scanlines and sends them to the display to render.
+ */
 class GPU {
     /*
     The background consists of 32x32 8x8 tiles, making 256x256 pixels total.
@@ -41,15 +53,19 @@ class GPU {
     /*
     There is a notion of both a tile "set" and a tile "map".
     A tileset is a collection of the pixel data of tiles.
-    A tilemap is a mapping from coordinates on the screen to an index in the tileset
+    A tilemap is a mapping from coordinates on the screen to an index in the tileset. These are used for the background and window.
     */
 
-    
+    /// The background map stored at 0x9800-0x9BFF. Can be used by either the background or window.
+    private TileMap tileMapA;
+
+    /// The background map stored at 0x9C00-0x9FFF. Can be used by either the background or window.
+    private TileMap tileMapB;
 
 }
 
 /// A representation of the different modes that the GameBoy GPU can be in
-enum GPUMode : ubyte
+private enum GPUMode : ubyte
 {
     /// Drawing of a single scanline. The CPU is able to access both OAM and VRAM.
     HORIZ_BLANK = 0,
@@ -66,7 +82,7 @@ enum GPUMode : ubyte
 }
 
 /// A representation of the LCD control register (LCDC)
-union LCDControl {
+private union LCDControl {
     ubyte data;
     mixin(bitfields!(
         /// Whether the background should be drawn
@@ -93,4 +109,12 @@ union LCDControl {
         /// Whether the LCD should be enabled. Should only be turned off during VBLANK
         bool, "lcdEnable", 1
     ));
+}
+
+private union TileMap {
+    /// Row-major locations of the tiles
+    private ubyte[BG_SIZE_TILES][BG_SIZE_TILES] tileLocations;
+
+    /// The raw data backing the tile map
+    private ubyte[BG_SIZE_TILES * BG_SIZE_TILES] data;
 }
