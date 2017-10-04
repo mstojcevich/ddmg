@@ -118,3 +118,22 @@ private union TileMap {
     /// The raw data backing the tile map
     private ubyte[BG_SIZE_TILES * BG_SIZE_TILES] data;
 }
+
+/// Data about a sprite. Stored in OAM RAM.
+private struct SpriteAttributes {
+    align(1): // Tightly pack the bytes
+        ubyte y;
+        ubyte x;
+        ubyte tileNum;
+        union {
+            ubyte options;
+            mixin(bitfields!(
+                uint, "", 3,        // Color palette: used on CGB only
+                bool, "", 1,        // Character bank: used on CGB only
+                bool, "palette", 1, // Palette to use: unused on CGB
+                bool, "xflip", 1,   // Whether to flip horizontally
+                bool, "yflip", 1,   // Whether to flip vertically
+                bool, "priority", 1 // Whether to force above the background
+            ));
+        }
+}
