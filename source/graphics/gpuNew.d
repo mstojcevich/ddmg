@@ -154,13 +154,13 @@ class GPU {
          * Each pixel is 2 bits large, so each byte holds 4 pixels (although it's interleaved)
          */
 
-         /*
-          * Each line is represented as two bytes with bits:
-          * ABCDEFGH abcdefgh
-          * 
-          * where the 8th pixel is the two bit long number Aa,
-          * the 7th pixel is Bb, etc.
-          */
+        /*
+         * Each line is represented as two bytes with bits:
+         * ABCDEFGH abcdefgh
+         * 
+         * where the 8th pixel is the two bit long number Aa,
+         * the 7th pixel is Bb, etc.
+         */
 
         // The number of the tile in the tileset
         immutable tileNum = addr / TILE_SIZE_BYTES;
