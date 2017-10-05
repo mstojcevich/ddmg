@@ -13,6 +13,7 @@ DATA_TRANSFER.
 */
 
 import std.bitmanip;
+import std.stdio;
 
 /// The size of the background in pixels. This is both the width and the height of the background.
 private const BG_SIZE = 256;
@@ -22,6 +23,20 @@ private const BG_TILE_SIZE = 8;
 
 /// The size of the background in tiles. This is both the width and the height.
 private const BG_SIZE_TILES = BG_SIZE / BG_TILE_SIZE;
+
+/// VRAM stores a total of 384 different tiles
+private const NUM_TILES = 384;
+
+/// Each tile is 16 bytes large because each line is 2 bytes
+private const TILE_SIZE_BYTES = 16;
+
+// Memory mappings
+private const BG_MAP_A_BEGIN  = 0x1800; /// Background map A begins at 0x9800, which is 0x1800 in VRAM
+private const BG_MAP_A_END    = 0x1BFF; /// Background map A ends at 0x9BFF, which is 0x1BFF in VRAM
+private const BG_MAP_B_BEGIN  = 0x1C00; /// Background map B begins at 0x9C00, which is 0x1C00 in VRAM
+private const BG_MAP_B_END    = 0x1FFF; /// Background map B ends at 0x9FFF, which is 0x1FFF in VRAM
+private const TILE_DATA_BEGIN = 0x0000; /// Tile data begins at 0x8000, which is 0x0000 in VRAM
+private const TILE_DATA_END   = 0x17FF; /// Tile data ends at 0x97FF, which is 0x17FF in VRAM
 
 /**
  * The GPU takes information from VRAM+OAM and processes it.
@@ -62,6 +77,65 @@ class GPU {
     /// The background map stored at 0x9C00-0x9FFF. Can be used by either the background or window.
     private TileMap tileMapB;
 
+    /// The entirity of the tile data stored in VRAM. This is used for the tile sets.
+    private ubyte[NUM_TILES * TILE_SIZE_BYTES] tileData;
+
+    /// Read VRAM at the specified address (relative to VRAM)
+    @safe @property ubyte vram(in ushort addr)
+    in {
+        // There are 8192 bytes of VRAM
+        assert(addr < 8192);
+    }
+    body {
+        if(addr >= BG_MAP_A_BEGIN && addr <= BG_MAP_A_END) {
+            return tileMapA.data[addr - BG_MAP_A_BEGIN];
+        }
+
+        if(addr >= BG_MAP_B_BEGIN && addr <= BG_MAP_B_END) {
+            return tileMapB.data[addr - BG_MAP_B_BEGIN];
+        }
+
+        if(addr >= TILE_DATA_BEGIN && addr <= TILE_DATA_END) {
+            return tileData[addr - TILE_DATA_BEGIN];
+        }
+
+        // Unmapped, return 0. This shouldn't happen since everything is mapped.
+        debug {
+            writefln("Tried to read VRAM at %d, which is unmapped.", addr);
+        }
+        return 0;
+    }
+
+    /// Set VRAM at the specified address
+    @safe @property void vram(in ushort addr, in ubyte val)
+    in {
+        // There are 8192 bytes of VRAM
+        assert(addr < 8192);
+    }
+    body {
+        if(addr >= BG_MAP_A_BEGIN && addr <= BG_MAP_A_END) {
+            bgChanged = true;
+            tileMapA.data[addr - BG_MAP_A_BEGIN] = val;
+            return;
+        }
+
+        if(addr >= BG_MAP_B_BEGIN && addr <= BG_MAP_B_END) {
+            bgChanged = true;
+            tileMapB.data[addr - BG_MAP_B_BEGIN] = val;
+            return;
+        }
+
+        if(addr >= TILE_DATA_BEGIN && addr <= TILE_DATA_END) {
+            bgChanged = true;
+            tileData[addr - TILE_DATA_BEGIN] = val;
+            return;
+        }
+
+        debug {
+            writefln("Tried to write VRAM at %d, which is unmapped.", addr);
+        }
+    }
+
 }
 
 /// A representation of the different modes that the GameBoy GPU can be in
@@ -85,7 +159,7 @@ private enum GPUMode : ubyte
 private union LCDControl {
     ubyte data;
     mixin(bitfields!(
-        /// Whether the background should be drawn
+        /// Whether the background should be drawn. On CGB this is instead superpriority for sprites
         bool, "bgEnabled", 1,
 
         /// Whether sprites should be drawn
