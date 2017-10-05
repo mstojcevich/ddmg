@@ -178,7 +178,7 @@ class GPU
                 curScanline++; // Move down a line
                 checkCoincidence();
 
-                if (curScanline == GB_DISPLAY_HEIGHT - 1)
+                if (curScanline == GB_DISPLAY_HEIGHT)
                 { // Last line, enter vblank
                     if(controlRegister.lcdEnable) {
                         iuptHandler.fireInterrupt(Interrupts.VBLANK);
