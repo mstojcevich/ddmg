@@ -194,6 +194,9 @@ class GPU {
                 // VBLANK starts at line 144 and goes until line 154
                 if(curScanline >= CYCLES_PER_LINE) {
                     curScanline++;
+                    // TODO LY=LYC coincidence
+                    // TODO does the coincidence interrupt happen for the virtual lines?
+
                     if(curScanline >= VIRTUAL_HEIGHT) {
                         // Begin again at the first line
                         curScanline = 0;
