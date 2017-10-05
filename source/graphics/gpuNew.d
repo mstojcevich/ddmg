@@ -3,17 +3,18 @@ ACCURACY WARNING
 
 This is not particularly accurate as far as timing goes.
 
-I don't emulate the exact cycles that things are read.
-This is because the CPU isn't alowed to read/write while the
-GPU is transferring stuff to the LCD controller.
-
-I need to do more research into what happens during the
-OAM_SEARCH mode, since I do all of the reading during
-DATA_TRANSFER.
+I don't emulate the exact timing for the stages which can
+vary in timing.
 */
 
 import std.bitmanip;
 import std.stdio;
+
+/// The width and height of the gameboy display in pixels
+private const DISPLAY_WIDTH = 160, DISPLAY_HEIGHT = 144;
+
+/// The LCD controller operates for a total of 154 lines (vblank goes through a total of 10 lines)
+private const VIRTUAL_HEIGHT = 154;
 
 /// The size of the background in pixels. This is both the width and the height of the background.
 private const BG_SIZE = 256;
@@ -38,6 +39,18 @@ private const BG_MAP_B_END    = 0x1FFF; /// Background map B ends at 0x9FFF, whi
 private const TILE_DATA_BEGIN = 0x0000; /// Tile data begins at 0x8000, which is 0x0000 in VRAM
 private const TILE_DATA_END   = 0x17FF; /// Tile data ends at 0x97FF, which is 0x17FF in VRAM
 
+// Timings
+/*
+NOTE: these timings are not accurate as they vary
+see https://gist.github.com/drhelius/3730564
+w/ original thread http://forums.nesdev.com/viewtopic.php?t=7861
+ */
+private const CYCLES_PER_OAM_SEARCH = 80;
+private const CYCLES_PER_DATA_TRANSFER = 172;
+private const CYCLES_PER_HBLANK = 204;
+private const CYCLES_PER_LINE = CYCLES_PER_OAM_SEARCH + CYCLES_PER_DATA_TRANSFER + CYCLES_PER_HBLANK; // 456
+
+
 /**
  * The GPU takes information from VRAM+OAM and processes it.
  * It prepares scanlines and sends them to the display to render.
@@ -46,6 +59,15 @@ class GPU {
 
     /// The LCD control register (LCDC)
     private LCDControl control;
+
+    /// The LCD status register (STAT)
+    private LCDStatus status;
+
+    /// The current scanline that is being updated. AKA LY
+    private ubyte curScanline;
+
+    /// The scanline to compare with for the conincidence (LY=LYC) interrupt. AKA LYC
+    private ubyte scanlineCompare;
 
     /*
     The background consists of 32x32 8x8 tiles, making 256x256 pixels total.
@@ -87,6 +109,15 @@ class GPU {
     /// The tile data decoded into a form that is larger but easier to use
     private ubyte[TILE_SIZE][TILE_SIZE][NUM_TILES] tileSet;
 
+    /// The palette to apply on the background pixels. Just a mapping from one color to another.
+    private ubyte backgroundPalette;
+
+    /// One of the two palettes to use for sprites
+    private ubyte spritePaletteA, spritePaletteB;
+
+    /// The amount of cycles we have spent in our current state. Used internally to time out the states properly.
+    private uint stateCycles;
+
     /// Read VRAM at the specified address (relative to VRAM)
     @safe @property ubyte vram(in ushort addr)
     in {
@@ -111,6 +142,68 @@ class GPU {
             writefln("Tried to read VRAM at %d, which is unmapped.", addr);
         }
         return 0;
+    }
+
+    /// Execute the GPU for a number of cycles
+    void execute(uint numCycles) {
+        stateCycles += numCycles;
+
+        final switch(status.gpuMode) {
+            case GPUMode.OAM_SEARCH:
+                if(stateCycles >= CYCLES_PER_OAM_SEARCH) {
+                    // Move on to the next mode
+                    stateCycles -= CYCLES_PER_OAM_SEARCH;
+                    status.gpuMode = GPUMode.DATA_TRANSFER;
+                }
+                break;
+
+            case GPUMode.DATA_TRANSFER:
+                if(stateCycles >= CYCLES_PER_DATA_TRANSFER) {
+                    // Move on to the next mode
+                    stateCycles -= CYCLES_PER_DATA_TRANSFER;
+                    status.gpuMode = GPUMode.HORIZ_BLANK;
+                }
+                break;
+
+            case GPUMode.HORIZ_BLANK:
+                if(stateCycles >= CYCLES_PER_HBLANK) {
+                    // Move on to the next mode
+                    stateCycles -= CYCLES_PER_HBLANK;
+
+                    // We're done with a line, move on to the next one
+                    curScanline++;
+                    // TODO check LY=LYC coincidence
+                    
+                    // TODO draw the scanline to the display
+
+                    // If we just finished the HBLANK for the last scanline,
+                    // then we enter VBLANK. Otherwise we move on to the
+                    // OAM scan for the next scanline.
+                    if(curScanline == DISPLAY_HEIGHT) {
+                        status.gpuMode = GPUMode.VERT_BLANK;
+
+                        // TODO VBLANK interrupt
+                        // TODO does the vblank happen here or does it happen on 143???
+
+                        // TODO Write a test that gets LY when a VBLANK occurs
+                    }
+                }
+                break;
+
+            case GPUMode.VERT_BLANK:
+                // VBLANK starts at line 144 and goes until line 154
+                if(curScanline >= CYCLES_PER_LINE) {
+                    curScanline++;
+                    if(curScanline >= VIRTUAL_HEIGHT) {
+                        // Begin again at the first line
+                        curScanline = 0;
+                        status.gpuMode = GPUMode.OAM_SEARCH;
+
+                        // TODO what exactly gets reset on a vblank?
+                    }
+                }
+                break;
+        }
     }
 
     /// Set VRAM at the specified address
@@ -199,13 +292,42 @@ class GPU {
                 
                 immutable ubyte[TILE_SIZE][TILE_SIZE] tile = tileSet[tileIndex];
 
-                // TODO finish
+                immutable pixelX = tX * TILE_SIZE;
+                immutable pixelY = tY * TILE_SIZE;
+
+                // Fill in the tile on the cached background
+                for(int rY = 0; rY < TILE_SIZE; rY++) {
+                    for(int rX = 0; rX < TILE_SIZE; rX++) {
+                        background[pixelY + rY][pixelX + rX] = tile[rY][rX];
+                    }
+                }
             }
         }
     }
 
+    /// Get the corrected index in the tilset for the specific indexing type
     @safe private ushort getTilesetIndex(ubyte value, TilesetIndexing indexingType) {
         return indexingType == TilesetIndexing.SIGNED ? (cast(byte)(value) + 256) : value;
+    }
+
+    /// Sets the initial state of the GPU
+    @safe private void reset() {
+        control.data = 0x91;
+
+        bgScrollX = 0;
+        bgScrollY = 0;
+
+        scanlineCompare = 0;
+
+        backgroundPalette = 0b11111100;
+        spritePaletteA    = 0b11111111;
+        spritePaletteB    = 0b11111111;
+
+        curScanline = 0;
+        status.data = 0x85;
+        control.data = 0x90;
+        
+        // TODO WX, WY, clocks spent in current cycle
     }
 
 }
@@ -257,6 +379,32 @@ private union LCDControl {
     ));
 }
 
+/// A representation of the LCD status register (STAT)
+union LCDStatus {
+    ubyte data;
+    mixin(bitfields!(
+        /// The current mode that the lcd controller is in
+        GPUMode, "gpuMode", 2,
+
+        /// Set when LY (the current Y coordinate) and LYC are equal
+        bool, "coincidenceFlag", 1,
+
+        /// Set if the user wants HBlanks to create STAT interrupts
+        bool, "hblankInterrupt", 1,
+
+        /// Set if the user wants VBlanks to create STAT interrupts
+        bool, "vblankInterrupt", 1,
+
+        /// Set if the user wants a STAT interrupt when we enter the OAM search state
+        bool, "oamInterrupt", 1,
+
+        /// Set if the user wants a STAT interrupt when LY=LYC
+        bool, "coincidenceInterrupt", 1,
+
+        bool, "", 1
+    ));
+}
+
 private union TileMap {
     /// Row-major locations of the tiles
     private ubyte[BG_SIZE_TILES][BG_SIZE_TILES] tileLocations;
@@ -268,18 +416,35 @@ private union TileMap {
 /// Data about a sprite. Stored in OAM RAM.
 private struct SpriteAttributes {
     align(1): // Tightly pack the bytes
+        /// The X position of the sprite on the screen (minus 16)
         ubyte y;
+
+        /// The Y position of the sprite on the screen (minus 8)
         ubyte x;
+
+        /// The unsigned tile number to use for the sprite
         ubyte tileNum;
+
         union {
             ubyte options;
             mixin(bitfields!(
-                uint, "", 3,        // Color palette: used on CGB only
-                bool, "", 1,        // Character bank: used on CGB only
-                bool, "palette", 1, // Palette to use: unused on CGB
-                bool, "xflip", 1,   // Whether to flip horizontally
-                bool, "yflip", 1,   // Whether to flip vertically
-                bool, "priority", 1 // Whether to force above the background
+                /// Color palette: used on CGB only
+                uint, "", 3,
+
+                /// Character bank: used on CGB only
+                bool, "", 1,
+
+                /// Palette to use: unused on CGB
+                bool, "palette", 1,
+
+                /// Whether to flip horizontally
+                bool, "xflip", 1,
+
+                /// Whether to flip vertically
+                bool, "yflip", 1,
+
+                /// Whether to force above the background
+                bool, "belowBG", 1
             ));
         }
 }
