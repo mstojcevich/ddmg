@@ -43,6 +43,10 @@ private const TILE_DATA_END   = 0x17FF; /// Tile data ends at 0x97FF, which is 0
  * It prepares scanlines and sends them to the display to render.
  */
 class GPU {
+
+    /// The LCD control register (LCDC)
+    private LCDControl control;
+
     /*
     The background consists of 32x32 8x8 tiles, making 256x256 pixels total.
     When rendered, it is offset by the SCX and SCY registers and wraps around.
@@ -136,6 +140,29 @@ class GPU {
         }
     }
 
+    /// Redraws the background held in the background array
+    @safe private void redrawBackground() {
+        // Go through all of the tiles in the tile map
+        for(int tY = 0; tY < NUM_TILES; tY++) {
+            for(int tX = 0; tX < NUM_TILES; tX++) {
+                immutable TileMap map = control.bgMapSelect ? tileMapB : tileMapA;
+                
+                // The offset of the tile in the tileset
+                immutable ubyte offset = map.tileLocations[tY][tX];
+
+                // Look up the tile in the tile set to use
+                immutable ushort tileIndex = getTilesetIndex(offset, control.bgTileset);
+                immutable uint tilesetIndex = tileIndex * TILE_SIZE_BYTES;
+                
+                // TODO finish
+            }
+        }
+    }
+
+    @safe private ushort getTilesetIndex(ubyte value, TilesetIndexing indexingType) {
+        return indexingType == TilesetIndexing.SIGNED ? (cast(byte)(value) + 256) : value;
+    }
+
 }
 
 /// A representation of the different modes that the GameBoy GPU can be in
@@ -172,7 +199,7 @@ private union LCDControl {
         bool, "bgMapSelect", 1,
 
         /// The tileset to use for the background and window
-        bool, "bgDataSelect", 1,
+        TilesetIndexing, "bgTileset", 1,
 
         /// Whether the window should be drawn
         bool, "windowEnable", 1,
@@ -210,4 +237,13 @@ private struct SpriteAttributes {
                 bool, "priority", 1 // Whether to force above the background
             ));
         }
+}
+
+/// Type of indexing of the tileset
+private enum TilesetIndexing : bool {
+    /// Use the signed tileset from 0x8800-0x97FF
+    SIGNED = false,
+
+    /// Use the unsigned tileset from 0x8000-0x8FFF
+    UNSIGNED = true
 }
