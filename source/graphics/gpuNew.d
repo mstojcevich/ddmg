@@ -7,6 +7,9 @@ I don't emulate the exact timing for the stages which can
 vary in timing.
 */
 
+import graphics.display;
+import interrupt;
+
 import std.bitmanip;
 import std.stdio;
 
@@ -78,7 +81,7 @@ class GPU {
     */
 
     /// y-major representation of the background
-    ubyte[BG_SIZE][BG_SIZE] background;
+    private ubyte[BG_SIZE][BG_SIZE] background;
 
     /**
     * Whether something has been changed since the last DATA_TRANSFER mode 
@@ -86,10 +89,10 @@ class GPU {
     *
     * For example, if the tile map or tile data gets changed.
     */
-    bool bgChanged;
+    private bool bgChanged;
 
-    ubyte bgScrollY; /// SCY register: The y coordinate of the background at the top left of the display
-    ubyte bgScrollX; /// SCX register: The x coordinate of the background at the top left of the display
+    private ubyte bgScrollY; /// SCY register: The y coordinate of the background at the top left of the display
+    private ubyte bgScrollX; /// SCX register: The x coordinate of the background at the top left of the display
 
     /*
     There is a notion of both a tile "set" and a tile "map".
@@ -117,6 +120,24 @@ class GPU {
 
     /// The amount of cycles we have spent in our current state. Used internally to time out the states properly.
     private uint stateCycles;
+
+    /// The display to render onto
+    private Display display;
+
+    /// The interrupt handler to fire interrupts with
+    private InterruptHandler iuptHandler;
+
+    /**
+     * Create a GPU that renders onto the specified display
+     * and fires interrupts using the specified interrupt handler
+     */
+    @safe this(Display display, InterruptHandler ih) {
+        this.display = display;
+        this.iuptHandler = ih;
+
+        // Set the initial values. TODO bootrom support
+        reset();
+    }
 
     /// Read VRAM at the specified address (relative to VRAM)
     @safe @property ubyte vram(in ushort addr)
@@ -159,6 +180,12 @@ class GPU {
 
             case GPUMode.DATA_TRANSFER:
                 if(stateCycles >= CYCLES_PER_DATA_TRANSFER) {
+                    // Update the background
+                    if(bgChanged) {
+                        redrawBackground();
+                        bgChanged = false;
+                    }
+
                     // Move on to the next mode
                     stateCycles -= CYCLES_PER_DATA_TRANSFER;
                     status.gpuMode = GPUMode.HORIZ_BLANK;
@@ -174,7 +201,8 @@ class GPU {
                     curScanline++;
                     // TODO check LY=LYC coincidence
                     
-                    // TODO draw the scanline to the display
+                    // Draw the line onto the display
+                    drawLine();
 
                     // If we just finished the HBLANK for the last scanline,
                     // then we enter VBLANK. Otherwise we move on to the
@@ -311,6 +339,45 @@ class GPU {
     /// Get the corrected index in the tilset for the specific indexing type
     @safe private ushort getTilesetIndex(ubyte value, TilesetIndexing indexingType) {
         return indexingType == TilesetIndexing.SIGNED ? (cast(byte)(value) + 256) : value;
+    }
+
+    /// Draw the current scanline onto the display
+    @safe private void drawLine() {
+        // Draw the background+window for the line
+        // TODO window
+        if(control.bgEnabled) {
+            for(ubyte x = 0; x < DISPLAY_WIDTH; x++) {
+                /// The scrolled X used to get the background pixel
+                immutable ubyte bgX = cast(ubyte)(x + bgScrollX);
+
+                /// The scrolled Y used to get the background pixel 
+                immutable ubyte bgY = cast(ubyte)(curScanline + bgScrollY);
+
+                /// The pixel at the current position in the background
+                immutable ubyte bgPixel = background[bgY][bgX];
+
+                // Apply the palette and draw the pixel
+                immutable ubyte palettedBgPixel = applyPalette(backgroundPalette, bgPixel);
+
+                display.setPixelGB(x, curScanline, palettedBgPixel);
+            }
+        }
+
+        // Draw the sprites for the line
+        // TODO 
+    }
+
+    /// Apply the specified palette to the specified gameboy color
+    @safe private ubyte applyPalette(ubyte palette, ubyte color)
+    in {
+        assert(color < 4); // There are 4 colors total
+    }
+    out(output) {
+        assert(output < 4); // There are 4 possible output colors
+    }
+    body {
+        // Each color is represented by 2 bits in the palette
+        return (palette >> (color * 2)) & 0b11;
     }
 
     /// Sets the initial state of the GPU
