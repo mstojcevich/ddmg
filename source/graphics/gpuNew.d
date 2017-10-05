@@ -18,11 +18,11 @@ import std.stdio;
 /// The size of the background in pixels. This is both the width and the height of the background.
 private const BG_SIZE = 256;
 
-/// The size of tiles in the background and window in pixels. This is both the width and the height of a given tile.
-private const BG_TILE_SIZE = 8;
+/// The size of tiles in pixels. This is both the width and the height of a given tile.
+private const TILE_SIZE = 8;
 
 /// The size of the background in tiles. This is both the width and the height.
-private const BG_SIZE_TILES = BG_SIZE / BG_TILE_SIZE;
+private const BG_SIZE_TILES = BG_SIZE / TILE_SIZE;
 
 /// VRAM stores a total of 384 different tiles
 private const NUM_TILES = 384;
@@ -84,6 +84,9 @@ class GPU {
     /// The entirity of the tile data stored in VRAM. This is used for the tile sets.
     private ubyte[NUM_TILES * TILE_SIZE_BYTES] tileData;
 
+    /// The tile data decoded into a form that is larger but easier to use
+    private ubyte[TILE_SIZE][TILE_SIZE][NUM_TILES] tileSet;
+
     /// Read VRAM at the specified address (relative to VRAM)
     @safe @property ubyte vram(in ushort addr)
     in {
@@ -132,11 +135,52 @@ class GPU {
         if(addr >= TILE_DATA_BEGIN && addr <= TILE_DATA_END) {
             bgChanged = true;
             tileData[addr - TILE_DATA_BEGIN] = val;
+            updateTileData(addr - TILE_DATA_BEGIN);
             return;
         }
 
         debug {
             writefln("Tried to write VRAM at %d, which is unmapped.", addr);
+        }
+    }
+
+    /// Update the internal tile representation given new tile data
+    @safe private void updateTileData(in ushort addr) {
+        /* Tile data:
+         * Byte 0-1 = first line (upper 8 pixels)
+         * Byte 2-3 = next line
+         * ...
+         *
+         * Each pixel is 2 bits large, so each byte holds 4 pixels (although it's interleaved)
+         */
+
+         /*
+          * Each line is represented as two bytes with bits:
+          * ABCDEFGH abcdefgh
+          * 
+          * where the 8th pixel is the two bit long number Aa,
+          * the 7th pixel is Bb, etc.
+          */
+
+        // The number of the tile in the tileset
+        immutable tileNum = addr / TILE_SIZE_BYTES;
+
+        // The current row being updated
+        immutable tileRow = (addr / 2) % TILE_SIZE;
+
+        // The second byte contains the upper bits of the color
+        // So this indicates whether this byte contains the upper or lower bits
+        immutable bool upperBits = (addr % 2) == 1;
+
+        // Update each X position in the row
+        for(ubyte x = 0; x < TILE_SIZE; x++) {
+            // Invert X since the bits are read backwards
+            immutable invX = 7 - x;
+
+            immutable bit1 = (tileData[upperBits ? (addr - 1) : addr] & (0b1 << invX)) > 0 ? 1 : 0;
+            immutable bit2 = (tileData[upperBits ? addr : (addr + 1)] & (0b1 << invX)) > 0 ? 2 : 0;
+
+            tileSet[tileNum][tileRow][x] = cast(ubyte)(bit1 + bit2);
         }
     }
 
@@ -152,8 +196,9 @@ class GPU {
 
                 // Look up the tile in the tile set to use
                 immutable ushort tileIndex = getTilesetIndex(offset, control.bgTileset);
-                immutable uint tilesetIndex = tileIndex * TILE_SIZE_BYTES;
                 
+                immutable ubyte[TILE_SIZE][TILE_SIZE] tile = tileSet[tileIndex];
+
                 // TODO finish
             }
         }
