@@ -7,6 +7,8 @@ I don't emulate the exact timing for the stages which can
 vary in timing.
 */
 
+// TODO how do the interrupts specified in LCDC work? I see some sources mentioning you can only select 1 type of interrupt...
+
 import graphics.display;
 import interrupt;
 
@@ -95,6 +97,19 @@ class GPU {
     private ubyte bgScrollX; /// SCX register: The x coordinate of the background at the top left of the display
 
     /*
+    The window works almost identically to the background.
+    The main difference is that instead of scrolling the window,
+    you specify where the top left of the window is located on the display.
+
+    The window always overlays the background.
+    */
+
+    /// WX: The X position of the top left of the window on the screen
+    private ubyte windowX;
+    /// WY: The Y position of the top left of the window on the screen
+    private ubyte windowY;
+
+    /*
     There is a notion of both a tile "set" and a tile "map".
     A tileset is a collection of the pixel data of tiles.
     A tilemap is a mapping from coordinates on the screen to an index in the tileset. These are used for the background and window.
@@ -137,32 +152,6 @@ class GPU {
 
         // Set the initial values. TODO bootrom support
         reset();
-    }
-
-    /// Read VRAM at the specified address (relative to VRAM)
-    @safe @property ubyte vram(in ushort addr)
-    in {
-        // There are 8192 bytes of VRAM
-        assert(addr < 8192);
-    }
-    body {
-        if(addr >= BG_MAP_A_BEGIN && addr <= BG_MAP_A_END) {
-            return tileMapA.data[addr - BG_MAP_A_BEGIN];
-        }
-
-        if(addr >= BG_MAP_B_BEGIN && addr <= BG_MAP_B_END) {
-            return tileMapB.data[addr - BG_MAP_B_BEGIN];
-        }
-
-        if(addr >= TILE_DATA_BEGIN && addr <= TILE_DATA_END) {
-            return tileData[addr - TILE_DATA_BEGIN];
-        }
-
-        // Unmapped, return 0. This shouldn't happen since everything is mapped.
-        debug {
-            writefln("Tried to read VRAM at %d, which is unmapped.", addr);
-        }
-        return 0;
     }
 
     /// Execute the GPU for a number of cycles
@@ -212,8 +201,10 @@ class GPU {
 
                         // TODO VBLANK interrupt
                         // TODO does the vblank happen here or does it happen on 143???
-
                         // TODO Write a test that gets LY when a VBLANK occurs
+
+                        // Present the frame
+                        display.drawFrame();
                     }
                 }
                 break;
@@ -234,37 +225,6 @@ class GPU {
                     }
                 }
                 break;
-        }
-    }
-
-    /// Set VRAM at the specified address
-    @safe @property void vram(in ushort addr, in ubyte val)
-    in {
-        // There are 8192 bytes of VRAM
-        assert(addr < 8192);
-    }
-    body {
-        if(addr >= BG_MAP_A_BEGIN && addr <= BG_MAP_A_END) {
-            bgChanged = true;
-            tileMapA.data[addr - BG_MAP_A_BEGIN] = val;
-            return;
-        }
-
-        if(addr >= BG_MAP_B_BEGIN && addr <= BG_MAP_B_END) {
-            bgChanged = true;
-            tileMapB.data[addr - BG_MAP_B_BEGIN] = val;
-            return;
-        }
-
-        if(addr >= TILE_DATA_BEGIN && addr <= TILE_DATA_END) {
-            bgChanged = true;
-            tileData[addr - TILE_DATA_BEGIN] = val;
-            updateTileData(addr - TILE_DATA_BEGIN);
-            return;
-        }
-
-        debug {
-            writefln("Tried to write VRAM at %d, which is unmapped.", addr);
         }
     }
 
@@ -400,6 +360,167 @@ class GPU {
         // TODO WX, WY, clocks spent in current cycle
     }
 
+    /// Set VRAM at the specified address
+    @safe @property void vram(in ushort addr, in ubyte val)
+    in {
+        // There are 8192 bytes of VRAM
+        assert(addr < 8192);
+    }
+    body {
+        if(addr >= BG_MAP_A_BEGIN && addr <= BG_MAP_A_END) {
+            bgChanged = true;
+            tileMapA.data[addr - BG_MAP_A_BEGIN] = val;
+            return;
+        }
+
+        if(addr >= BG_MAP_B_BEGIN && addr <= BG_MAP_B_END) {
+            bgChanged = true;
+            tileMapB.data[addr - BG_MAP_B_BEGIN] = val;
+            return;
+        }
+
+        if(addr >= TILE_DATA_BEGIN && addr <= TILE_DATA_END) {
+            bgChanged = true;
+            tileData[addr - TILE_DATA_BEGIN] = val;
+            updateTileData(addr - TILE_DATA_BEGIN);
+            return;
+        }
+
+        debug {
+            writefln("Tried to write VRAM at %d, which is unmapped.", addr);
+        }
+    }
+
+    /// Read VRAM at the specified address (relative to VRAM)
+    @safe @property ubyte vram(in ushort addr)
+    in {
+        // There are 8192 bytes of VRAM
+        assert(addr < 8192);
+    }
+    body {
+        if(addr >= BG_MAP_A_BEGIN && addr <= BG_MAP_A_END) {
+            return tileMapA.data[addr - BG_MAP_A_BEGIN];
+        }
+
+        if(addr >= BG_MAP_B_BEGIN && addr <= BG_MAP_B_END) {
+            return tileMapB.data[addr - BG_MAP_B_BEGIN];
+        }
+
+        if(addr >= TILE_DATA_BEGIN && addr <= TILE_DATA_END) {
+            return tileData[addr - TILE_DATA_BEGIN];
+        }
+
+        // Unmapped, return 0. This shouldn't happen since everything is mapped.
+        debug {
+            writefln("Tried to read VRAM at %d, which is unmapped.", addr);
+        }
+        return 0;
+    }
+
+    /// Write to the LCD status register (STAT)
+    @safe @property void statRegister(in ubyte stat) {
+        // TODO Is the first bit always 0 or always 1? Or can the user actually write it?
+        status.data = stat & 0b01111111;
+    }
+
+    /// Read from the LCD status register (STAT)
+    @safe @property ubyte statRegister() {
+        return status.data;
+    }
+
+    /// Write to the LCD control register (LCDC)
+    @safe @property void lcdcRegister(in ubyte lcdc) {
+        LCDControl newControl;
+        newControl.data = lcdc;
+        
+        // The display is turning off
+        if(!newControl.lcdEnable && control.lcdEnable) {
+            // When the display is turned off, LY immediately becomes 0
+            
+            curScanline = 0;
+            // TODO check LY=LYC coincidence
+            // TODO what does mode get set to? Write a test
+        }
+
+        control.data = lcdc;
+    }
+
+    /// Read from the LCD control register (LCDC)
+    @safe @property ubyte lcdcRegister() {
+        // TODO "On DMG, the LCDC should be off during VBLANK". Is this advice for programs or hardware behavior?? TEST
+        return control.data;
+    }
+
+    /// Read from the background scroll x register (SCX)
+    @safe @property ubyte scxRegister() {
+        return bgScrollX;
+    }
+
+    /// Write to the background scroll x register (SCX)
+    @safe @property void scxRegister(ubyte scx) {
+        bgScrollX = scx;
+    }
+
+    /// Read from the background scroll y register (SCY)
+    @safe @property ubyte scyRegister() {
+        return bgScrollY;
+    }
+
+    /// Write to the background scroll y register (SCY)
+    @safe @property void scyRegister(ubyte scy) {
+        bgScrollY = scy;
+    }
+
+    /// Read from the window x register (WX)
+    @safe @property ubyte wxRegister() {
+        return windowX;
+    }
+
+    /// Write to the window x register (WX)
+    @safe @property void wxRegister(ubyte wx) {
+        windowX = wx;
+    }
+
+    /// Read from the window y register (WY)
+    @safe @property ubyte wyRegister() {
+        return windowY;
+    }
+
+    /// Write to the window y register (WY)
+    @safe @property void wyRegister(ubyte wy) {
+        windowY = wy;
+    }
+
+    /// Write to the background palette register
+    @safe @property void bgpRegister(ubyte bgp) {
+         backgroundPalette = bgp;
+    }
+
+    /// Read from the background palette register
+    @safe @property ubyte bgpRegister() {
+        return backgroundPalette;
+    }
+
+    /// Write to the first sprite palette register
+    @safe @property void obp0Register(ubyte obp0) {
+        spritePaletteA = obp0;
+    }
+
+    /// Read from the first sprite palette register
+    @safe @property ubyte obp0Register() {
+        return spritePaletteA;
+    }
+
+    /// Write to the second sprite palette register
+    @safe @property void obp1Register(ubyte obp1) {
+        spritePaletteB = obp1;
+    }
+
+    /// Read from the second sprite palette register
+    @safe @property ubyte obp1Register() {
+        return spritePaletteB;
+    }
+    
 }
 
 /// A representation of the different modes that the GameBoy GPU can be in
