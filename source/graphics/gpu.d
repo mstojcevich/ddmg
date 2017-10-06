@@ -480,7 +480,7 @@ class GPU
         lcdStatusRegister.coincidenceFlag = getCurScanline() == getScanlineCompare();
 
         // TODO is this right? There's something about LYC00 or something
-        if(lcdStatusRegister.coincidenceInterrupt) {
+        if(lcdStatusRegister.coincidenceInterrupt && lcdStatusRegister.coincidenceFlag) {
             iuptHandler.fireInterrupt(Interrupts.LCD_STATUS);
         }
     }
