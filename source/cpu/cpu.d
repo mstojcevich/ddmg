@@ -627,40 +627,7 @@ class CPU {
         // Result with the extra bits dropped
         regs.a = outResult;
     }
-    @system unittest { // Unit test for ADD A, n
-        InterruptHandler ih = new InterruptHandler();
-        Clock clk = new Clock(ih);
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(ih), ih), clk, ih);
-
-        with(c) {
-            // Test 1, 0x3A + 0xC6
-            regs.a = 0x3A;
-            regs.b = 0xC6;
-            add(regs.b);
-
-            assert(regs.a == 0x00);
-            assert(regs.isFlagSet(Flag.ZERO));
-            assert(regs.isFlagSet(Flag.HALF_OVERFLOW));
-            assert(!regs.isFlagSet(Flag.SUBTRACTION));
-            assert(regs.isFlagSet(Flag.OVERFLOW));
-
-            // Test 2, 0xFF + 0x33
-            regs.a = 0xFF;
-            regs.c = 0x33;
-
-            // Set the subtraction flag to make sure it gets reset
-            regs.setFlag(Flag.SUBTRACTION, true);
-
-            add(c.regs.c);
-
-            assert(regs.a == 0x32);
-            assert(!regs.isFlagSet(Flag.ZERO));
-            assert(regs.isFlagSet(Flag.HALF_OVERFLOW));
-            assert(!regs.isFlagSet(Flag.SUBTRACTION));
-            assert(regs.isFlagSet(Flag.OVERFLOW));
-        }
-    }
-
+    
     /**
      * Add the 8-bit value stored in memory at the address stored in register HL to register A
      */
@@ -703,56 +670,7 @@ class CPU {
         // Result with the extra bits dropped
         regs.a = outResult;
      }
-     @system unittest { // Unit test for ADC A, n
-        InterruptHandler ih = new InterruptHandler();
-        Clock clk = new Clock(ih);
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(ih), ih), clk, ih);
-
-        with(c) {
-            regs.a = 0xE1;
-            regs.b = 0x0F;
-            regs.c = 0x3B;
-            regs.h = 0x1E;
-
-            regs.setFlag(Flag.OVERFLOW, true);
-
-            adc(regs.b);
-            assert(regs.a == 0xF1);
-            assert(!regs.isFlagSet(Flag.SUBTRACTION));
-            assert(!regs.isFlagSet(Flag.ZERO));
-            assert(regs.isFlagSet(Flag.HALF_OVERFLOW));
-            assert(!regs.isFlagSet(Flag.OVERFLOW));
-
-            regs.a = 0xE1;
-            regs.b = 0x0F;
-            regs.c = 0x3B;
-            regs.h = 0x1E;
-
-            regs.setFlag(Flag.OVERFLOW, true);
-
-            adc(regs.c);
-            assert(regs.a == 0x1D);
-            assert(!regs.isFlagSet(Flag.SUBTRACTION));
-            assert(!regs.isFlagSet(Flag.ZERO));
-            assert(!regs.isFlagSet(Flag.HALF_OVERFLOW));
-            assert(regs.isFlagSet(Flag.OVERFLOW));
-
-            regs.a = 0xE1;
-            regs.b = 0x0F;
-            regs.c = 0x3B;
-            regs.h = 0x1E;
-
-            regs.setFlag(Flag.OVERFLOW, true);
-
-            adc(regs.h);
-            assert(regs.a == 0x00);
-            assert(!regs.isFlagSet(Flag.SUBTRACTION));
-            assert(regs.isFlagSet(Flag.ZERO));
-            assert(regs.isFlagSet(Flag.HALF_OVERFLOW));
-            assert(regs.isFlagSet(Flag.OVERFLOW));
-        }
-     }
-
+     
     /**
      * Adc the 8-bit value stored in memory at the address stored in register HL to register A
      */
@@ -967,24 +885,6 @@ class CPU {
         regs.a = rol(regs.a, 1);
         regs.setFlag(Flag.OVERFLOW, leftmostBit);
     }
-    @system unittest {  // Unit tests for RLCA
-        InterruptHandler ih = new InterruptHandler();
-        Clock clk = new Clock(ih);
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(ih), ih), clk, ih);
-
-        with(c) {
-            regs.a = 0x85;
-            regs.setFlag(Flag.OVERFLOW, false);
-
-            rlca();
-
-            assert(regs.a == 0x0B);
-            assert(regs.isFlagSet(Flag.OVERFLOW));
-            assert(!regs.isFlagSet(Flag.ZERO));
-            assert(!regs.isFlagSet(Flag.HALF_OVERFLOW));
-            assert(!regs.isFlagSet(Flag.SUBTRACTION));
-        }
-    }
 
     /**
      * Rotate A left, with the previous 8th bit going to the carry flag
@@ -1001,25 +901,7 @@ class CPU {
         regs.a = cast(ubyte)((regs.a << 1)) | carryFlag;
         regs.setFlag(Flag.OVERFLOW, leftmostBit);
     }
-    @system unittest {  // Unit tests for RLA
-        InterruptHandler ih = new InterruptHandler();
-        Clock clk = new Clock(ih);
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(ih), ih), clk, ih);
-
-        with(c) {
-            regs.a = 0x05;
-            regs.setFlag(Flag.OVERFLOW, true);
-
-            rla();
-
-            assert(regs.a == 0x0B);
-            assert(!regs.isFlagSet(Flag.OVERFLOW));
-            assert(!regs.isFlagSet(Flag.ZERO));
-            assert(!regs.isFlagSet(Flag.HALF_OVERFLOW));
-            assert(!regs.isFlagSet(Flag.SUBTRACTION));
-        }
-    }
-
+    
     /**
      * Rotate A right, with the previous 0th bit going to both 
      * the new 8th bit and the carry flag
@@ -1034,25 +916,7 @@ class CPU {
         regs.a = ror(regs.a, 1);
         regs.setFlag(Flag.OVERFLOW, rightmostBit);
     }
-    @system unittest {
-        InterruptHandler ih = new InterruptHandler();
-        Clock clk = new Clock(ih);
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(ih), ih), clk, ih);
-
-        with(c) {
-            regs.a = 0x3B;
-            regs.setFlag(Flag.OVERFLOW, false);
-
-            rrca();
-
-            assert(regs.a == 0x9D);
-            assert(regs.isFlagSet(Flag.OVERFLOW));
-            assert(!regs.isFlagSet(Flag.ZERO));
-            assert(!regs.isFlagSet(Flag.HALF_OVERFLOW));
-            assert(!regs.isFlagSet(Flag.SUBTRACTION));
-        }
-    }
-
+    
     /**
      * Rotate A right, with the carry flag bit going to the new 8th bit
      * and the old 0th bit going to the carry flag
@@ -1068,25 +932,7 @@ class CPU {
         regs.a = (regs.a >> 1) | (carryBit << 7);
         regs.setFlag(Flag.OVERFLOW, rightmostBit);
     }
-    @system unittest {
-        InterruptHandler ih = new InterruptHandler();
-        Clock clk = new Clock(ih);
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(ih), ih), clk, ih);
-
-        with(c) {
-            regs.a = 0x81;
-            regs.setFlag(Flag.OVERFLOW, false);
-
-            rra();
-
-            assert(regs.a == 0x40);
-            assert(regs.isFlagSet(Flag.OVERFLOW));
-            assert(!regs.isFlagSet(Flag.ZERO));
-            assert(!regs.isFlagSet(Flag.HALF_OVERFLOW));
-            assert(!regs.isFlagSet(Flag.SUBTRACTION));
-        }
-    }
-
+    
     @safe private void jumpImmediate() {
         readShort(regs.pc, regs.pc);
         // No need to increment pc to compensate for the immediate value because we jumped
@@ -1273,23 +1119,6 @@ class CPU {
 
 		cbBlock.handle(subop);
 	}
-    @system unittest {
-        InterruptHandler ih = new InterruptHandler();
-        Clock clk = new Clock(ih);
-        CPU c = new CPU(new MMU(new Cartridge(), new GPU(new Display(), clk, ih), new Keypad(ih), ih), clk, ih);
-
-        with(c) {
-            regs.a = 0xAB;
-            regs.hl = 0xC010;
-            mmu.writeByte(regs.hl, 0xAB);
-            cbBlock.handle(0x37);
-            cbBlock.handle(0x36);
-            writefln("%02X", regs.a);
-            writefln("%02X", mmu.readByte(regs.hl));
-            assert(regs.a == 0xBA);
-            assert(mmu.readByte(regs.hl) == 0xBA);
-        }
-    }
 
     /**
      * Decimal adjusts A after operations involving multiple decimal encoded binary operations
