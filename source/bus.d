@@ -17,7 +17,7 @@ class Bus {
     /// Simulate n cycles of the components on the bus
     @safe void update(uint cyclesExpended) {
         clk.spendCycles(cyclesExpended);
-        gpu.step(cyclesExpended);
+        gpu.execute(cyclesExpended);
         mmu.step(cyclesExpended);
     }
 

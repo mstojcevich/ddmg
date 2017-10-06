@@ -9,6 +9,8 @@ vary in timing.
 
 // TODO how do the interrupts specified in LCDC work? I see some sources mentioning you can only select 1 type of interrupt...
 
+module graphics.gpu_new;
+
 import graphics.display;
 import interrupt;
 
@@ -35,6 +37,11 @@ private const NUM_TILES = 384;
 
 /// Each tile is 16 bytes large because each line is 2 bytes
 private const TILE_SIZE_BYTES = 16;
+
+/// The size of sprite attributes in bytes
+private const BYTES_PER_SPRITE_ATTR = 4;
+/// The number of sprite attribtes in OAM memory
+private const NUM_SPRITES = 40;
 
 // Memory mappings
 private const BG_MAP_A_BEGIN  = 0x1800; /// Background map A begins at 0x9800, which is 0x1800 in VRAM
@@ -133,6 +140,9 @@ class GPU {
     /// One of the two palettes to use for sprites
     private ubyte spritePaletteA, spritePaletteB;
 
+    /// Sprite attribute memory (OAM)
+    private ubyte[BYTES_PER_SPRITE_ATTR * NUM_SPRITES] spriteMemory;
+
     /// The amount of cycles we have spent in our current state. Used internally to time out the states properly.
     private uint stateCycles;
 
@@ -155,7 +165,7 @@ class GPU {
     }
 
     /// Execute the GPU for a number of cycles
-    void execute(uint numCycles) {
+    @safe void execute(uint numCycles) {
         stateCycles += numCycles;
 
         final switch(status.gpuMode) {
@@ -183,15 +193,17 @@ class GPU {
 
             case GPUMode.HORIZ_BLANK:
                 if(stateCycles >= CYCLES_PER_HBLANK) {
-                    // Move on to the next mode
                     stateCycles -= CYCLES_PER_HBLANK;
+
+                    // Draw the line onto the display
+                    drawLine();
 
                     // We're done with a line, move on to the next one
                     curScanline++;
                     // TODO check LY=LYC coincidence
-                    
-                    // Draw the line onto the display
-                    drawLine();
+
+                    // Move on to the next mode
+                    status.gpuMode = GPUMode.OAM_SEARCH;
 
                     // If we just finished the HBLANK for the last scanline,
                     // then we enter VBLANK. Otherwise we move on to the
@@ -199,9 +211,10 @@ class GPU {
                     if(curScanline == DISPLAY_HEIGHT) {
                         status.gpuMode = GPUMode.VERT_BLANK;
 
-                        // TODO VBLANK interrupt
                         // TODO does the vblank happen here or does it happen on 143???
                         // TODO Write a test that gets LY when a VBLANK occurs
+
+                        iuptHandler.fireInterrupt(Interrupts.VBLANK);
 
                         // Present the frame
                         display.drawFrame();
@@ -211,7 +224,8 @@ class GPU {
 
             case GPUMode.VERT_BLANK:
                 // VBLANK starts at line 144 and goes until line 154
-                if(curScanline >= CYCLES_PER_LINE) {
+                if(stateCycles >= CYCLES_PER_LINE) {
+                    stateCycles -= CYCLES_PER_LINE;
                     curScanline++;
                     // TODO LY=LYC coincidence
                     // TODO does the coincidence interrupt happen for the virtual lines?
@@ -271,8 +285,8 @@ class GPU {
     /// Redraws the background held in the background array
     @safe private void redrawBackground() {
         // Go through all of the tiles in the tile map
-        for(int tY = 0; tY < NUM_TILES; tY++) {
-            for(int tX = 0; tX < NUM_TILES; tX++) {
+        for(int tY = 0; tY < BG_SIZE_TILES; tY++) {
+            for(int tX = 0; tX < BG_SIZE_TILES; tX++) {
                 immutable TileMap map = control.bgMapSelect ? tileMapB : tileMapA;
                 
                 // The offset of the tile in the tileset
@@ -392,7 +406,7 @@ class GPU {
     }
 
     /// Read VRAM at the specified address (relative to VRAM)
-    @safe @property ubyte vram(in ushort addr)
+    @safe @property ubyte vram(in ushort addr) const
     in {
         // There are 8192 bytes of VRAM
         assert(addr < 8192);
@@ -417,14 +431,33 @@ class GPU {
         return 0;
     }
 
+    /// Set OAM at the specified address
+    @safe @property void oam(in ushort addr, in ubyte val)
+    in {
+        assert(addr < BYTES_PER_SPRITE_ATTR * NUM_SPRITES);
+    }
+    body {
+        spriteMemory[addr] = val;
+    }
+
+    /// Read OAM at the specified address
+    @safe @property ubyte oam(in ushort addr) const
+    in {
+        assert(addr < BYTES_PER_SPRITE_ATTR * NUM_SPRITES);
+    }
+    body {
+        return spriteMemory[addr];
+    }
+
     /// Write to the LCD status register (STAT)
     @safe @property void statRegister(in ubyte stat) {
+        // TODO Can the user really rewrite everyhing in STAT??
         // TODO Is the first bit always 0 or always 1? Or can the user actually write it?
         status.data = stat & 0b01111111;
     }
 
     /// Read from the LCD status register (STAT)
-    @safe @property ubyte statRegister() {
+    @safe @property ubyte statRegister() const {
         return status.data;
     }
 
@@ -446,13 +479,13 @@ class GPU {
     }
 
     /// Read from the LCD control register (LCDC)
-    @safe @property ubyte lcdcRegister() {
+    @safe @property ubyte lcdcRegister() const {
         // TODO "On DMG, the LCDC should be off during VBLANK". Is this advice for programs or hardware behavior?? TEST
         return control.data;
     }
 
     /// Read from the background scroll x register (SCX)
-    @safe @property ubyte scxRegister() {
+    @safe @property ubyte scxRegister() const {
         return bgScrollX;
     }
 
@@ -462,7 +495,7 @@ class GPU {
     }
 
     /// Read from the background scroll y register (SCY)
-    @safe @property ubyte scyRegister() {
+    @safe @property const ubyte scyRegister() {
         return bgScrollY;
     }
 
@@ -472,7 +505,7 @@ class GPU {
     }
 
     /// Read from the window x register (WX)
-    @safe @property ubyte wxRegister() {
+    @safe @property ubyte wxRegister() const {
         return windowX;
     }
 
@@ -482,7 +515,7 @@ class GPU {
     }
 
     /// Read from the window y register (WY)
-    @safe @property ubyte wyRegister() {
+    @safe @property ubyte wyRegister() const {
         return windowY;
     }
 
@@ -497,7 +530,7 @@ class GPU {
     }
 
     /// Read from the background palette register
-    @safe @property ubyte bgpRegister() {
+    @safe @property ubyte bgpRegister() const {
         return backgroundPalette;
     }
 
@@ -507,7 +540,7 @@ class GPU {
     }
 
     /// Read from the first sprite palette register
-    @safe @property ubyte obp0Register() {
+    @safe @property ubyte obp0Register() const {
         return spritePaletteA;
     }
 
@@ -517,8 +550,27 @@ class GPU {
     }
 
     /// Read from the second sprite palette register
-    @safe @property ubyte obp1Register() {
+    @safe @property ubyte obp1Register() const {
         return spritePaletteB;
+    }
+
+    /// Read from the current scanline register
+    @safe @property ubyte lyRegister() const {
+        return curScanline;
+    }
+
+    // TODO does writing to LY reset it? For whatever reason the old GPU code did that
+
+    /// Read from the scanline compare register
+    @safe @property ubyte lycRegister() const {
+        return scanlineCompare;
+    }
+
+    /// Write to the scanline compare register
+    @safe @property void lycRegister(ubyte lyc) {
+        scanlineCompare = lyc;
+
+        // TODO check conincidence. Also can the coincidence interrupt happen here?
     }
     
 }

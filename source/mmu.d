@@ -107,7 +107,7 @@ class MMU {
                 while(oamCycleAccum >= 4) {
                     oamCycleAccum -= 4;
 
-                    gpu.setOAM(cast(ushort)(oamTransferToAddr - OAM_BEGIN), readByte(oamTransferFromAddr));
+                    gpu.oam(cast(ushort)(oamTransferToAddr - OAM_BEGIN), readByte(oamTransferFromAddr));
                     oamTransferToAddr++;
                     oamTransferFromAddr++;
 
@@ -157,45 +157,45 @@ class MMU {
         }
 
         if(VRAM_BEGIN <= address && address <= VRAM_END) {
-            return gpu.getVRAM(cast(ushort)(address - VRAM_BEGIN));
+            return gpu.vram(cast(ushort)(address - VRAM_BEGIN));
         }
         
         if(OAM_BEGIN <= address && address <= OAM_END) {
-            return gpu.getOAM(cast(ushort)(address - OAM_BEGIN));
+            return gpu.oam(cast(ushort)(address - OAM_BEGIN));
         }
 
         if(address == 0xFF40) {
-            return gpu.getLCDControl();
+            return gpu.lcdcRegister;
         }
-        if(address == 0xFF44) { // Reset the current scanline if the CPU tries to write to it
-            return gpu.getCurScanline();
+        if(address == 0xFF44) {
+            return gpu.lyRegister;
         }
         if(address == 0xFF45) {
-            return gpu.getScanlineCompare();
+            return gpu.lycRegister;
         }
         if(address == 0xFF41) {
-            return gpu.getLCDStatus();
+            return gpu.statRegister;
         }
         if(address == 0xFF42) {
-            return gpu.getScrollY();
+            return gpu.scyRegister;
         }
         if(address == 0xFF43) {
-            return gpu.getScrollX();
+            return gpu.scxRegister;
         }
         if(address == WINDOW_Y) {
-            return gpu.windowY;
+            return gpu.wyRegister;
         }
         if(address == WINDOW_X) {
-            return gpu.windowX;
+            return gpu.wxRegister;
         }
         if(address == BGP) {
-            return gpu.backgroundPalette;
+            return gpu.bgpRegister;
         }
         if(address == OBP0) {
-            return gpu.obp0;
+            return gpu.obp0Register;
         }
         if(address == OBP1) {
-            return gpu.obp1;
+            return gpu.obp1Register;
         }
 
         if(address == 0xFF00) {
@@ -270,11 +270,11 @@ class MMU {
         } else 
 
         if(VRAM_BEGIN <= address && address <= VRAM_END) {
-            gpu.setVRAM(cast(ushort)(address - VRAM_BEGIN), val);
+            gpu.vram(cast(ushort)(address - VRAM_BEGIN), val);
         } else
         
         if(OAM_BEGIN <= address && address <= OAM_END) {
-            gpu.setOAM(cast(ushort)(address - OAM_BEGIN), val);
+            gpu.oam(cast(ushort)(address - OAM_BEGIN), val);
         } else
 
         if(CARTRIDGE_BANK_0_BEGIN <= address && address <= CARTRIDGE_BANK_1_END) {
@@ -282,27 +282,25 @@ class MMU {
         } else
 
         if(address == 0xFF40) {
-            gpu.setLCDControl(val);
-        } else if(address == 0xFF44) { // Reset the current scanline if the CPU tries to write to it
-            gpu.resetCurScanline();
+            gpu.lcdcRegister = val;
         } else if(address == 0xFF45) {
-            gpu.setScanlineCompare(val);
+            gpu.lycRegister = val;
         } else if(address == 0xFF41) {
-            gpu.setLCDStatus(val);
+            gpu.statRegister = val;
         } else if(address == 0xFF42) {
-            gpu.setScrollY(val);
+            gpu.scyRegister = val;
         } else if(address == 0xFF43) {
-            gpu.setScrollX(val);
+            gpu.scxRegister = val;
         } else if(address == WINDOW_Y) {
-            gpu.windowY = val;
+            gpu.wyRegister = val;
         } else if(address == WINDOW_X) {
-            gpu.windowX = val;
+            gpu.wxRegister = val;
         } else if(address == BGP) {
-            gpu.backgroundPalette = val;
+            gpu.bgpRegister = val;
         } else if(address == OBP0) {
-            gpu.obp0 = val;
+            gpu.obp0Register = val;
         } else if(address == OBP1) {
-            gpu.obp1 = val;
+            gpu.obp1Register = val;
 
         } else if(address == DMA_TRANSFER_ADDR) {
             // Transfer from RAM to OAM
