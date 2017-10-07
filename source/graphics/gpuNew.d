@@ -372,6 +372,7 @@ class GPU {
                     tileRow = TILE_SIZE - 1 - tileRow;
                 }
 
+                // Get the tile the current sprite is pulling from
                 immutable ubyte[TILE_SIZE][TILE_SIZE] tile = tileSet[attrs.tileNum];
 
                 // Draw the entire width of the sprite
@@ -380,19 +381,22 @@ class GPU {
                         continue;
                     }
 
+                    // Get the x position relative to the tile
                     auto relativeX = attrs.x - x - 1;
                     if(!attrs.xflip) {
                         relativeX = TILE_SIZE - 1 - relativeX;
                     }
 
+                    // Get the unpaletted color to draw
                     immutable ubyte color = tile[tileRow][relativeX];
-                    if(color == 0) {
+                    if(color == 0) { // Never draw transparent sprites
                         continue;
                     }
 
                     if(attrs.belowBG) {
                         immutable ubyte bgColor = getBackgroundPixel(x, curScanline);
 
+                        // Only draw sprites below the background when the background is transparent
                         if(bgColor != 0) {
                             continue;
                         }
