@@ -650,12 +650,15 @@ class GPU {
         }
 
         if(newControl.bgTileset != control.bgTileset) {
-            if(newControl.bgMapSelect != control.bgMapSelect) {
-                bgChanged = true;
-            }
-            if(newControl.windowMapSelect != control.windowMapSelect) {
-                windowChanged = true;
-            }
+            bgChanged = true;
+            windowChanged = true;
+        }
+
+        if(newControl.bgMapSelect != control.bgMapSelect) {
+            bgChanged = true;
+        }
+        if(newControl.windowMapSelect != control.windowMapSelect) {
+            windowChanged = true;
         }
 
         control.data = lcdc;
