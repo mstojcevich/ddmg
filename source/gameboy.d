@@ -1,7 +1,9 @@
+import frontend;
 import mmu, cpu, clock, cartridge, graphics, keypad, interrupt, bus;
 import std.stdio;
 
 class Gameboy {
+
     private Clock clock;
     private MMU mmu;
     private CPU cpu;
@@ -11,13 +13,16 @@ class Gameboy {
     private Keypad keypad;
     private InterruptHandler iuptHandler;
     private Bus bus;
+    private Frontend frontend;
 
-    @safe this(string romPath) {
+    @safe this(Frontend frontend, string romPath) {
+        this.frontend = frontend;
+
         this.cartridge = new Cartridge(romPath);
 
-        this.display = new Display();
+        this.display = frontend.getDisplay();
         this.iuptHandler = new InterruptHandler();
-        this.keypad = new Keypad(this.display.glfwWindow, this.iuptHandler);
+        this.keypad = new Keypad(frontend.getKeypad(), this.iuptHandler);
         this.clock = new Clock(this.iuptHandler);
         this.gpu = new GPU(this.display, this.iuptHandler);
         this.mmu = new MMU(this.cartridge, this.gpu, this.keypad, this.iuptHandler, this.clock);
@@ -30,7 +35,7 @@ class Gameboy {
             keypad.update();
             cpu.step();
 
-            if(display.shouldProgramTerminate()) {
+            if(frontend.shouldProgramTerminate()) {
                 break;
             }
         }
