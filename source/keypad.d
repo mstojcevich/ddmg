@@ -1,4 +1,3 @@
-import derelict.glfw3.glfw3;
 import std.stdio;
 import std.exception;
 import std.typecons;
@@ -22,18 +21,23 @@ class Keypad {
 
     // TODO figure out what the priority is if both button and direction are selected and if neither are selected
 
-    private GLFWwindow* window;
-
     private InterruptHandler iuptHandler;
 
-    @trusted this(GLFWwindow* w, InterruptHandler iuptHandler) {
+    private KeypadFrontend frontend;
+
+    // Keep two copies of the current input, one for button selected, one for direction selected
+    // These need to be outside of the class file since they're set by a c callback
+    private BitFlags!JOYPFlag joypButtons = JOYPFlag.BUTTON_MODE;
+    private BitFlags!JOYPFlag joypDirections = JOYPFlag.DIRECTION_MODE;
+
+    // Request for an interrupt fire
+    private bool iupt;
+
+    @trusted this(KeypadFrontend frontend, InterruptHandler iuptHandler) {
         this.iuptHandler = iuptHandler;
 
-        if(w != null) {
-            this.window = w;
-            
-            glfwSetKeyCallback(window, &keyCallback);
-        }
+        this.frontend = frontend;
+        this.frontend.setCallback(&kpCallback);
     }
 
     @safe bool isJOYPFlagSet(JOYPFlag flag) {
@@ -46,7 +50,7 @@ class Keypad {
 
     @safe void writeJOYP(ubyte joyp) {
         // Since the buttons are read only, we only need to handle the directions part
-
+        
         bool buttons = (joyp & JOYPFlag.BUTTON_MODE) == 0;
         bool directions = (joyp & JOYPFlag.DIRECTION_MODE) == 0;
         
@@ -63,82 +67,87 @@ class Keypad {
         }
     }
 
-}
-
-// Keep two copies of the current input, one for button selected, one for direction selected
-// These need to be outside of the class file since they're set by a c callback
-private BitFlags!JOYPFlag joypButtons = JOYPFlag.BUTTON_MODE;
-private BitFlags!JOYPFlag joypDirections = JOYPFlag.DIRECTION_MODE;
-
-// Request for an interrupt fire
-private bool iupt;
-
-private extern(C) void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) nothrow {
-    if(action == GLFW_PRESS) {
-        switch(key) {
-            case GLFW_KEY_Z:
-                joypButtons |= JOYPFlag.RIGHT_OR_A;
-                iupt = true;
+    @safe void kpCallback(bool pressed, GameboyKey key) {
+        final switch(key) {
+            case GameboyKey.A:
+                if(pressed) {
+                    joypButtons |= JOYPFlag.RIGHT_OR_A;
+                    iupt = true;
+                } else {
+                    joypButtons &= ~JOYPFlag.RIGHT_OR_A;
+                }
                 break;
-            case GLFW_KEY_X:
-                joypButtons |= JOYPFlag.LEFT_OR_B;
-                iupt = true;
+            case GameboyKey.B:
+                if(pressed) {
+                    joypButtons |= JOYPFlag.LEFT_OR_B;
+                    iupt = true;
+                } else {
+                    joypButtons &= ~JOYPFlag.LEFT_OR_B;
+                }
                 break;
-            case GLFW_KEY_TAB:
-                joypButtons |= JOYPFlag.UP_OR_SELECT;
-                iupt = true;
+            case GameboyKey.SELECT:
+                if(pressed) {
+                    joypButtons |= JOYPFlag.UP_OR_SELECT;
+                    iupt = true;
+                } else {
+                    joypButtons &= ~JOYPFlag.UP_OR_SELECT;
+                }
                 break;
-            case GLFW_KEY_ENTER:
-                joypButtons |= JOYPFlag.DOWN_OR_START;
-                iupt = true;
+            case GameboyKey.START:
+                if(pressed) {
+                    joypButtons |= JOYPFlag.DOWN_OR_START;
+                    iupt = true;
+                } else {
+                    joypButtons &= ~JOYPFlag.DOWN_OR_START;
+                }
                 break;
-            case GLFW_KEY_LEFT:
-                joypDirections |= JOYPFlag.LEFT_OR_B;
-                iupt = true;
+            
+            case GameboyKey.RIGHT:
+                if(pressed) {
+                    joypDirections |= JOYPFlag.RIGHT_OR_A;
+                    iupt = true;
+                } else {
+                    joypDirections &= ~JOYPFlag.RIGHT_OR_A;
+                }
                 break;
-            case GLFW_KEY_RIGHT:
-                joypDirections |= JOYPFlag.RIGHT_OR_A;
-                iupt = true;
+            case GameboyKey.LEFT:
+                if(pressed) {
+                    joypDirections |= JOYPFlag.LEFT_OR_B;
+                    iupt = true;
+                } else {
+                    joypDirections &= ~JOYPFlag.LEFT_OR_B;
+                }
                 break;
-            case GLFW_KEY_UP:
-                joypDirections |= JOYPFlag.UP_OR_SELECT;
-                iupt = true;
+            case GameboyKey.UP:
+                if(pressed) {
+                    joypDirections |= JOYPFlag.UP_OR_SELECT;
+                    iupt = true;
+                } else {
+                    joypDirections &= ~JOYPFlag.UP_OR_SELECT;
+                }
                 break;
-            case GLFW_KEY_DOWN:
-                joypDirections |= JOYPFlag.DOWN_OR_START;
-                iupt = true;
-                break;
-            default:
-                break;
-        }
-    } else if(action == GLFW_RELEASE) {
-        switch(key) {
-            case GLFW_KEY_Z:
-                joypButtons &= ~JOYPFlag.RIGHT_OR_A;
-                break;
-            case GLFW_KEY_X:
-                joypButtons &= ~JOYPFlag.LEFT_OR_B;
-                break;
-            case GLFW_KEY_TAB:
-                joypButtons &= ~JOYPFlag.UP_OR_SELECT;
-                break;
-            case GLFW_KEY_ENTER:
-                joypButtons &= ~JOYPFlag.DOWN_OR_START;
-                break;
-            case GLFW_KEY_LEFT:
-                joypDirections &= ~JOYPFlag.LEFT_OR_B;
-                break;
-            case GLFW_KEY_RIGHT:
-                joypDirections &= ~JOYPFlag.RIGHT_OR_A;
-                break;
-            case GLFW_KEY_UP:
-                joypDirections &= ~JOYPFlag.UP_OR_SELECT;
-                break;
-            case GLFW_KEY_DOWN:
-                joypDirections &= ~JOYPFlag.DOWN_OR_START;
-                break;
-            default:
+            case GameboyKey.DOWN:
+                if(pressed) {
+                    joypDirections |= JOYPFlag.DOWN_OR_START;
+                    iupt = true;
+                } else {
+                    joypDirections &= ~JOYPFlag.DOWN_OR_START;
+                }
                 break;
         }
     }
+
+}
+
+/// The collection of keys on a Gameboy
+enum GameboyKey {
+    A, B, SELECT, START, UP, DOWN, LEFT, RIGHT
+}
+
+alias keypressCallback = @safe void delegate(bool down, GameboyKey key);
+
+/// A frontend implementation of the keypad
+interface KeypadFrontend {
+    /// Set the callback to run when a key is pressed
+    @safe void setCallback(keypressCallback callback);
 }
