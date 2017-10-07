@@ -423,13 +423,14 @@ class GPU {
         // Count how many sprites are drawn because a max of 10 are allowed per scanline
         auto spritesDrawn = 0;
 
+        // Whether the given pixel already has a sprite on it
+        bool[DISPLAY_WIDTH] filled;
+
         for(int i = 0; i < NUM_SPRITES && spritesDrawn < 10; i++) {
             immutable SpriteAttributes attrs = (cast(SpriteAttributes[NUM_SPRITES]) spriteMemory)[i];
             
             // The row on the sprite that the current scanline represents
             auto tileRow = curScanline - attrs.y + (TILE_SIZE * 2);
-
-            // TODO 8x16 sprites
 
             immutable ubyte spriteHeight = control.tallSprites ? TILE_SIZE * 2 : TILE_SIZE;
 
@@ -450,7 +451,7 @@ class GPU {
 
                 // Draw the entire width of the sprite
                 for(int x = attrs.x - TILE_SIZE; x < attrs.x; x++) {
-                    if(x < 0 || x >= GB_DISPLAY_WIDTH) {
+                    if(x < 0 || x >= GB_DISPLAY_WIDTH || filled[x]) {
                         continue;
                     }
 
@@ -465,6 +466,8 @@ class GPU {
                     if(color == 0) { // Never draw transparent sprites
                         continue;
                     }
+
+                    filled[x] = true;
 
                     if(attrs.belowBG) {
                         immutable ubyte bgColor = getBackgroundPixel(x, curScanline);
