@@ -89,7 +89,7 @@ class GPU {
     ahead of time. This also makes the data read timing slightly more (but not fully) accurate.
     */
 
-    /// y-major representation of the background
+    /// y-major representation of the background (unpaletted)
     private ubyte[BG_SIZE][BG_SIZE] background;
 
     /**
@@ -315,20 +315,26 @@ class GPU {
         return indexingType == TilesetIndexing.SIGNED ? (cast(byte)(value) + 256) : value;
     }
 
+    /// Get the (unpaletted) background pixel at the specific coordinates on the screen
+    @safe private ubyte getBackgroundPixel(int screenX, int screenY) {
+        /// The scrolled X used to get the background pixel
+        immutable ubyte bgX = cast(ubyte)(screenX + bgScrollX);
+
+        /// The scrolled Y used to get the background pixel 
+        immutable ubyte bgY = cast(ubyte)(screenY + bgScrollY);
+
+        /// The pixel at the current position in the background
+        return background[bgY][bgX];
+    }
+
     /// Draw the current scanline onto the display
     @safe private void drawLine() {
         // Draw the background+window for the line
         // TODO window
         if(control.bgEnabled) {
             for(ubyte x = 0; x < DISPLAY_WIDTH; x++) {
-                /// The scrolled X used to get the background pixel
-                immutable ubyte bgX = cast(ubyte)(x + bgScrollX);
-
-                /// The scrolled Y used to get the background pixel 
-                immutable ubyte bgY = cast(ubyte)(curScanline + bgScrollY);
-
                 /// The pixel at the current position in the background
-                immutable ubyte bgPixel = background[bgY][bgX];
+                immutable ubyte bgPixel = getBackgroundPixel(x, curScanline);
 
                 // Apply the palette and draw the pixel
                 immutable ubyte palettedBgPixel = applyPalette(backgroundPalette, bgPixel);
@@ -338,7 +344,65 @@ class GPU {
         }
 
         // Draw the sprites for the line
+        drawLineSprites();
         // TODO 
+    }
+
+    /// Draw the sprites on the current line
+    @safe private void drawLineSprites() {
+        // TODO handle priority between sprites
+
+        // Count how many sprites are drawn because a max of 10 are allowed per scanline
+        auto spritesDrawn = 0;
+
+        for(int i = 0; i < NUM_SPRITES && spritesDrawn < 10; i++) {
+            immutable SpriteAttributes attrs = (cast(SpriteAttributes[NUM_SPRITES]) spriteMemory)[i];
+            
+            // The row on the sprite that the current scanline represents
+            auto tileRow = curScanline - attrs.y + (TILE_SIZE * 2);
+
+            // TODO 8x16 sprites
+
+            // Ensure that some part of the sprite is visible on the current scanline
+            if(tileRow >= 0 && tileRow < TILE_SIZE) {
+                // NOTE: the sprite count & priority still includes sprites that are not visible due to their X coordinate
+                spritesDrawn++;
+
+                if(attrs.yflip) {
+                    tileRow = TILE_SIZE - 1 - tileRow;
+                }
+
+                immutable ubyte[TILE_SIZE][TILE_SIZE] tile = tileSet[attrs.tileNum];
+
+                // Draw the entire width of the sprite
+                for(int x = attrs.x - TILE_SIZE; x < attrs.x; x++) {
+                    if(x < 0 || x >= GB_DISPLAY_WIDTH) {
+                        continue;
+                    }
+
+                    auto relativeX = attrs.x - x - 1;
+                    if(!attrs.xflip) {
+                        relativeX = TILE_SIZE - 1 - relativeX;
+                    }
+
+                    immutable ubyte color = tile[tileRow][relativeX];
+                    if(color == 0) {
+                        continue;
+                    }
+
+                    if(attrs.belowBG) {
+                        immutable ubyte bgColor = getBackgroundPixel(x, curScanline);
+
+                        if(bgColor != 0) {
+                            continue;
+                        }
+                    }
+
+                    immutable ubyte paletted = applyPalette(attrs.palette ? spritePaletteB : spritePaletteA, color);
+                    display.setPixelGB(cast(ubyte) x, curScanline, paletted);
+                }
+            }
+        }
     }
 
     /// Apply the specified palette to the specified gameboy color
@@ -451,13 +515,18 @@ class GPU {
 
     /// Write to the LCD status register (STAT)
     @safe @property void statRegister(in ubyte stat) {
-        // TODO Can the user really rewrite everyhing in STAT??
-        // TODO Is the first bit always 0 or always 1? Or can the user actually write it?
-        status.data = stat & 0b01111111;
+        // The first bit is always 1, and the user cannot write the last two bits
+        // TODO According to the official docs, executing a write instruction forthe match flag resets that flag. Is this true?
+        status.data = (status.data & 0b10000011) | (stat & 0b01111000);
     }
 
     /// Read from the LCD status register (STAT)
     @safe @property ubyte statRegister() const {
+        // TODO The mode returns 0 when the display is off. Does the mode actually change to 0??
+        if(control.lcdEnable == 0) {
+            return status.data & 0b11111100;
+        }
+
         return status.data;
     }
 
@@ -473,6 +542,10 @@ class GPU {
             curScanline = 0;
             // TODO check LY=LYC coincidence
             // TODO what does mode get set to? Write a test
+        }
+
+        if(newControl.bgTileset != control.bgTileset) {
+            bgChanged = true;
         }
 
         control.data = lcdc;
