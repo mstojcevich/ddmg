@@ -414,7 +414,6 @@ class GPU {
         if(control.spritesEnabled) {
             drawLineSprites();
         }
-        // TODO 
     }
 
     /// Draw the sprites on the current line
@@ -432,17 +431,22 @@ class GPU {
 
             // TODO 8x16 sprites
 
+            immutable ubyte spriteHeight = control.tallSprites ? TILE_SIZE * 2 : TILE_SIZE;
+
             // Ensure that some part of the sprite is visible on the current scanline
-            if(tileRow >= 0 && tileRow < TILE_SIZE) {
+            if(tileRow >= 0 && tileRow < spriteHeight) {
                 // NOTE: the sprite count & priority still includes sprites that are not visible due to their X coordinate
                 spritesDrawn++;
 
                 if(attrs.yflip) {
-                    tileRow = TILE_SIZE - 1 - tileRow;
+                    tileRow = spriteHeight - 1 - tileRow;
                 }
 
                 // Get the tile the current sprite is pulling from
-                immutable ubyte[TILE_SIZE][TILE_SIZE] tile = tileSet[attrs.tileNum];
+                immutable ubyte tileNum = control.tallSprites ? attrs.tileNum & 0b11111110 : attrs.tileNum;
+                immutable ubyte[TILE_SIZE][TILE_SIZE] tile = 
+                        tileRow < TILE_SIZE ? tileSet[tileNum] 
+                        : tileSet[tileNum | 0b00000001];
 
                 // Draw the entire width of the sprite
                 for(int x = attrs.x - TILE_SIZE; x < attrs.x; x++) {
@@ -457,7 +461,7 @@ class GPU {
                     }
 
                     // Get the unpaletted color to draw
-                    immutable ubyte color = tile[tileRow][relativeX];
+                    immutable ubyte color = tile[tileRow % TILE_SIZE][relativeX];
                     if(color == 0) { // Never draw transparent sprites
                         continue;
                     }
