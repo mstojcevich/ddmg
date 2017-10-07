@@ -397,6 +397,10 @@ class GPU {
 
     /// Draw the current scanline onto the display
     @safe private void drawLine() {
+        if(!control.lcdEnable) {
+            return;
+        }
+
         // Draw the background+window for the line
         if(control.bgEnabled || control.windowEnable) {
             for(ubyte x = 0; x < DISPLAY_WIDTH; x++) {
