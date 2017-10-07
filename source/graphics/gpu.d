@@ -9,7 +9,7 @@ vary in timing.
 
 // TODO how do the interrupts specified in LCDC work? I see some sources mentioning you can only select 1 type of interrupt...
 
-module graphics.gpu_new;
+module graphics.gpu;
 
 import graphics.display;
 import interrupt;

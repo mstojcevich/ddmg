@@ -1,4 +1,4 @@
 module graphics;
 
 public import graphics.display;
-public import graphics.gpu_new;
+public import graphics.gpu;
