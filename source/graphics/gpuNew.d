@@ -23,6 +23,12 @@ private const DISPLAY_WIDTH = 160, DISPLAY_HEIGHT = 144;
 /// The LCD controller operates for a total of 154 lines (vblank goes through a total of 10 lines)
 private const VIRTUAL_HEIGHT = 154;
 
+/// The width of the window in pixels
+private const WINDOW_WIDTH = DISPLAY_WIDTH + 7; // Window X is offset by 7, so you can draw 7 more pixels if you set it to 0
+
+/// The height of the window in pixels
+private const WINDOW_HEIGHT = DISPLAY_HEIGHT;
+
 /// The size of the background in pixels. This is both the width and the height of the background.
 private const BG_SIZE = 256;
 
@@ -92,6 +98,9 @@ class GPU {
     /// y-major representation of the background (unpaletted)
     private ubyte[BG_SIZE][BG_SIZE] background;
 
+    /// y-major representation of the window (unpaletted)
+    private ubyte[BG_SIZE][BG_SIZE] window;
+
     /**
     * Whether something has been changed since the last DATA_TRANSFER mode 
     * that would require the background to be redrawn.
@@ -99,6 +108,15 @@ class GPU {
     * For example, if the tile map or tile data gets changed.
     */
     private bool bgChanged;
+
+    /**
+    * Whether something has been changed since the last DATA_TRANSFER mode 
+    * that would require the window to be redrawn.
+    *
+    * For example, if the tile map or tile data gets changed.
+    */
+    private bool windowChanged;
+    
 
     private ubyte bgScrollY; /// SCY register: The y coordinate of the background at the top left of the display
     private ubyte bgScrollX; /// SCX register: The x coordinate of the background at the top left of the display
@@ -146,6 +164,9 @@ class GPU {
     /// The amount of cycles we have spent in our current state. Used internally to time out the states properly.
     private uint stateCycles;
 
+    /// Internal STAT interrupt signal. STAT iupt is triggered when this goes from false to true
+    private bool iuptSignal;
+
     /// The display to render onto
     private Display display;
 
@@ -174,6 +195,7 @@ class GPU {
                     // Move on to the next mode
                     stateCycles -= CYCLES_PER_OAM_SEARCH;
                     status.gpuMode = GPUMode.DATA_TRANSFER;
+                    updateIuptSignal();
                 }
                 break;
 
@@ -184,10 +206,15 @@ class GPU {
                         redrawBackground();
                         bgChanged = false;
                     }
+                    if(windowChanged) {
+                        redrawWindow();
+                        windowChanged = false;
+                    }
 
                     // Move on to the next mode
                     stateCycles -= CYCLES_PER_DATA_TRANSFER;
                     status.gpuMode = GPUMode.HORIZ_BLANK;
+                    updateIuptSignal();
                 }
                 break;
 
@@ -200,10 +227,7 @@ class GPU {
 
                     // We're done with a line, move on to the next one
                     curScanline++;
-                    // TODO check LY=LYC coincidence
-
-                    // Move on to the next mode
-                    status.gpuMode = GPUMode.OAM_SEARCH;
+                    updateCoincidence();
 
                     // If we just finished the HBLANK for the last scanline,
                     // then we enter VBLANK. Otherwise we move on to the
@@ -218,7 +242,12 @@ class GPU {
 
                         // Present the frame
                         display.drawFrame();
+                    } else {
+                        // Move on to the next mode
+                        status.gpuMode = GPUMode.OAM_SEARCH;
                     }
+
+                    updateIuptSignal();
                 }
                 break;
 
@@ -227,13 +256,15 @@ class GPU {
                 if(stateCycles >= CYCLES_PER_LINE) {
                     stateCycles -= CYCLES_PER_LINE;
                     curScanline++;
-                    // TODO LY=LYC coincidence
+                    updateCoincidence();
                     // TODO does the coincidence interrupt happen for the virtual lines?
 
                     if(curScanline >= VIRTUAL_HEIGHT) {
                         // Begin again at the first line
                         curScanline = 0;
+                        updateCoincidence();
                         status.gpuMode = GPUMode.OAM_SEARCH;
+                        updateIuptSignal();
 
                         // TODO what exactly gets reset on a vblank?
                     }
@@ -273,7 +304,7 @@ class GPU {
         // Update each X position in the row
         for(ubyte x = 0; x < TILE_SIZE; x++) {
             // Invert X since the bits are read backwards
-            immutable invX = 7 - x;
+            immutable invX = TILE_SIZE - 1 - x;
 
             immutable bit1 = (tileData[upperBits ? (addr - 1) : addr] & (0b1 << invX)) > 0 ? 1 : 0;
             immutable bit2 = (tileData[upperBits ? addr : (addr + 1)] & (0b1 << invX)) > 0 ? 2 : 0;
@@ -282,7 +313,7 @@ class GPU {
         }
     }
 
-    /// Redraws the background held in the background array
+    /// Redraws the pixels held in the background array
     @safe private void redrawBackground() {
         // Go through all of the tiles in the tile map
         for(int tY = 0; tY < BG_SIZE_TILES; tY++) {
@@ -310,6 +341,34 @@ class GPU {
         }
     }
 
+    /// Redraws the pixels held in the cached window array
+    @safe private void redrawWindow() {
+        // Go through all of the tiles in the tile map
+        for(int tY = 0; tY < (WINDOW_HEIGHT / TILE_SIZE); tY++) {
+            for(int tX = 0; tX < (WINDOW_WIDTH / TILE_SIZE); tX++) {
+                immutable TileMap map = control.windowMapSelect ? tileMapB : tileMapA;
+                
+                // The offset of the tile in the tileset
+                immutable ubyte offset = map.tileLocations[tY][tX];
+
+                // Look up the tile in the tile set to use
+                immutable ushort tileIndex = getTilesetIndex(offset, control.bgTileset);
+                
+                immutable ubyte[TILE_SIZE][TILE_SIZE] tile = tileSet[tileIndex];
+
+                immutable pixelX = tX * TILE_SIZE;
+                immutable pixelY = tY * TILE_SIZE;
+
+                // Fill in the tile on the cached background
+                for(int rY = 0; rY < TILE_SIZE; rY++) {
+                    for(int rX = 0; rX < TILE_SIZE; rX++) {
+                        window[pixelY + rY][pixelX + rX] = tile[rY][rX];
+                    }
+                }
+            }
+        }
+    }
+
     /// Get the corrected index in the tilset for the specific indexing type
     @safe private ushort getTilesetIndex(ubyte value, TilesetIndexing indexingType) {
         return indexingType == TilesetIndexing.SIGNED ? (cast(byte)(value) + 256) : value;
@@ -317,6 +376,15 @@ class GPU {
 
     /// Get the (unpaletted) background pixel at the specific coordinates on the screen
     @safe private ubyte getBackgroundPixel(int screenX, int screenY) {
+        if(control.windowEnable) {
+            immutable winX = screenX - (windowX - 7);
+            immutable winY = screenY - windowY;
+
+            if(winX >= 0 && winY >= 0) {
+                return window[winY][winX];
+            }
+        }
+
         /// The scrolled X used to get the background pixel
         immutable ubyte bgX = cast(ubyte)(screenX + bgScrollX);
 
@@ -330,8 +398,7 @@ class GPU {
     /// Draw the current scanline onto the display
     @safe private void drawLine() {
         // Draw the background+window for the line
-        // TODO window
-        if(control.bgEnabled) {
+        if(control.bgEnabled || control.windowEnable) {
             for(ubyte x = 0; x < DISPLAY_WIDTH; x++) {
                 /// The pixel at the current position in the background
                 immutable ubyte bgPixel = getBackgroundPixel(x, curScanline);
@@ -344,7 +411,9 @@ class GPU {
         }
 
         // Draw the sprites for the line
-        drawLineSprites();
+        if(control.spritesEnabled) {
+            drawLineSprites();
+        }
         // TODO 
     }
 
@@ -450,19 +519,36 @@ class GPU {
     }
     body {
         if(addr >= BG_MAP_A_BEGIN && addr <= BG_MAP_A_END) {
-            bgChanged = true;
+            if(!control.bgMapSelect) {
+                bgChanged = true;
+            }
+
+            if(!control.windowMapSelect) {
+                windowChanged = true;
+            }
+
             tileMapA.data[addr - BG_MAP_A_BEGIN] = val;
             return;
         }
 
         if(addr >= BG_MAP_B_BEGIN && addr <= BG_MAP_B_END) {
-            bgChanged = true;
+            if(control.bgMapSelect) {
+                bgChanged = true;
+            }
+
+            if(control.windowMapSelect) {
+                windowChanged = true;
+            }
+
             tileMapB.data[addr - BG_MAP_B_BEGIN] = val;
             return;
         }
 
         if(addr >= TILE_DATA_BEGIN && addr <= TILE_DATA_END) {
+            // TODO only update if the changed data is indexable using the current selected BG/window data indexing type (signed/unsigned)
             bgChanged = true;
+            windowChanged = true;
+
             tileData[addr - TILE_DATA_BEGIN] = val;
             updateTileData(addr - TILE_DATA_BEGIN);
             return;
@@ -544,12 +630,25 @@ class GPU {
             // When the display is turned off, LY immediately becomes 0
             
             curScanline = 0;
-            // TODO check LY=LYC coincidence
+            updateCoincidence();
             // TODO what does mode get set to? Write a test
         }
 
+        if(newControl.lcdEnable && !control.lcdEnable) {
+            status.gpuMode = GPUMode.OAM_SEARCH;
+            curScanline = 0;
+            updateCoincidence();
+            stateCycles = 4;
+            updateIuptSignal();
+        }
+
         if(newControl.bgTileset != control.bgTileset) {
-            bgChanged = true;
+            if(newControl.bgMapSelect != control.bgMapSelect) {
+                bgChanged = true;
+            }
+            if(newControl.windowMapSelect != control.windowMapSelect) {
+                windowChanged = true;
+            }
         }
 
         control.data = lcdc;
@@ -646,8 +745,29 @@ class GPU {
     /// Write to the scanline compare register
     @safe @property void lycRegister(ubyte lyc) {
         scanlineCompare = lyc;
+        updateCoincidence();
 
         // TODO check conincidence. Also can the coincidence interrupt happen here?
+    }
+
+    /// Updates the internal STAT interrupt signal. Should be called on mode change.
+    @safe private void updateIuptSignal() {
+        immutable bool newIuptSignal = 
+            (status.coincidenceInterrupt && status.coincidenceFlag) ||
+            (status.hblankInterrupt && status.gpuMode == GPUMode.HORIZ_BLANK) ||
+            (status.oamInterrupt && (status.gpuMode == GPUMode.OAM_SEARCH || status.gpuMode == GPUMode.VERT_BLANK)) ||
+            (status.vblankInterrupt && (status.gpuMode == GPUMode.VERT_BLANK));
+        
+        if(!iuptSignal && newIuptSignal) {
+            iuptHandler.fireInterrupt(Interrupts.LCD_STATUS);
+        }
+
+        iuptSignal = newIuptSignal;
+    }
+
+    /// Update the coincidence flag. Should be called every scanline change.
+    @safe private void updateCoincidence() {
+        status.coincidenceFlag = curScanline == scanlineCompare;
     }
     
 }
