@@ -168,3 +168,12 @@ enum CartridgeType : ubyte {
     HUC3                            = 0xFE,
     HUC1_RAM_BATTERY                = 0xFF
 }
+
+@safe bool hasBattery(CartridgeType type) {
+    with(CartridgeType) {
+        return type == MBC1_RAM_BATTERY || type == MBC2_BATTERY || type == ROM_RAM_BATTERY
+                || type == MMM01_RAM_BATTERY || type == MBC3_TIMER_BATTERY || type == MBC3_TIMER_RAM_BATTERY
+                || type == MBC3_RAM_BATTERY || type == MBC5_RAM_BATTERY || type == MBC5_RUMBLE_RAM_BATTERY
+                || type == MBC7_SENSOR_RUMBLE_RAM_BATTERY || type == HUC1_RAM_BATTERY;
+    }
+}

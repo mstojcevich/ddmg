@@ -2,6 +2,7 @@ module cartridge.mbc.generic;
 
 import cartridge.header;
 import std.file;
+import std.format;
 
 /// The last address in (fixed) ROM bank 0
 const size_t BANK_0_END = 0x3FFF;
@@ -15,11 +16,16 @@ abstract class MBC {
     /// The external RAM of the cartridge
     protected ubyte[] extRAM;
 
+    /// Header of the cartridge
+    private CartridgeHeader header;
+
     /**
      * Creates an MBC for a ROM at the given path
      * with the given header
      */
     @safe this(string filePath, CartridgeHeader header) {
+        this.header = header;
+
         if(filePath == null) {
             romData = new ubyte[BANK_0_END + 1];
         } else {
@@ -27,6 +33,7 @@ abstract class MBC {
         }
 
         extRAM = new ubyte[sizeBytes(header.ramSize)];
+        loadExtRAM();
     }
 
     /// Read the data at addr in bank 0
@@ -46,5 +53,30 @@ abstract class MBC {
 
     /// Write a value to external RAM
     @safe void writeExtRAM(size_t addr, ubyte val);
+
+    @safe protected void loadExtRAM() {
+        if(!hasBattery(header.cartridgeType)) {
+            return;
+        }
+
+        try {
+            char[11 + ".sav".length] filename;
+            sformat(filename, "%s.sav", (cast(const char[11]) header.newTitle));
+            const ubyte[] readRAM = cast(const(ubyte[])) read(filename);
+            for(int i = 0; i < readRAM.length; i++) {
+                extRAM[i] = readRAM[i];
+            }
+        } catch(FileException ex) {}
+    }
+
+    @safe protected void saveExtRAM() {
+        if(!hasBattery(header.cartridgeType)) {
+            return;
+        }
+
+        char[11 + ".sav".length] filename;
+        sformat(filename, "%s.sav", (cast(const char[11]) header.newTitle));
+        write(filename, extRAM);
+    }
 
 }

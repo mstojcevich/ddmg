@@ -99,6 +99,9 @@ class MBC3 : MBC {
                 if((val & 0b1111) == 0x0A) {
                     ramEnabled = true;
                 } else {
+                    if(ramEnabled) {
+                        saveExtRAM();
+                    }
                     ramEnabled = false;
                 }
                 
