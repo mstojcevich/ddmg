@@ -24,7 +24,7 @@ class Gameboy {
         this.iuptHandler = new InterruptHandler();
         this.keypad = new Keypad(frontend.getKeypad(), this.iuptHandler);
         this.clock = new Clock(this.iuptHandler);
-        this.gpu = new GPU(this.display, this.iuptHandler);
+        this.gpu = new GPU(frontend, this.iuptHandler);
         this.mmu = new MMU(this.cartridge, this.gpu, this.keypad, this.iuptHandler, this.clock);
         this.bus = new Bus(this.clock, this.gpu, this.mmu);
         this.cpu = new CPU(this.mmu, this.bus, this.iuptHandler);
@@ -32,7 +32,6 @@ class Gameboy {
 
     @safe public void run() {
         while(true) {
-            keypad.update();
             cpu.step();
 
             if(frontend.shouldProgramTerminate()) {

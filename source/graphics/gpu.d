@@ -11,6 +11,7 @@ vary in timing.
 
 module graphics.gpu;
 
+import frontend;
 import graphics.display;
 import interrupt;
 
@@ -173,12 +174,16 @@ class GPU {
     /// The interrupt handler to fire interrupts with
     private InterruptHandler iuptHandler;
 
+    /// The frontend to update each frame
+    private Frontend frontend;
+
     /**
      * Create a GPU that renders onto the specified display
      * and fires interrupts using the specified interrupt handler
      */
-    @safe this(Display display, InterruptHandler ih) {
-        this.display = display;
+    @safe this(Frontend frontend, InterruptHandler ih) {
+        this.frontend = frontend;
+        this.display = frontend.getDisplay;
         this.iuptHandler = ih;
 
         // Set the initial values. TODO bootrom support
@@ -242,6 +247,8 @@ class GPU {
 
                         // Present the frame
                         display.drawFrame();
+
+                        frontend.update();
                     } else {
                         // Move on to the next mode
                         status.gpuMode = GPUMode.OAM_SEARCH;

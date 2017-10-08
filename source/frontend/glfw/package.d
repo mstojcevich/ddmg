@@ -29,4 +29,6 @@ class GLFWFrontend : Frontend {
         return display.shouldProgramTerminate();
     }
 
+    @safe override void update() {}
+
 }

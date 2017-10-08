@@ -13,4 +13,6 @@ interface Frontend {
 
     @safe bool shouldProgramTerminate();
 
+    @safe void update();
+
 }

@@ -3,7 +3,7 @@ import gameboy;
 import std.parallelism;
 import std.getopt;
 import frontend;
-import frontend.glfw;
+import frontend.sdl;
 
 string romName = "../opus5.gb";
 
@@ -12,7 +12,7 @@ string romName = "../opus5.gb";
 
     readRomName(args);
 
-    Frontend frontend = new GLFWFrontend();
+    Frontend frontend = new SDLFrontend();
     frontend.init();
 
     Gameboy g = new Gameboy(frontend, romName);
