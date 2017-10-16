@@ -50,7 +50,7 @@ class SDLDisplay : Display {
 
     @trusted private void initSDL() {
         window = SDL_CreateWindow("DDMG", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                DISPLAY_WIDTH, DISPLAY_HEIGHT, 0);
+                DISPLAY_WIDTH, DISPLAY_HEIGHT, SDL_RENDERER_PRESENTVSYNC);
         renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
         renderTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, 
                 SDL_TEXTUREACCESS_STREAMING, GB_DISPLAY_WIDTH, GB_DISPLAY_HEIGHT);

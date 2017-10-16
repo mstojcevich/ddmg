@@ -1,7 +1,13 @@
 module sound.apu;
 
-import std.bitmanip;
+import sound.frontend;
 import sound.sound1;
+import std.bitmanip;
+import std.stdio;
+
+// Memory mappings, inclusive
+private const SOUND1_REGISTERS_BEGIN = 0x00;
+private const SOUND1_REGISTERS_END   = 0x04;
 
 /// Representation of the NR50 register
 private union VolumeControlRegister {
@@ -51,12 +57,61 @@ class APU {
 
     private Sound1 sound1;
 
-    this() {
+    /// The amount of cpu cycles since the last APU tick
+    private int tickAccum;
+
+    private SoundFrontend frontend;
+
+    @safe this(SoundFrontend frontend) {
+        this.frontend = frontend;
+
         sound1 = new Sound1();
     }
-    
-    ~this() {
-        
+
+    // Run every CPU cycle
+    @safe void tick() {
+        ubyte s1out = sound1.tick();
+        frontend.playAudio(s1out, s1out);
+    }
+
+    /**
+     * Sets the value of an APU register
+     *
+     * @param number Number of the register to set. Relative to 0xFF10. Between 0x00 and 0x16.
+     */
+    @safe void setApuRegister(ushort number, ubyte value)
+    in {
+        assert(number <= 0x16);
+    }
+    body {
+        if(number >= SOUND1_REGISTERS_BEGIN && number <= SOUND1_REGISTERS_END) {
+            sound1.setRegister(number, value);
+            return;
+        }
+
+        debug {
+            writefln("Game tried to write unimplemented APU register %02X", number);
+        }
+    }
+
+    /**
+     * Gets the value of an APU register
+     *
+     * @param number Number of the register to set. Relative to 0xFF10. Between 0x00 and 0x16.
+     */
+    @safe ubyte getApuRegister(ushort number)
+    in {
+        assert(number <= 0x16);
+    }
+    body {
+        // if(number >= SOUND1_REGISTERS_BEGIN && number <= SOUND1_REGISTERS_END) {
+        //     return sound1.getRegister(number);
+        // }
+
+        debug {
+            writefln("Game tried to read unimplemented APU register %02X", number);
+        }
+        return 0xFF;
     }
 
 }

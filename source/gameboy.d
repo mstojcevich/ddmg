@@ -1,4 +1,5 @@
 import frontend;
+import sound.apu;
 import mmu, cpu, clock, cartridge, graphics, keypad, interrupt, bus;
 import std.stdio;
 
@@ -8,6 +9,7 @@ class Gameboy {
     private MMU mmu;
     private CPU cpu;
     private GPU gpu;
+    private APU apu;
     private Cartridge cartridge;
     private Display display;
     private Keypad keypad;
@@ -25,8 +27,9 @@ class Gameboy {
         this.keypad = new Keypad(frontend.getKeypad(), this.iuptHandler);
         this.clock = new Clock(this.iuptHandler);
         this.gpu = new GPU(frontend, this.iuptHandler);
-        this.mmu = new MMU(this.cartridge, this.gpu, this.keypad, this.iuptHandler, this.clock);
-        this.bus = new Bus(this.clock, this.gpu, this.mmu);
+        this.apu = new APU(frontend.getSound());
+        this.mmu = new MMU(this.cartridge, this.gpu, this.keypad, this.iuptHandler, this.clock, this.apu);
+        this.bus = new Bus(this.clock, this.gpu, this.mmu, this.apu);
         this.cpu = new CPU(this.mmu, this.bus, this.iuptHandler);
     }
 

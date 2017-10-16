@@ -1,3 +1,4 @@
+import sound.apu;
 import std.conv;
 import std.stdio;
 
@@ -40,6 +41,9 @@ private const TIMER_COUNTER             = 0xFF05;
 private const TIMER_MODULO              = 0xFF06;
 private const TIMER_CONTROL             = 0xFF07;
 
+private const APU_REGISTERS_BEGIN        = 0xFF10;
+private const APU_REGISTERS_END          = 0xFF26;
+
 private enum OamTransferState {
     NO_TRANSFER,
     SETUP,
@@ -70,18 +74,20 @@ class MMU {
     private Keypad keypad;
     private InterruptHandler iuptHandler;
     private Clock clock;
+    private APU apu;
 
     private OamTransferState oamTransferState;
     private uint oamCycleAccum; // Leftover cycles since the last transfered bytes
     private ushort oamTransferToAddr; // The current address to transfer to
     private ushort oamTransferFromAddr; // The current address to transfer from
 
-    @safe this(Cartridge c, GPU g, Keypad k, InterruptHandler ih, Clock clk) {
+    @safe this(Cartridge c, GPU g, Keypad k, InterruptHandler ih, Clock clk, APU apu) {
         this.cartridge = c;
         this.gpu = g;
         this.keypad = k;
         this.iuptHandler = ih;
         this.clock = clk;
+        this.apu = apu;
     }
 
     /// Simulate n cycles of the MMU running. Currently used for simulating OAM transfer
@@ -324,6 +330,9 @@ class MMU {
             clock.timerModulo = val;
         } else if(address == TIMER_CONTROL) {
             clock.timerControl = val;
+
+        } else if(address >= APU_REGISTERS_BEGIN && address <= APU_REGISTERS_END) {
+            apu.setApuRegister(cast(ushort)(address - APU_REGISTERS_BEGIN), val);
 
         } else if(address < 0xFEA0 || address > 0xFEFF) { // Unimplemented but don't want to crash for unmapped
             debug {
