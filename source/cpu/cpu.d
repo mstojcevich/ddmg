@@ -40,7 +40,7 @@ class CPU {
     private MMU mmu;
     private Bus bus;
     private InterruptHandler iuptHandler;
-	private CB cbBlock;
+    private CB cbBlock;
 
     // Whether the CPU is halted (not executing until interrupt)
     private HaltMode haltMode;
@@ -49,7 +49,7 @@ class CPU {
         this.mmu = mmu;
         this.bus = bus;
         this.iuptHandler = ih;
-		this.cbBlock = new CB(regs, mmu, bus);
+        this.cbBlock = new CB(regs, mmu, bus);
 
         // 0 in the cycle count will mean it's calculated conditionally later
         this.instructions = [
@@ -1113,12 +1113,12 @@ class CPU {
         }
     }
 
-	@safe private void cb() {
-		immutable ubyte subop = readByte(regs.pc);
+    @safe private void cb() {
+        immutable ubyte subop = readByte(regs.pc);
         regs.pc += 1;
 
-		cbBlock.handle(subop);
-	}
+        cbBlock.handle(subop);
+    }
 
     /**
      * Decimal adjusts A after operations involving multiple decimal encoded binary operations

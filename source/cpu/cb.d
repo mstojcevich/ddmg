@@ -13,14 +13,14 @@ import bus;
 alias Operation = void delegate(ref reg8 reg) @safe;
 
 private struct Destination {
-	// The name of the destination for use in debugging
-	string name;
+    // The name of the destination for use in debugging
+    string name;
 
-	// The amount of cycles it takes to apply a CB operation w/ the destination
-	uint cycles;
+    // The amount of cycles it takes to apply a CB operation w/ the destination
+    uint cycles;
 
-	// How to apply an operation to the destination
-	@safe void delegate(Operation op, ubyte opcode) apply;
+    // How to apply an operation to the destination
+    @safe void delegate(Operation op, ubyte opcode) apply;
 }
 
 class CB {
@@ -29,71 +29,71 @@ class CB {
     private Instruction[256] instructions;
 
     private Registers regs;
-	private MMU mmu;
+    private MMU mmu;
     private Bus bus;
 
-	// Lookup tables for op and destination
-	// Probably a perf penalty but at least I don't have to write a 256 item long table again
+    // Lookup tables for op and destination
+    // Probably a perf penalty but at least I don't have to write a 256 item long table again
     // This is possible because each operation occurs exactly 8 times so we can do actual instruction decoding
-	private @safe Operation[32] ops;
-	private @safe Destination[8] destinations;
+    private @safe Operation[32] ops;
+    private @safe Destination[8] destinations;
 
     @safe this(ref Registers registers, ref MMU mmu, ref Bus bus) {
         this.bus = bus;
         this.regs = registers;
-		this.mmu = mmu;
+        this.mmu = mmu;
 
-		this.destinations = [
-			Destination("B", 4, (Operation op, ubyte opcode) @safe => op(regs.b)),
-			Destination("C", 4, (Operation op, ubyte opcode) @safe => op(regs.c)),
-			Destination("D", 4, (Operation op, ubyte opcode) @safe => op(regs.d)),
-			Destination("E", 4, (Operation op, ubyte opcode) @safe => op(regs.e)),
-			Destination("H", 4, (Operation op, ubyte opcode) @safe => op(regs.h)),
-			Destination("L", 4, (Operation op, ubyte opcode) @safe => op(regs.l)),
-			Destination("(HL)", 4 /*remaining 8 spent in op itself*/, (Operation op, ubyte opcode) @safe {
+        this.destinations = [
+            Destination("B", 4, (Operation op, ubyte opcode) @safe => op(regs.b)),
+            Destination("C", 4, (Operation op, ubyte opcode) @safe => op(regs.c)),
+            Destination("D", 4, (Operation op, ubyte opcode) @safe => op(regs.d)),
+            Destination("E", 4, (Operation op, ubyte opcode) @safe => op(regs.e)),
+            Destination("H", 4, (Operation op, ubyte opcode) @safe => op(regs.h)),
+            Destination("L", 4, (Operation op, ubyte opcode) @safe => op(regs.l)),
+            Destination("(HL)", 4 /*remaining 8 spent in op itself*/, (Operation op, ubyte opcode) @safe {
                 ubyte hlVal = this.mmu.readByte(this.regs.hl);
                 this.bus.update(4);
-				op(hlVal);
+                op(hlVal);
 
                 // HACK: BIT operation doesn't need to write
                 if(opcode >= 8 && opcode <= 15) {
                     return;
                 }
 
-				this.mmu.writeByte(this.regs.hl, hlVal);
+                this.mmu.writeByte(this.regs.hl, hlVal);
                 this.bus.update(4);
-			}),
-			Destination("A", 4, (Operation op, ubyte opcode) @safe => op(regs.a))
-		];
+            }),
+            Destination("A", 4, (Operation op, ubyte opcode) @safe => op(regs.a))
+        ];
 
-		this.ops = [
-			&rlc, &rrc, &rl, &rr, 
-			&sla, &sra, &swap, &srl,
-			(ref reg8 reg) => bit(0, reg),
-			(ref reg8 reg) => bit(1, reg),
-			(ref reg8 reg) => bit(2, reg),
-			(ref reg8 reg) => bit(3, reg),
-			(ref reg8 reg) => bit(4, reg),
-			(ref reg8 reg) => bit(5, reg),
-			(ref reg8 reg) => bit(6, reg),
-			(ref reg8 reg) => bit(7, reg),
-			(ref reg8 reg) => res(0, reg),
-			(ref reg8 reg) => res(1, reg),
-			(ref reg8 reg) => res(2, reg),
-			(ref reg8 reg) => res(3, reg),
-			(ref reg8 reg) => res(4, reg),
-			(ref reg8 reg) => res(5, reg),
-			(ref reg8 reg) => res(6, reg),
-			(ref reg8 reg) => res(7, reg),
-			(ref reg8 reg) => set(0, reg),
-			(ref reg8 reg) => set(1, reg),
-			(ref reg8 reg) => set(2, reg),
-			(ref reg8 reg) => set(3, reg),
-			(ref reg8 reg) => set(4, reg),
-			(ref reg8 reg) => set(5, reg),
-			(ref reg8 reg) => set(6, reg),
-			(ref reg8 reg) => set(7, reg),
-		];
+        this.ops = [
+            &rlc, &rrc, &rl, &rr, 
+            &sla, &sra, &swap, &srl,
+            (ref reg8 reg) => bit(0, reg),
+            (ref reg8 reg) => bit(1, reg),
+            (ref reg8 reg) => bit(2, reg),
+            (ref reg8 reg) => bit(3, reg),
+            (ref reg8 reg) => bit(4, reg),
+            (ref reg8 reg) => bit(5, reg),
+            (ref reg8 reg) => bit(6, reg),
+            (ref reg8 reg) => bit(7, reg),
+            (ref reg8 reg) => res(0, reg),
+            (ref reg8 reg) => res(1, reg),
+            (ref reg8 reg) => res(2, reg),
+            (ref reg8 reg) => res(3, reg),
+            (ref reg8 reg) => res(4, reg),
+            (ref reg8 reg) => res(5, reg),
+            (ref reg8 reg) => res(6, reg),
+            (ref reg8 reg) => res(7, reg),
+            (ref reg8 reg) => set(0, reg),
+            (ref reg8 reg) => set(1, reg),
+            (ref reg8 reg) => set(2, reg),
+            (ref reg8 reg) => set(3, reg),
+            (ref reg8 reg) => set(4, reg),
+            (ref reg8 reg) => set(5, reg),
+            (ref reg8 reg) => set(6, reg),
+            (ref reg8 reg) => set(7, reg),
+        ];
     }
 
     /**
@@ -101,11 +101,11 @@ class CB {
      * @return How many cycles were elapsed
      */
     @safe public int handle(in ubyte instruction) {
-		immutable ubyte destination = instruction & 0b111;
-		immutable ubyte op = instruction >> 3;
+        immutable ubyte destination = instruction & 0b111;
+        immutable ubyte op = instruction >> 3;
 
-		immutable Destination dest = destinations[destination];
-		dest.apply(ops[op], op);
+        immutable Destination dest = destinations[destination];
+        dest.apply(ops[op], op);
 
         return dest.cycles;
     }
