@@ -6,6 +6,7 @@ __dummy.html
 *.obj
 *.dll
 *.lib
+*.a
 
 /tags
 
@@ -14,3 +15,7 @@ __dummy.html
 
 *.gb
 *.sav
+
+.trial
+/trial-root
+/trial_root.d

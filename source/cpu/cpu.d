@@ -392,28 +392,30 @@ class CPU {
         // to its own interrupthandler method
         
         // Handle any interrupts that were triggered
-        foreach(iupt; EnumMembers!Interrupts) {
-            if(iuptHandler.shouldHandle(iupt)) {
-                if(haltMode != HaltMode.NO_INTERRUPT_JUMP) {
-                    call(iupt.address);
-                    iuptHandler.markHandled(iupt);
-                    iuptHandler.masterToggle = false;
+        if(iuptHandler !is null) {
+            foreach(iupt; EnumMembers!Interrupts) {
+                if(iuptHandler.shouldHandle(iupt)) {
+                    if(haltMode != HaltMode.NO_INTERRUPT_JUMP) {
+                        call(iupt.address);
+                        iuptHandler.markHandled(iupt);
+                        iuptHandler.masterToggle = false;
 
-                    // It takes 20 clocks to dispatch an interrupt. 8 if you account for the CALL 
-                    bus.update(8);
+                        // It takes 20 clocks to dispatch an interrupt. 8 if you account for the CALL 
+                        bus.update(8);
 
-                    if(haltMode == HaltMode.NORMAL) {
-                        // If the CPU is in HALT mode, another 4 clocks are needed
-                        bus.update(4);
+                        if(haltMode == HaltMode.NORMAL) {
+                            // If the CPU is in HALT mode, another 4 clocks are needed
+                            bus.update(4);
+                            haltMode = HaltMode.NO_HALT;
+                        }
+                    } else {
+                        // No interrupt jump halt mode continues execution but doesn't handle the interrupt
                         haltMode = HaltMode.NO_HALT;
+                        iuptHandler.masterToggle = false;
                     }
-                } else {
-                    // No interrupt jump halt mode continues execution but doesn't handle the interrupt
-                    haltMode = HaltMode.NO_HALT;
-                    iuptHandler.masterToggle = false;
-                }
 
-                break;
+                    break;
+                }
             }
         }
     }
@@ -1219,6 +1221,20 @@ class CPU {
         bus.update(4);
         mmu.writeByte(addr, toWrite & 0xFF);
         bus.update(4);
+    }
+
+    version(trial) @safe @property public Registers* registers() {
+        return &regs;
+    }
+
+    version(trial) @safe public void reset() {
+        // Test builds only for now because it doesn't properly reset everything it should
+        regs.sp = 0xFFFE;
+        regs.af = 0x01B0;
+        regs.bc = 0x0013;
+        regs.de = 0x00D8;
+        regs.hl = 0x014D;
+        regs.pc = 0x0100;
     }
 
     // TODO use function templates for the functions that are the same between reg8 and reg16
