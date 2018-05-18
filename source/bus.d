@@ -16,6 +16,8 @@ class Bus {
         this.apu = apu;
     }
 
+    version(test) @safe this() {}
+
     /// Simulate n cycles of the components on the bus
     @safe void update(uint cyclesExpended) {
         clk.spendCycles(cyclesExpended);

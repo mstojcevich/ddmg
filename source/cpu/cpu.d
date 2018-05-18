@@ -1223,11 +1223,11 @@ class CPU {
         bus.update(4);
     }
 
-    version(trial) @safe @property public Registers* registers() {
+    version(test) @safe @property public Registers* registers() {
         return &regs;
     }
 
-    version(trial) @safe public void reset() {
+    version(test) @safe public void reset() {
         // Test builds only for now because it doesn't properly reset everything it should
         regs.sp = 0xFFFE;
         regs.af = 0x01B0;

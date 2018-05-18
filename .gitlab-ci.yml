@@ -1,0 +1,21 @@
+image: dlang2/ldc-ubuntu
+
+build-release:
+       stage: build
+       script: ci/build-release.sh
+       artifacts:
+               paths:
+               - ddmg
+
+build-trial:
+        stage: build
+        script: apt-get update -qq && apt-get install -y -qq git && ci/build-trial.sh
+        cache:
+                paths:
+                - trial/
+        artifacts:
+                paths:
+                - trial/trial
+
+unittests:
+        script: ci/unittests.sh

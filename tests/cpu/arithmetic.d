@@ -3,29 +3,31 @@ module tests.cpu.arithmetic;
 import cpu;
 import mmu;
 import bus;
-import fluent.asserts;
-import trial.discovery.testclass;
-import dmocks.mocks;
+import dunit;
 import interrupt;
+
+import unit_threaded.mock;
+import unit_threaded.should;
 
 private const PGM_START = 0xC000;
 
 class ArithmeticTests {
+    mixin UnitTest;
+
     // TODO we should probably mock the MMU
 
     private MMU m;
     private CPU c;
-    private Mocker mocker = new Mocker();
 
     this() {
         m = new MMU(null, null, null, null, null, null);
         
-        Bus mockBus = mocker.mock!(Bus)(null, null, m, null);
+        Bus mockBus = mock!Bus;
 
         c = new CPU(m, mockBus, null);
     }
 
-    @Test()
+    @Test
     void addUnsetsSubtraction() {
         c.reset();
         c.registers.pc = 0xC000;
@@ -34,11 +36,11 @@ class ArithmeticTests {
         m.writeByte(PGM_START, 0x80); // ADD A,B
         c.step();
 
-        (c.registers.f & Flag.SUBTRACTION).should.equal(0).because(
-            "ADD should unset the subtraction flag");
+        // ADD should unset the subtraction flag
+        (c.registers.f & Flag.SUBTRACTION).shouldEqual(0);
     }
 
-    @Test()
+    @Test
     void addingWithOverflow() {
         c.reset();
         c.registers.pc = 0xC000;
@@ -48,19 +50,23 @@ class ArithmeticTests {
         m.writeByte(PGM_START, 0x80); // ADD A,B
         c.step();
 
-        (c.registers.a).should.equal(0x01).because(
-            "(0xFE + 0x03) & 0xFF = 0x01");
-        (c.registers.f & Flag.OVERFLOW).should.not.equal(0).because(
-            "ADD should set the overflow flag when the result > 0xFF");
-        (c.registers.f & Flag.HALF_OVERFLOW).should.not.equal(0).because(
-            "ADD should set the half-overflow flag when (A & 0xF + B & 0xF) > 0xF");
-        (c.registers.f & Flag.ZERO).should.equal(0).because(
-            "ADD shouldn't set the zero flag when the result isn't 0");
-        (c.registers.f & Flag.SUBTRACTION).should.equal(0).because(
-            "ADD should unset the subtraction flag");
+        // (0xFE + 0x03) & 0xFF = 0x01
+        (c.registers.a).shouldEqual(0x01);
+
+        // ADD should set the overflow flag when the result > 0xFF
+        (c.registers.f & Flag.OVERFLOW).shouldNotEqual(0);
+
+        // ADD should set the half-overflow flag when (A & 0xF + B & 0xF) > 0xF
+        (c.registers.f & Flag.HALF_OVERFLOW).shouldNotEqual(0);
+
+        // ADD shouldn't set the zero flag when the result isn't 0
+        (c.registers.f & Flag.ZERO).shouldEqual(0);
+
+        // ADD should unset the subtraction flag
+        (c.registers.f & Flag.SUBTRACTION).shouldEqual(0);
     }
 
-    @Test()
+    @Test
     void addingWithOverflowNoHalf() {
         // Add results in overflow but NOT half-overflow
 
@@ -71,13 +77,14 @@ class ArithmeticTests {
         m.writeByte(PGM_START, 0x80); // ADD A,B
         c.step();
 
-        (c.registers.f & Flag.OVERFLOW).should.not.equal(0).because(
-            "ADD should set the overflow flag when the result > 0xFF");
-        (c.registers.f & Flag.HALF_OVERFLOW).should.not.equal(0).because(
-            "ADD should set the half-overflow flag when (A & 0xF + B & 0xF) > 0xF");
+        // ADD should set the overflow flag when the result > 0xFF
+        (c.registers.f & Flag.OVERFLOW).shouldNotEqual(0);
+
+        // ADD should set the half-overflow flag when (A & 0xF + B & 0xF) > 0xF
+        (c.registers.f & Flag.HALF_OVERFLOW).shouldNotEqual(0);
     }
 
-    @Test()
+    @Test
     void addingWithOverflowBarely() {
         // Add exactly enough to overflow
 
@@ -89,14 +96,19 @@ class ArithmeticTests {
         m.writeByte(PGM_START, 0x80); // ADD A,B
         c.step();
 
-        (c.registers.a).should.equal(0x00).because(
-            "(0xFE + 0x02) & 0xFF = 0x00");
-        (c.registers.f & Flag.OVERFLOW).should.not.equal(0).because(
-            "ADD should set the overflow flag when the result > 0xFF");
-        (c.registers.f & Flag.HALF_OVERFLOW).should.not.equal(0).because(
-            "ADD should set the half-overflow flag when (A & 0xF + B & 0xF) > 0xF");
-        (c.registers.f & Flag.ZERO).should.not.equal(0).because(
-            "ADD should set the zero flag when the result is 0");
+        // (0xFE + 0x02) & 0xFF = 0x00
+        (c.registers.a).shouldEqual(0x00);
+
+        // ADD should set the overflow flag when the result > 0xFF
+        (c.registers.f & Flag.OVERFLOW).shouldNotEqual(0);
+
+        // ADD should set the half-overflow flag when (A & 0xF + B & 0xF) > 0xF
+        (c.registers.f & Flag.HALF_OVERFLOW).shouldNotEqual(0);
+
+        // ADD should set the zero flag when the result is 0
+        (c.registers.f & Flag.ZERO).shouldNotEqual(0);
     }
     
 }
+
+mixin Main;
