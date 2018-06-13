@@ -3,4 +3,4 @@
 set -eux
 
 # Test for successful release build
-dub build -b release
+dub build -b release --skip-registry=standard
