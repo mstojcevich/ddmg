@@ -3,4 +3,4 @@
 set -eux
 
 # Run unit tests
-dub test
+dub test --skip-registry=standard

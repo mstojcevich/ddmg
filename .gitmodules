@@ -1,0 +1,22 @@
+[submodule "dependencies/DerelictSDL2"]
+	path = dependencies/DerelictSDL2
+	url = https://github.com/DerelictOrg/DerelictSDL2.git
+	branch = 2.1
+[submodule "dependencies/DerelictGL3"]
+	path = dependencies/DerelictGL3
+	url = https://github.com/DerelictOrg/DerelictGL3.git
+	branch = 1.0
+[submodule "dependencies/DerelictGLFW3"]
+	path = dependencies/DerelictGLFW3
+	url = https://github.com/DerelictOrg/DerelictGLFW3.git
+	branch = 3.1
+[submodule "dependencies/unit-threaded"]
+	path = dependencies/unit-threaded
+	url = https://github.com/atilaneves/unit-threaded.git
+[submodule "dependencies/dunit"]
+	path = dependencies/dunit
+	url = https://github.com/linkrope/dunit.git
+[submodule "dependencies/DerelictUtil"]
+	path = dependencies/DerelictUtil
+	url = https://github.com/DerelictOrg/DerelictUtil.git
+	branch = 2.1
