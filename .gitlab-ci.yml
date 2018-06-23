@@ -540,7 +540,6 @@ mooneye-rom_512Kb:
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/emulator-only/mbc1/rom_512Kb.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 mooneye-bits_ram_en:
   stage: test
