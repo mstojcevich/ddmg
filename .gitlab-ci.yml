@@ -476,3 +476,63 @@ mooneye-boot_regs-sgb2:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/boot_regs-sgb2.gb" --testMode "mooneye"
   
+mooneye-rom_1Mb:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/emulator-only/mbc1/rom_1Mb.gb" --testMode "mooneye"
+  
+mooneye-rom_512Kb:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/emulator-only/mbc1/rom_512Kb.gb" --testMode "mooneye"
+  
+mooneye-bits_ram_en:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/emulator-only/mbc1/bits_ram_en.gb" --testMode "mooneye"
+  
+mooneye-ram_64Kb:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/emulator-only/mbc1/ram_64Kb.gb" --testMode "mooneye"
+  
+mooneye-rom_2Mb:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/emulator-only/mbc1/rom_2Mb.gb" --testMode "mooneye"
+  
+mooneye-ram_256Kb:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/emulator-only/mbc1/ram_256Kb.gb" --testMode "mooneye"
+  
+mooneye-rom_4Mb:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/emulator-only/mbc1/rom_4Mb.gb" --testMode "mooneye"
+  
+mooneye-multicart_rom_8Mb:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/emulator-only/mbc1/multicart_rom_8Mb.gb" --testMode "mooneye"
+  
+mooneye-rom_8Mb:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/emulator-only/mbc1/rom_8Mb.gb" --testMode "mooneye"
+  
+mooneye-rom_16Mb:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/emulator-only/mbc1/rom_16Mb.gb" --testMode "mooneye"
+  
