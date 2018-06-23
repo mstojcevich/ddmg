@@ -56,4 +56,8 @@ class Gameboy {
         }
     }
 
+    @safe public const(MMU) getMMU() const {
+        return this.mmu;
+    }
+
 }
