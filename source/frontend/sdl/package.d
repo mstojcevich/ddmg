@@ -7,6 +7,7 @@ import frontend.sdl.keypad;
 import frontend.sdl.sound;
 import graphics.display;
 import keypad;
+import serial;
 import sound.frontend;
 import std.stdio;
 
@@ -16,6 +17,7 @@ class SDLFrontend : Frontend {
     private SDLDisplay display;
     private SDLKeypad keypad;
     private SDLSound sound;
+    private SerialIO serial;
 
     private bool shouldQuit;
 
@@ -27,6 +29,7 @@ class SDLFrontend : Frontend {
         this.display = new SDLDisplay();
         this.keypad = new SDLKeypad();
         this.sound = new SDLSound();
+        this.serial = new StandardSerialIO();
     }
 
     @trusted ~this() {
@@ -43,6 +46,10 @@ class SDLFrontend : Frontend {
 
     @safe override SoundFrontend getSound() {
         return sound;
+    }
+
+    @safe override SerialIO getSerial() {
+        return serial;
     }
 
     @safe override bool shouldProgramTerminate() {

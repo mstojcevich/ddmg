@@ -2,6 +2,7 @@ module frontend;
 
 import graphics.display;
 import keypad;
+import serial;
 import sound;
 
 interface Frontend {
@@ -17,5 +18,7 @@ interface Frontend {
     @safe bool shouldProgramTerminate();
 
     @safe void update();
+
+    @safe SerialIO getSerial();
 
 }
