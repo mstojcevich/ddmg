@@ -1,9 +1,9 @@
 module serial.serial;
 
 import std.bitmanip;
-import std.outbuffer;
 import std.stdio;
 import interrupt;
+import std.ascii;
 
 /// GameBoy serial communication module
 class Serial {
@@ -14,7 +14,7 @@ class Serial {
 
     private InterruptHandler iuptHandler;
 
-    private OutBuffer output;
+    private SerialIO output;
 
     /// FF01 - SB - Serial transfer data
     private ubyte serialData;
@@ -29,7 +29,7 @@ class Serial {
     private int wireBit;
 
     /// Create a new serial module with the specified interrupt handler and output buffer
-    @safe this(InterruptHandler ih, OutBuffer output) {
+    @safe this(InterruptHandler ih, SerialIO output) {
         this.iuptHandler = ih;
         this.output = output;
     }
@@ -81,12 +81,7 @@ class Serial {
 
     /// Write a byte over the "wire"
     @safe private void writeByte(ubyte val) {
-        // TODO use some more generic stream type
-        // for output so that custom output behavior
-        // can be defined
-        if (output !is null) {
-            output.write(val);
-        }
+        output.write(val);
     }
 
     private enum ShiftClock : bool {
@@ -114,4 +109,24 @@ class Serial {
         ));
     }
 
+}
+
+interface SerialIO {
+    /// Write one byte of data from the serial port
+    @safe void write(ubyte data);
+
+    /// Read one byte of data into the serial port. Unused. TODO implement
+    @safe ubyte read();
+}
+
+class StandardSerialIO : SerialIO {
+    @safe override void write(ubyte data) {
+        writef("SERIAL: 0x%02X", data);
+        if (isPrintable(data)) {
+            writef(" (%c)", cast(char)data);
+        }
+        writeln();
+    }
+
+    @safe override ubyte read() { return 0; }
 }

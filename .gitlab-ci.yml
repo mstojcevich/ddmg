@@ -2,13 +2,56 @@ image: dlang2/ldc-ubuntu
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
-
-build-release:
-       stage: build
-       script: ci/build-release.sh
-       artifacts:
-               paths:
-               - ddmg
-
+  
+build:linux:
+  stage: build
+  script: ci/build-release.sh
+  artifacts:
+    paths:
+      - ddmg
+    expire_in: 1 week
+        
 unittests:
-        script: ci/unittests.sh
+  stage: test
+  script: ci/unittests.sh
+          
+blargg-cpu_instrs:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/blargg/cpu_instrs/cpu_instrs.gb" --testMode "blargg_serial" --testMaxInstrs 25000000
+
+blargg-instr_timing:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/blargg/instr_timing/instr_timing.gb" --testMode "blargg_serial" --testMaxInstrs 300000
+
+blargg-mem_timing:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/blargg/mem_timing/mem_timing.gb" --testMode "blargg_serial" --testMaxInstrs 700000
+
+blargg-mem_timing-2:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/blargg/mem_timing-2/mem_timing.gb" --testMode "blargg_memory" --testMaxInstrs 1200000
+
+blargg-oam_bug:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/blargg/oam_bug/oam_bug.gb" --testMode "blargg_memory" --testMaxInstrs 6000000
+  allow_failure: true  # OAM bug not yet implemented
+
+blargg-dmg_sound:
+  stage: test
+  dependencies:
+    - build:linux
+  script: ./ddmg --rom "./test-roms/blargg/dmg_sound/dmg_sound.gb" --testMode "blargg_memory" --testMaxInstrs 3400000
+  allow_failure: true  # Sound not yet implemented
+
+# No CGB support, so the cgb_sound test never finishes.
+# TODO figure out how to automate the blargg halt_bug test rom

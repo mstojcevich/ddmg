@@ -27,7 +27,7 @@ class Gameboy {
         this.iuptHandler = new InterruptHandler();
         this.keypad = new Keypad(frontend.getKeypad(), this.iuptHandler);
         this.clock = new Clock(this.iuptHandler);
-        this.serial = new Serial(this.iuptHandler, null);
+        this.serial = new Serial(this.iuptHandler, this.frontend.getSerial());
         this.gpu = new GPU(frontend, this.iuptHandler);
         this.apu = new APU(frontend.getSound());
         this.mmu = new MMU(this.cartridge, this.gpu, this.keypad, this.iuptHandler, this.clock, this.apu, this.serial);
@@ -43,6 +43,21 @@ class Gameboy {
                 break;
             }
         }
+    }
+
+    /// Run until at most numInstrs instructions have been executed
+    @safe public void run(long numInstrs) {
+        for(long i; i < numInstrs; i++) {
+            cpu.step();
+
+            if(frontend.shouldProgramTerminate()) {
+                break;
+            }
+        }
+    }
+
+    @safe public const(MMU) getMMU() const {
+        return this.mmu;
     }
 
 }
