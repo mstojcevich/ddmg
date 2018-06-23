@@ -40,7 +40,7 @@ long maxInstrs = 25_000_000;  // Max instructions to run a test rom for
     string serialOut = frontend.getSerialOutput().toString();
     writefln("FINAL SERIAL OUTPUT: %s", serialOut);
 
-    if(!canFind(serialOut, "Passed all tests")) {
+    if(!canFind(serialOut, "Passed")) {
         stderr.writeln("FAILED: Didn't pass all tests");
         exit(1);
     } else {
