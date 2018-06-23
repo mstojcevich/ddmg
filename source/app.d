@@ -1,4 +1,5 @@
 import core.stdc.stdlib;
+import cpu;
 import std.stdio;
 import gameboy;
 import mmu;
@@ -10,7 +11,7 @@ import frontend;
 import frontend.sdl;
 import frontend.test;
 
-private enum TestMode { none, blargg_serial, blargg_memory }
+private enum TestMode { none, blargg_serial, blargg_memory, mooneye }
 
 string romName = "../opus5.gb";
 TestMode testMode = TestMode.none;
@@ -33,17 +34,27 @@ long maxInstrs = 25_000_000;  // Max instructions to run a test rom for
 }
 
 @trusted private void runTest() {
+    bool passed = false;
+    string failReason = "Unexpected failure";
+
     TestFrontend frontend = new TestFrontend();
     frontend.init();
 
     Gameboy g = new Gameboy(frontend, romName);
-    g.run(maxInstrs);
+    CPU cpu = g.getCPU();
+    for(long i; i < maxInstrs; i++) {
+        const ubyte opcode = cpu.step();
+
+        // Mooneye tests indicate that exeution has finished by executing LD B,B
+        if (opcode == 0x40 && testMode == TestMode.mooneye) {
+            passed = true;
+            break;
+        }
+    }
 
     string serialOut = frontend.getSerialOutput().toString();
     writefln("FINAL SERIAL OUTPUT: %s", serialOut);
 
-    bool passed = false;
-    string failReason = "Unexpected failure";
     if (testMode == TestMode.blargg_serial) {
         passed = canFind(serialOut, "Passed");
         if(!passed) {
@@ -75,6 +86,21 @@ long maxInstrs = 25_000_000;  // Max instructions to run a test rom for
             passed = testStatus == 0;
             if(!passed) {
                 failReason = "Bad test status code.";
+            }
+        }
+    } else if (testMode == TestMode.mooneye) {
+        if(!passed) {
+            failReason = "Magic breakpoint never executed";
+        } else {
+            // Mooneye tests set the registers to certain magic numbers on success
+            passed = cpu.registers.b == 0x03 &&
+                     cpu.registers.c == 0x05 &&
+                     cpu.registers.d == 0x08 &&
+                     cpu.registers.e == 0x0D &&
+                     cpu.registers.h == 0x15 &&
+                     cpu.registers.l == 0x22;
+            if (!passed) {
+                failReason = "Success value not found in registers";
             }
         }
     }

@@ -45,19 +45,12 @@ class Gameboy {
         }
     }
 
-    /// Run until at most numInstrs instructions have been executed
-    @safe public void run(long numInstrs) {
-        for(long i; i < numInstrs; i++) {
-            cpu.step();
-
-            if(frontend.shouldProgramTerminate()) {
-                break;
-            }
-        }
-    }
-
     @safe public const(MMU) getMMU() const {
         return this.mmu;
+    }
+
+    @safe public CPU getCPU() {
+        return this.cpu;
     }
 
 }

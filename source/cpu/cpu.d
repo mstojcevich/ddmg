@@ -339,10 +339,17 @@ class CPU {
         // TODO the rom disable I/O register at memory address 0xFF50 should be set to 1
     }
 
-    @safe void step() {
+    /**
+     * Runs the CPU for one instruction, updating the bus and interrupt handler as necessary.
+     * @return opcode of the instruction that was executed
+     */
+    @safe ubyte step() {
+        ubyte ret = 0x00;
+
         if(haltMode == HaltMode.NO_HALT || haltMode == HaltMode.HALT_BUG) { // If the CPU is halted, stop execution
             // Fetch the operation in memory
             immutable ubyte opcode = mmu.readByte(regs.pc);
+            ret = opcode;
 
             Instruction instr = instructions[opcode];
 
@@ -418,6 +425,8 @@ class CPU {
                 }
             }
         }
+
+        return ret;
     }
 
     // A debug function for printing the flag statuses
@@ -1223,8 +1232,14 @@ class CPU {
         bus.update(4);
     }
 
-    version(test) @safe @property public Registers* registers() {
-        return &regs;
+    version(test) {
+        @safe @property public Registers* registers() {
+            return &regs;
+        }
+    } else {
+        @safe @property public const(Registers) registers() const {
+            return regs;
+        }
     }
 
     version(test) @safe public void reset() {
