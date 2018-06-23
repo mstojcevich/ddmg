@@ -20,7 +20,7 @@ class ArithmeticTests {
     private CPU c;
 
     this() {
-        m = new MMU(null, null, null, null, null, null);
+        m = new MMU(null, null, null, null, null, null, null);
         
         Bus mockBus = mock!Bus;
 
