@@ -2,7 +2,9 @@ import sound.apu;
 import std.conv;
 import std.stdio;
 
-import cartridge, graphics, keypad, interrupt, clock;
+import cartridge, graphics, keypad, interrupt, clock, serial;
+
+// TODO move some constants to their relevant modules
 
 private const WORK_RAM_BEGIN            = 0xC000;
 private const WORK_RAM_END              = 0xDFFF;
@@ -44,6 +46,9 @@ private const TIMER_CONTROL             = 0xFF07;
 private const APU_REGISTERS_BEGIN        = 0xFF10;
 private const APU_REGISTERS_END          = 0xFF26;
 
+private const SERIAL_DATA                = 0xFF01;
+private const SERIAL_CONTROL             = 0xFF02;
+
 private enum OamTransferState {
     NO_TRANSFER,
     SETUP,
@@ -75,19 +80,22 @@ class MMU {
     private InterruptHandler iuptHandler;
     private Clock clock;
     private APU apu;
+    private Serial serial;
 
     private OamTransferState oamTransferState;
     private uint oamCycleAccum; // Leftover cycles since the last transfered bytes
     private ushort oamTransferToAddr; // The current address to transfer to
     private ushort oamTransferFromAddr; // The current address to transfer from
 
-    @safe this(Cartridge c, GPU g, Keypad k, InterruptHandler ih, Clock clk, APU apu) {
+    /// Create a new MMU connected to the specified components
+    @safe this(Cartridge c, GPU g, Keypad k, InterruptHandler ih, Clock clk, APU apu, Serial serial) {
         this.cartridge = c;
         this.gpu = g;
         this.keypad = k;
         this.iuptHandler = ih;
         this.clock = clk;
         this.apu = apu;
+        this.serial = serial;
     }
 
     /// Simulate n cycles of the MMU running. Currently used for simulating OAM transfer
@@ -228,6 +236,13 @@ class MMU {
             return clock.timerControl;
         }
 
+        if(address == SERIAL_CONTROL) {
+            return serial.control;
+        }
+        if(address == SERIAL_DATA) {
+            return serial.data;
+        }
+
         debug {
             writefln("UNIMPLEMENTED : Reading address %04X", address);
             return 0;
@@ -238,7 +253,7 @@ class MMU {
     }
 
     /**
-     * Read a 16-bit value in memory at the specified address
+     * Read a two-byte little endian value in memory at the specified address
      */
     @safe public ushort readShort(in size_t address) const
     in {
@@ -249,7 +264,7 @@ class MMU {
         // TODO On little endian hosts, we can treat the array as an array of shorts and don't have to do bit operations like crazy
         return (readByte(cast(ushort)(address+1)) << 8) | readByte(address);
     }
-
+    /// Write an 8-bit value to memory at the specified address
     @safe public void writeByte(in size_t address, in ubyte val) 
     in {
         assert(address <= 0xFFFF);
@@ -334,6 +349,11 @@ class MMU {
         } else if(address >= APU_REGISTERS_BEGIN && address <= APU_REGISTERS_END) {
             apu.setApuRegister(cast(ushort)(address - APU_REGISTERS_BEGIN), val);
 
+        } else if(address == SERIAL_CONTROL) {
+            serial.control = val;
+        } else if(address == SERIAL_DATA) {
+            serial.data = val;
+
         } else if(address < 0xFEA0 || address > 0xFEFF) { // Unimplemented but don't want to crash for unmapped
             debug {
                 writefln("UNIMPLEMENTED : Writing %02X at address %04X", val, address);
@@ -348,13 +368,12 @@ class MMU {
         }
     }
 
+    /// Write a two-byte little endian value to memory
     @safe public void writeShort(in size_t address, in ushort val)
     in {
         assert(address <= 0xFFFF);
     }
-    body {
-        // TODO On little endian hosts, we can treat the array as an array of shorts and don't have to do a two-part save
-        
+    body {        
         // Bytes are swapped to correct for endianness
         writeByte(address, val & 0x00FF);
         writeByte(address + 1, val >> 8);
