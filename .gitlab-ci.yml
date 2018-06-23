@@ -15,38 +15,38 @@ unittests:
   stage: test
   script: ci/unittests.sh
           
-blargg-cpu_instrs:
+blargg 1/6 cpu_instrs:
   stage: test
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/blargg/cpu_instrs/cpu_instrs.gb" --testMode "blargg_serial" --testMaxInstrs 25000000
 
-blargg-instr_timing:
+blargg 2/6 instr_timing:
   stage: test
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/blargg/instr_timing/instr_timing.gb" --testMode "blargg_serial" --testMaxInstrs 300000
 
-blargg-mem_timing:
+blargg 3/6 mem_timing:
   stage: test
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/blargg/mem_timing/mem_timing.gb" --testMode "blargg_serial" --testMaxInstrs 700000
 
-blargg-mem_timing-2:
+blargg 4/6 mem_timing-2:
   stage: test
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/blargg/mem_timing-2/mem_timing.gb" --testMode "blargg_memory" --testMaxInstrs 1200000
 
-blargg-oam_bug:
+blargg 5/6 oam_bug:
   stage: test
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/blargg/oam_bug/oam_bug.gb" --testMode "blargg_memory" --testMaxInstrs 6000000
   allow_failure: true  # OAM bug not yet implemented
 
-blargg-dmg_sound:
+blargg 6/6 dmg_sound:
   stage: test
   dependencies:
     - build:linux
