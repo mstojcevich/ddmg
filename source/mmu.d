@@ -243,6 +243,10 @@ class MMU {
             return serial.data;
         }
 
+        if(address >= APU_REGISTERS_BEGIN && address <= APU_REGISTERS_END) {
+            return apu.readApuRegister(cast(ushort)(address - APU_REGISTERS_BEGIN));
+        }
+
         debug {
             writefln("UNIMPLEMENTED : Reading address %04X", address);
             return 0;

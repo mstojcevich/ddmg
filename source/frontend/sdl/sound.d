@@ -48,7 +48,7 @@ class SDLSound : SoundFrontend {
     }
 
     @trusted override void playAudio(ubyte left, ubyte right) {
-        if(false) {
+        if(true) {
             if(bufferWriteAccum >= ticksPerSample) {
                 bufferWriteAccum = 0;
                 buffer[bufferPos] = cast(ubyte)(left * (195/15));
