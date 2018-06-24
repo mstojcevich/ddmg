@@ -56,7 +56,7 @@ class SDLSound : SoundFrontend {
 
                 // Write out the buffer if it is full
                 if(bufferPos >= buffer.length) {
-                    SDL_QueueAudio(1, &buffer, bufferPos);
+                    SDL_QueueAudio(1, &buffer[0], bufferPos);
 
                     bufferPos = 0;
                 }
