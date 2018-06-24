@@ -37,7 +37,7 @@ class SDLSound : SoundFrontend {
         this.sampleRate = actual.freq;
         this.buffer = new ubyte[actual.samples];
 
-        this.ticksPerSample = DDMG_TICKS_HZ / sampleRate;
+        this.ticksPerSample = DDMG_TICKS_HZ / sampleRate * 4;
 
         SDL_PauseAudio(0);
     }

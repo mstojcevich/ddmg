@@ -8,6 +8,8 @@ import std.stdio;
 // Memory mappings, inclusive
 private const SOUND1_REGISTERS_BEGIN = 0x00;
 private const SOUND1_REGISTERS_END   = 0x04;
+private const SOUND2_REGISTERS_BEGIN = 0x05;
+private const SOUND2_REGISTERS_END   = 0x09;
 
 // TODO evaluate writing "components" that the individual sounds can have, like evelope and sweep etc
 
@@ -19,6 +21,7 @@ class APU {
     private SoundEnableRegister enabledSounds;
 
     private Sound1 sound1;
+    private Sound1 sound2;
 
     /// The amount of cpu cycles since the last APU tick
     private int tickAccum;
@@ -29,18 +32,17 @@ class APU {
         this.frontend = frontend;
 
         sound1 = new Sound1();
+        sound2 = new Sound1();
     }
 
     // Run every CPU cycle
     int n = 0;
     @safe void tick() {
-        n++;
-        if(n % 4 == 0) { // TODO not suer why I have to do this
-            ubyte s1out = sound1.tick();
-            frontend.playAudio(s1out/2, s1out/2);
+        ubyte s1out = cast(ubyte)(sound1.tick() + sound2.tick());
+        frontend.playAudio(s1out, s1out);
 
-            enabledSounds.sound1Enable = sound1.enabled();
-        }
+        enabledSounds.sound1Enable = sound1.enabled();
+        enabledSounds.sound2Enable = sound2.enabled();
     }
 
     /**
@@ -54,13 +56,19 @@ class APU {
     }
     body {
         if(number >= SOUND1_REGISTERS_BEGIN && number <= SOUND1_REGISTERS_END) {
-            sound1.setRegister(number - SOUND1_REGISTERS_BEGIN, value);
+            sound1.setRegister(cast(ubyte)(number - SOUND1_REGISTERS_BEGIN), value);
+            return;
+        }
+
+        if(number >= SOUND2_REGISTERS_BEGIN && number <= SOUND2_REGISTERS_END) {
+            sound2.setRegister(cast(ubyte)(number - SOUND2_REGISTERS_BEGIN), value);
             return;
         }
 
         if(number == 0x16) {
             enabledSounds.data = value;
             sound1.enabled(enabledSounds.sound1Enable);
+            sound2.enabled(enabledSounds.sound2Enable);
             return;
         }
 
@@ -79,8 +87,12 @@ class APU {
         assert(number <= 0x16);
     }
     body {
+        if(number >= SOUND2_REGISTERS_BEGIN && number <= SOUND2_REGISTERS_END) {
+            return sound2.readRegister(cast(ubyte)(number - SOUND2_REGISTERS_BEGIN));
+        }
+
         if(number >= SOUND1_REGISTERS_BEGIN && number <= SOUND1_REGISTERS_END) {
-            return sound1.readRegister(number - SOUND1_REGISTERS_BEGIN);
+            return sound1.readRegister(cast(ubyte)(number - SOUND1_REGISTERS_BEGIN));
         }
 
         if(number == 0x16) {

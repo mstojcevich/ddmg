@@ -73,6 +73,7 @@ public class Sound1 {
 
         freqUpdate();
 
+        timerAccum++;
         if(timerAccum > CYCLES_PER_TIMER) {
             timerTick();
             timerAccum = 0;
@@ -141,13 +142,12 @@ public class Sound1 {
 
     /// Set the lower frequency data (NR13)
     @safe void setLowerFreq(ubyte data) {
-        frequency = (frequency & 0xFFFFFF00) | data;
+        lowerFreq = data;
     }
 
     /// Set the content of the NR14 register
     @safe void setNR14(ubyte data) {
         nr14.data = data;
-        frequency = (frequency & 0xFF) | (nr14.higherFreq << 8);
 
         if(nr14.initialize) {
             enable = true;
@@ -185,6 +185,7 @@ public class Sound1 {
     /// Enable/disable sound1
     @safe void enabled(bool enabled) {
         this.enable = enabled;
+        frequency = (nr14.higherFreq << 8) | lowerFreq;
     }
 
     /// Set one of the 4 sound1 registers

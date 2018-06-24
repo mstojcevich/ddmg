@@ -5,7 +5,7 @@ import std.bitmanip;
 import timing;
 
 /// The amount of CPU cycles before sweep is updated
-private const CYCLES_PER_SWEEP = DDMG_TICKS_HZ / 256; // Updated 128 times a second
+private const CYCLES_PER_SWEEP = DDMG_TICKS_HZ / 128; // Updated 128 times a second
 
 class Sweep {
 
