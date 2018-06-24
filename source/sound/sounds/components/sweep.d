@@ -5,7 +5,7 @@ import std.bitmanip;
 import timing;
 
 /// The amount of CPU cycles before sweep is updated
-private const CYCLES_PER_SWEEP = DMG_CLOCKRATE_HZ / 128; // Updated 128 times a second
+private const CYCLES_PER_SWEEP = DDMG_TICKS_HZ / 256; // Updated 128 times a second
 
 class Sweep {
 
@@ -32,7 +32,7 @@ class Sweep {
      */
     @safe int tick(int frequency)
     in { assert(frequency >= 0 && frequency <= MAX_FREQUENCY); }
-    out (frequency) { assert(frequency >= 0); }
+    out (outfreq) { assert(outfreq >= 0); }
     body {
         cycleAccum++;
 
@@ -51,7 +51,7 @@ class Sweep {
      */
     @safe int sweepCalculation(int frequency)
     in { assert(frequency >= 0 && frequency <= MAX_FREQUENCY); }
-    out (frequency) { assert(frequency >= 0); }
+    out (outfreq) { assert(outfreq >= 0); }
     body {
         if(active) {
             const freqChange = frequency >> shift;

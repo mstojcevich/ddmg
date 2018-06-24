@@ -27,7 +27,7 @@ private union NR14 {
 }
 
 /// The amount of CPU cycles before the timer is updates
-const CYCLES_PER_TIMER    = DMG_CLOCKRATE_HZ / 256; // Updated 256 times a second
+const CYCLES_PER_TIMER    = DDMG_TICKS_HZ / 256; // Updated 256 times a second
 
 // TODO what happens when the different registers are read? Do they return the last written, 00, FF, or the actual value??
 

@@ -4,7 +4,7 @@ import std.bitmanip;
 import timing;
 
 /// The amount of CPU cycles before envelope is updated
-private const CYCLES_PER_ENVELOPE = DMG_CLOCKRATE_HZ / 64; // Updated 64 times a second
+private const CYCLES_PER_ENVELOPE = DDMG_TICKS_HZ / 128; // Updated 64 times a second
 
 /**
  * The envelope component deals with fading the volume

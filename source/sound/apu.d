@@ -32,10 +32,12 @@ class APU {
     }
 
     // Run every CPU cycle
+    int n = 0;
     @safe void tick() {
-        for(int i; i < 4; i++) {
+        n++;
+        if(n % 4 == 0) { // TODO not suer why I have to do this
             ubyte s1out = sound1.tick();
-            frontend.playAudio(s1out, s1out);
+            frontend.playAudio(s1out/2, s1out/2);
 
             enabledSounds.sound1Enable = sound1.enabled();
         }
@@ -52,7 +54,7 @@ class APU {
     }
     body {
         if(number >= SOUND1_REGISTERS_BEGIN && number <= SOUND1_REGISTERS_END) {
-            sound1.setRegister(number, value);
+            sound1.setRegister(number - SOUND1_REGISTERS_BEGIN, value);
             return;
         }
 
@@ -78,7 +80,7 @@ class APU {
     }
     body {
         if(number >= SOUND1_REGISTERS_BEGIN && number <= SOUND1_REGISTERS_END) {
-            return sound1.readRegister(number);
+            return sound1.readRegister(number - SOUND1_REGISTERS_BEGIN);
         }
 
         if(number == 0x16) {
