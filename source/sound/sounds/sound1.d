@@ -131,6 +131,7 @@ public class Sound1 {
             if(newTimerCount == 0) {
                 enable = false;
             }
+            timerCount = newTimerCount;
         }
     }
     

@@ -74,6 +74,7 @@ class Envelope {
         this.controlReg = val;
     }
 
+    /// Get the default volume to start with
     @safe @property ubyte defaultVolume()
     out (vol) { assert(vol <= MAX_VOLUME); }
     body {
