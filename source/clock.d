@@ -71,6 +71,7 @@ class Clock {
      *  iuptHandler = Interrupt handler to flag the timer overflow iupt with
      */
     @safe this(InterruptHandler iuptHandler) {
+        this.tac.data = 0xF8; // Unused bits to 1, used stuff to 0
         this.iuptHandler = iuptHandler;
         reset();
     }
@@ -117,7 +118,7 @@ class Clock {
      * Set the timer control (TAC) register (FF07)
      */
     @safe @property void timerControl(ubyte newTac) {
-        this.tac.data = newTac & 0b111; // Only the lower 3 bits can be written
+        this.tac.data = 0b11111000 | (newTac & 0b111); // Only the lower 3 bits can be written
     }
 
     /**

@@ -245,10 +245,10 @@ class MMU {
 
         debug {
             writefln("UNIMPLEMENTED : Reading address %04X", address);
-            return 0;
+            return 0xFF;
         } else {
             // Silently fail
-            return 0;
+            return 0xFF;
         }
     }
 

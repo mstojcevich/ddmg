@@ -32,6 +32,8 @@ class Serial {
     @safe this(InterruptHandler ih, SerialIO output) {
         this.iuptHandler = ih;
         this.output = output;
+
+        serialControl.data = 0x7E;
     }
 
     /// Set the value of the serial transfer data register
@@ -46,7 +48,7 @@ class Serial {
 
     /// Set the value of the serial control register
     @safe @property void control(ubyte val) {
-        this.serialControl.data = val;
+        this.serialControl.data = val | 0b01111110; // Unused bits should be 1
     }
 
     /// Read the value of the serial control register
@@ -95,7 +97,7 @@ class Serial {
     private union SerialControl {
         ubyte data;
         mixin(bitfields!(
-            /// The current mode that the lcd controller is in
+            /// Whether we're the client or 
             ShiftClock, "shiftClock", 1,
 
             /// Clock speed (Only used on CGB)

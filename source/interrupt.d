@@ -27,7 +27,7 @@ class InterruptHandler {
     private ubyte interruptEnable;
 
     // Keeps track of if an interrupt signal has happened but the interrupt hasn't yet been processed
-    private ubyte interruptFlags;
+    private ubyte interruptFlags = Interrupts.VBLANK.flagBit; // vblank is flagged by default
 
     // Check whether an interrupt is enabled
     @safe bool isInterruptEnabled(Interrupts iupt) const {
