@@ -37,7 +37,7 @@ class SDLSound : SoundFrontend {
         this.sampleRate = actual.freq;
         this.buffer = new ubyte[actual.samples];
 
-        this.ticksPerSample = DMG_CLOCKRATE_HZ / sampleRate;
+        this.ticksPerSample = DDMG_TICKS_HZ / sampleRate;
 
         SDL_PauseAudio(0);
     }
@@ -48,15 +48,16 @@ class SDLSound : SoundFrontend {
     }
 
     @trusted override void playAudio(ubyte left, ubyte right) {
-        if(false) {
+        // while(SDL_GetQueuedAudioSize(1) > 2048) {} // Drain
+        if(SDL_GetQueuedAudioSize(1) <= 2048) {
             if(bufferWriteAccum >= ticksPerSample) {
                 bufferWriteAccum = 0;
-                buffer[bufferPos] = cast(ubyte)(left * (195/15));
+                buffer[bufferPos] = cast(ubyte)(left * (128/15));
                 bufferPos++;
 
                 // Write out the buffer if it is full
                 if(bufferPos >= buffer.length) {
-                    SDL_QueueAudio(1, &buffer, bufferPos);
+                    SDL_QueueAudio(1, &buffer[0], bufferPos);
 
                     bufferPos = 0;
                 }
