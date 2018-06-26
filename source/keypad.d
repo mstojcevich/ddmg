@@ -16,19 +16,17 @@ enum JOYPFlag : ubyte
 }
 
 class Keypad {
-    // Whether to use the directions
-    private bool useDirections;
-
-    // TODO figure out what the priority is if both button and direction are selected and if neither are selected
+    // Whether to use the directions buttons / non-direction buttons
+    private bool useDirections = true;
+    private bool useButtons = true;
 
     private InterruptHandler iuptHandler;
 
     private KeypadFrontend frontend;
 
     // Keep two copies of the current input, one for button selected, one for direction selected
-    // These need to be outside of the class file since they're set by a c callback
-    private BitFlags!JOYPFlag joypButtons = JOYPFlag.BUTTON_MODE;
-    private BitFlags!JOYPFlag joypDirections = JOYPFlag.DIRECTION_MODE;
+    private BitFlags!JOYPFlag joypButtons;
+    private BitFlags!JOYPFlag joypDirections;
 
     // Request for an interrupt fire
     private bool iupt;
@@ -45,16 +43,23 @@ class Keypad {
     }
 
     @safe const ubyte readJOYP() {
-        return ~(useDirections ? cast(ubyte) joypDirections : cast(ubyte) joypButtons);
+        ubyte joyp = 0x00;
+        if (useDirections) {
+            joyp |= cast(ubyte)(JOYPFlag.DIRECTION_MODE); // TODO or swap because of invert??
+            joyp |= cast(ubyte)(joypDirections);
+        }
+        if (useButtons) {
+            joyp |= cast(ubyte)(JOYPFlag.BUTTON_MODE);
+            joyp |= cast(ubyte)(joypButtons);
+        }
+        return ~(joyp);
     }
 
     @safe void writeJOYP(ubyte joyp) {
         // Since the buttons are read only, we only need to handle the directions part
         
-        bool buttons = (joyp & JOYPFlag.BUTTON_MODE) == 0;
-        bool directions = (joyp & JOYPFlag.DIRECTION_MODE) == 0;
-        
-        useDirections = directions;
+        useButtons = (joyp & JOYPFlag.BUTTON_MODE) == 0;
+        useDirections = (joyp & JOYPFlag.DIRECTION_MODE) == 0;
     }
 
     /**
