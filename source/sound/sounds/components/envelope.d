@@ -25,6 +25,12 @@ class Envelope {
         ));
     }
 
+    @safe this() {
+        stepLength = 3;
+        mode = EnvelopeMode.REDUCE;
+        defaultValue = MAX_VOLUME;
+    }
+
     /**
      * Called every cpu cycle (4_194_304 times a second) to update.
      * @param volume The current volume (value from 0 to 15)

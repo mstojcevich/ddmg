@@ -20,8 +20,8 @@ class APU {
     private ChannelEnableRegister enabledChannels;
     private SoundEnableRegister enabledSounds;
 
-    private Sound1 sound1;
-    private Sound1 sound2;
+    private SquareSound sound1;
+    private SquareSound sound2;
 
     /// The amount of cpu cycles since the last APU tick
     private int tickAccum;
@@ -31,8 +31,8 @@ class APU {
     @safe this(SoundFrontend frontend) {
         this.frontend = frontend;
 
-        sound1 = new Sound1();
-        sound2 = new Sound1();
+        sound1 = new SquareSound(true, DutyCycle.PCT_50);
+        sound2 = new SquareSound(false, DutyCycle.PCT_12_5);
     }
 
     // Run every CPU cycle

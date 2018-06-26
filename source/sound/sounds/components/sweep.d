@@ -67,8 +67,7 @@ class Sweep {
     /**
      * Whether sweeping is currently active.
      * Note that this is different than effective.
-     * This should be used to determine whether writes to
-     * NR14 and NR14 change the real frequency.
+     * This should be used to determine whether overflow should be calculated.
      */
     @safe @property bool active() const {
         // The internal enabled flag is set if either the sweep period
@@ -81,6 +80,7 @@ class Sweep {
      * frequency is able to be updated.
      * This is different than active because overflow checks
      * should still happen even if the sweep isn't effective.
+     * This determines whether the sweep frequency should be used or thrown away.
      */
     @safe @property bool effective() const {
         return shift != 0;
@@ -88,7 +88,7 @@ class Sweep {
 
      /// Read the value of the sweep control register (used for NR10)
     @safe ubyte readControlReg() const {
-        return controlReg;
+        return controlReg | 0b10000000; // First bit is unused
     }
 
     /// Write to the envelope control register (used for NR10)

@@ -1,4 +1,4 @@
-module sound.sounds.sound1;
+module sound.sounds.square;
 
 import sound.consts;
 import sound.sounds.components;
@@ -31,8 +31,8 @@ const CYCLES_PER_TIMER    = DDMG_TICKS_HZ / 256; // Updated 256 times a second
 
 // TODO what happens when the different registers are read? Do they return the last written, 00, FF, or the actual value??
 
-/// The sound1 gameboy sound. Square wave with sweep and envelope.
-public class Sound1 {
+/// The sound1/sound2 gameboy sound. Square wave with envelope and optional sweep.
+public class SquareSound {
 
     /// Whether sound1 is enabled
     private bool enable;
@@ -49,7 +49,7 @@ public class Sound1 {
     /// Internal effective frequency
     private int frequency;
 
-    private bool[8] dutyCycle = dutyCycles[0];
+    private bool[8] dutyCycle = dutyCycles[2];
 
     /// Number from 0-15 representing volume
     private ubyte volume = MAX_VOLUME;
@@ -65,6 +65,18 @@ public class Sound1 {
 
     /// The amount of timer cycles (1/256th of a second) remaining on the timer
     private int timerCount;
+
+    /// Whether this square channel has sweep support (sound1 does, sound2 does not)
+    private bool hasSweep;
+
+    /**
+     * @param hasSweep Whether this square voice has a sweep module
+     * @param defaultDuty Default duty cycle to use
+     */
+    @safe this(bool hasSweep, DutyCycle defaultDuty) {
+        this.nr11.dutyCycle = defaultDuty;
+        this.hasSweep = hasSweep;
+    }
 
     // Called every cpu cycle (4_194_304 times a second) to update. Returns the volume that should be played at this time.
     @safe ubyte tick() {
@@ -101,25 +113,27 @@ public class Sound1 {
     @safe private void freqUpdate() {
         // Do one tick's worth of frequency update
 
-        int newFreq = sweep.tick(frequency);
-        if(newFreq > MAX_FREQUENCY) {
-            enable = false;
-        }
-        if(sweep.effective) {
-            frequency = newFreq & 0b1111_1111_111;
-
-            // Update the registers with the newly calculated frequency
-            lowerFreq = frequency & 0b11;
-            nr14.higherFreq = cast(ubyte)(frequency >> 8);
-
-            // This seems a bit odd, but the overflow check happens
-            // again on the new value
-            newFreq = sweep.sweepCalculation(frequency);
+        if(hasSweep) {
+            int newFreq = sweep.tick(frequency);
             if(newFreq > MAX_FREQUENCY) {
                 enable = false;
             }
+            if(sweep.effective) {
+                frequency = newFreq & 0b1111_1111_111;
+
+                // Update the registers with the newly calculated frequency
+                lowerFreq = frequency & 0b11;
+                nr14.higherFreq = cast(ubyte)(frequency >> 8);
+
+                // This seems a bit odd, but the overflow check happens
+                // again on the new value
+                newFreq = sweep.sweepCalculation(frequency);
+                if(newFreq > MAX_FREQUENCY) {
+                    enable = false;
+                }
+            }
         }
-        if(!sweep.active) {
+        if(!sweep.effective || !hasSweep) {
             frequency = (nr14.higherFreq << 8) | lowerFreq;
         }
     }
@@ -221,28 +235,24 @@ public class Sound1 {
     body {
         switch (number) {
             case 0: // NR10
-                // TODO the left bit can't be read, so is it 0 or 1?
-                return sweep.readControlReg() & 0b01111111;
+                return hasSweep ? sweep.readControlReg() : 0xFF;
             case 1:
-                // TODO the are the unreadable bits 0 or 1?
-                return nr11.data & 0b11000000;
+                return nr11.data | 0b00111111;
             case 2:
                 return evp.readControlReg();
             case 4:
-                // TODO the are the unreadable bits 0 or 1?
-                return nr14.data & 0b01000000;
+                return nr14.data | 0b10111111;
             default:
                 writefln("Game tried to read write-only APU register %02X", number);
-                // TODO what gets returned for the unreadable ones?
-                return 0x00;
+                return 0xFF;
         }
     }
 
 }
 
 enum DutyCycle : ubyte {
-    PCT_12_5 = 0x00,   // 12.5%
-    PCT_25   = 0x01,   // 25%
-    PCT_50   = 0x10,   // 50%
-    PCT_75   = 0x11    // 75%
+    PCT_12_5 = 0b00,   // 12.5%
+    PCT_25   = 0b01,   // 25%
+    PCT_50   = 0b10,   // 50%
+    PCT_75   = 0b11    // 75%
 }
