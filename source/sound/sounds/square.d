@@ -122,8 +122,8 @@ public class SquareSound {
                 frequency = newFreq & 0b1111_1111_111;
 
                 // Update the registers with the newly calculated frequency
-                lowerFreq = frequency & 0b11;
-                nr14.higherFreq = cast(ubyte)(frequency >> 8);
+                // lowerFreq = frequency & 0b11;
+                // nr14.higherFreq = cast(ubyte)(frequency >> 8);
 
                 // This seems a bit odd, but the overflow check happens
                 // again on the new value
@@ -172,6 +172,8 @@ public class SquareSound {
             cycleAccum = 0;
             volume = evp.defaultVolume;
             // TODO Square 1's sweep does several things
+
+            frequency = (nr14.higherFreq << 8) | lowerFreq;
 
             // If the DAC power is 0 (controlled by NR12 volume), channel is diabled again
             if(volume == 0) {

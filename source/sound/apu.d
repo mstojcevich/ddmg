@@ -23,9 +23,6 @@ class APU {
     private SquareSound sound1;
     private SquareSound sound2;
 
-    /// The amount of cpu cycles since the last APU tick
-    private int tickAccum;
-
     private SoundFrontend frontend;
 
     @safe this(SoundFrontend frontend) {
@@ -36,10 +33,9 @@ class APU {
     }
 
     // Run every CPU cycle
-    int n = 0;
     @safe void tick() {
         ubyte s1out = cast(ubyte)(sound1.tick() + sound2.tick());
-        frontend.playAudio(s1out, s1out);
+        frontend.playAudio(cast(ubyte) (s1out * volumes.leftVol/7.0), cast(ubyte) (s1out * volumes.rightVol/7.0));
 
         enabledSounds.sound1Enable = sound1.enabled();
         enabledSounds.sound2Enable = sound2.enabled();
@@ -62,6 +58,11 @@ class APU {
 
         if(number >= SOUND2_REGISTERS_BEGIN && number <= SOUND2_REGISTERS_END) {
             sound2.setRegister(cast(ubyte)(number - SOUND2_REGISTERS_BEGIN), value);
+            return;
+        }
+
+        if(number == 0x14) {
+            volumes.data = value;
             return;
         }
 
@@ -93,6 +94,10 @@ class APU {
 
         if(number >= SOUND1_REGISTERS_BEGIN && number <= SOUND1_REGISTERS_END) {
             return sound1.readRegister(cast(ubyte)(number - SOUND1_REGISTERS_BEGIN));
+        }
+
+        if(number == 0x14) {
+            return volumes.data;
         }
 
         if(number == 0x16) {
