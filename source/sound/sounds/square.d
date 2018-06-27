@@ -29,13 +29,17 @@ private union NR14 {
 /// The amount of CPU cycles before the timer is updates
 const CYCLES_PER_TIMER    = DDMG_TICKS_HZ / 256; // Updated 256 times a second
 
-// TODO what happens when the different registers are read? Do they return the last written, 00, FF, or the actual value??
+// TODO some documentation mentions timers getting "reloaded w/ period"
+// does that mean that if the period gets changed midway that they'll restart?
 
 /// The sound1/sound2 gameboy sound. Square wave with envelope and optional sweep.
 public class SquareSound {
 
     /// Whether sound1 is enabled
     private bool enable;
+
+    /// Whether the dac is off
+    private bool dacOff; // TODO is the sound2 DAC off by default?
 
     // TODO I don't like how the registers are dealt with here.
     // Maybe make an anonymous struct for "state" and then have a bunch of anonymous unions.
@@ -93,12 +97,12 @@ public class SquareSound {
 
         // Update 1/4194304th of a second worth of audio
 
-        const timerPeriod = (2048 - frequency) * 4;
-        // switch which bit in the duty cycle we use each passing timerPeriod
-        cycleAccum++;
-        while (cycleAccum >= timerPeriod) {
-            dutyLocation = (dutyLocation + 1) % 8;
-            cycleAccum -= timerPeriod;
+        // Move forward in the duty cycle if needed
+        const period = (2048 - ((nr14.higherFreq << 8) | lowerFreq)) * 4;
+        this.cycleAccum++;
+        while (cycleAccum >= period) {
+            this.dutyLocation = (dutyLocation + 1) % 8;
+            this.cycleAccum -= period;
         }
 
         immutable ubyte curAmplitude = dutyCycle[dutyLocation] ? volume : 0;
@@ -117,13 +121,12 @@ public class SquareSound {
             int newFreq = sweep.tick(frequency);
             if(newFreq > MAX_FREQUENCY) {
                 enable = false;
-            }
-            if(sweep.effective) {
+            } else if (sweep.effective) {
                 frequency = newFreq & 0b1111_1111_111;
 
                 // Update the registers with the newly calculated frequency
-                // lowerFreq = frequency & 0b11;
-                // nr14.higherFreq = cast(ubyte)(frequency >> 8);
+                lowerFreq = frequency & 0b11;
+                nr14.higherFreq = cast(ubyte)(frequency >> 8);
 
                 // This seems a bit odd, but the overflow check happens
                 // again on the new value
@@ -133,7 +136,8 @@ public class SquareSound {
                 }
             }
         }
-        if(!sweep.effective || !hasSweep) {
+
+        if(!sweep.active || !hasSweep) {
             frequency = (nr14.higherFreq << 8) | lowerFreq;
         }
     }
@@ -165,33 +169,43 @@ public class SquareSound {
         nr14.data = data;
 
         if(nr14.initialize) {
-            enable = true;
-            if(timerCount == 0) {
-                timerCount = 64;
-            }
-            cycleAccum = 0;
-            volume = evp.defaultVolume;
-            // TODO Square 1's sweep does several things
-
-            frequency = (nr14.higherFreq << 8) | lowerFreq;
-
-            // If the DAC power is 0 (controlled by NR12 volume), channel is diabled again
-            if(volume == 0) {
-                // TODO what if you want to envelope up? Do you have to start at 1?
-                enable = false;
-            }
+            triggerEvent();
         }
     }
 
-    /// Set the frequency to the specified value
-    @safe private void setFrequency(int frequency)
-    in {
-        assert(frequency < 2048);
-    }
-    body {
-        frequency = min(frequency, 0);
-        this.frequency = frequency;
-        nr14.higherFreq = (frequency >> 8) & 0b111;
+    @safe private void triggerEvent() {
+        this.enable = true;
+
+        // If the length counter is 0, it is set to 64
+        if (this.timerCount == 0) {
+            this.timerCount = 64;
+        }
+
+        // Frequency timer is reloaded
+        this.cycleAccum = 0;
+        
+        evp.triggerEvent();
+        this.volume = evp.defaultVolume;
+
+        sweep.triggerEvent();
+
+        // Write frequency to the shadow register
+        this.frequency = (nr14.higherFreq << 8) | lowerFreq;
+
+        // This seems a bit odd, but the calculation and overflow check happens
+        // I THINK the resulting frequency is just thrown away.
+        if (hasSweep && sweep.effective) {
+            const newFreq = sweep.sweepCalculation(frequency);
+            if(newFreq > MAX_FREQUENCY) {
+                enable = false;
+            }
+        }
+
+        // If the channel's DAC is off, the channel will be
+        // disabled again
+        if (dacOff) {
+            enable = false;
+        }
     }
 
     /// Whether sound1 should be enabled
@@ -201,8 +215,12 @@ public class SquareSound {
 
     /// Enable/disable sound1
     @safe void enabled(bool enabled) {
-        this.enable = enabled;
-        frequency = (nr14.higherFreq << 8) | lowerFreq;
+        // TODO we don't need this once the power control reg is properly implemented
+        if (enabled) {
+            triggerEvent();
+        } else {
+            enable = false;
+        }
     }
 
     /// Set one of the 4 sound1 registers
@@ -220,6 +238,11 @@ public class SquareSound {
                 break;
             case 2:
                 evp.writeControlReg(value);
+
+                this.dacOff = (value & 0b11111000) == 0;
+                if(this.dacOff) {
+                    enable = false;
+                }
                 break;
             case 3:
                 setLowerFreq(value);

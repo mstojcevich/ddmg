@@ -70,6 +70,14 @@ class Envelope {
         return volume;
     }
 
+    /**
+     * Called during the "trigger event" when a channel is enabled
+     */
+    @safe void triggerEvent() {
+        // Volume envelope timer is reloaded
+        cycleAccum = 0;
+    }
+
     /// Read the value of the envelope control register (used for NR12, NR22, and NR42)
     @safe ubyte readControlReg() const {
         return controlReg;

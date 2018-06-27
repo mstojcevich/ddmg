@@ -12,6 +12,9 @@ class Sweep {
     /// The number of cycles since the last sweep update
     private int cycleAccum;
 
+    /// Internal enabled flag
+    private bool enabled;
+
     // Hardware register for sweep control: This is NR10
     private union {
         ubyte controlReg;
@@ -36,13 +39,25 @@ class Sweep {
     body {
         cycleAccum++;
 
-        const cyclesPerStep = CYCLES_PER_SWEEP * stepLength;
+        const cyclesPerStep = CYCLES_PER_SWEEP * (stepLength == 0 ? 8 : stepLength);
         if(cycleAccum > cyclesPerStep) {
             cycleAccum -= cyclesPerStep;
             frequency = sweepCalculation(frequency);
         }
 
         return frequency;
+    }
+
+    /**
+     * Called during the "trigger event" when a channel is enabled
+     */
+    @safe void triggerEvent() {
+        // The sweep timer is reloaded
+        this.cycleAccum = 0;
+
+        // The internal enabled flag is set if either the sweep period or shift
+        // are non-zero, cleared otherwise
+        this.enabled = stepLength != 0 || shift != 0;
     }
 
     /**
@@ -70,9 +85,7 @@ class Sweep {
      * This should be used to determine whether overflow should be calculated.
      */
     @safe @property bool active() const {
-        // The internal enabled flag is set if either the sweep period
-        // or shift are non-zero, cleared otherwise
-        return stepLength != 0 || shift != 0;
+        return this.enabled && stepLength != 0;
     }
 
     /**

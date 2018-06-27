@@ -67,6 +67,7 @@ class Serial {
             // Write out one bit
             this.outByte |= (this.serialData & 0b10000000) >> wireBit;
             this.serialData <<= 1;
+            this.serialData |= 1;
             // TODO this is where we'd probably read in the input
             this.wireBit++;
 
@@ -76,7 +77,7 @@ class Serial {
                 this.wireBit = 0;
                 this.outByte = 0;
                 this.serialControl.inProgress = false;
-                iuptHandler.fireInterrupt(Interrupts.SERIAL_LINK);
+                // iuptHandler.fireInterrupt(Interrupts.SERIAL_LINK);
             }
         }
     }
