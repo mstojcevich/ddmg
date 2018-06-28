@@ -23,6 +23,7 @@ class APU {
 
     private SquareSound sound1;
     private SquareSound sound2;
+    private WaveSound sound3;
 
     private SoundFrontend frontend;
 
@@ -34,6 +35,7 @@ class APU {
 
         sound1 = new SquareSound(true, DutyCycle.PCT_50);
         sound2 = new SquareSound(false, DutyCycle.PCT_12_5);
+        sound3 = new WaveSound();
     }
 
     /// Run every CPU cycle
@@ -42,15 +44,17 @@ class APU {
         while (frameCycleAccum >= TICKS_PER_FRAME) {
             sound1.frameUpdate(frame);
             sound2.frameUpdate(frame);
+            sound3.frameUpdate(frame);
             frame = (frame + 1) % 8;
             frameCycleAccum -= TICKS_PER_FRAME;
         }
 
-        ubyte s1out = cast(ubyte)(sound1.tick() + sound2.tick());
+        ubyte s1out = cast(ubyte)(sound1.tick() + sound2.tick() + sound3.tick());
         frontend.playAudio(cast(ubyte) (s1out * volumes.leftVol/7.0), cast(ubyte) (s1out * volumes.rightVol/7.0));
 
         enabledSounds.sound1Enable = sound1.enabled();
         enabledSounds.sound2Enable = sound2.enabled();
+        enabledSounds.sound3Enable = sound3.enabled();
     }
 
     /**
@@ -83,6 +87,7 @@ class APU {
             enabledSounds.data = value;
             sound1.enabled(enabledSounds.sound1Enable);
             sound2.enabled(enabledSounds.sound2Enable);
+            sound3.enabled(enabledSounds.sound3Enable);
             return;
         }
 
@@ -121,6 +126,20 @@ class APU {
             writefln("Game tried to read unimplemented APU register %02X", number);
         }
         return 0xFF;
+    }
+
+    /// Write a byte to wave RAM
+    @safe void writeWaveRAM(ubyte addr, ubyte data)
+    in { assert(addr <= 15); }
+    body {
+        sound3.writeWaveRAM(addr, data);
+    }
+
+    /// Read a byte from wave RAM
+    @safe ubyte readWaveRAM(ubyte addr) const
+    in { assert(addr <= 15); }
+    body {
+        return sound3.readWaveRAM(addr);
     }
 
 }

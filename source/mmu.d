@@ -43,11 +43,14 @@ private const TIMER_COUNTER             = 0xFF05;
 private const TIMER_MODULO              = 0xFF06;
 private const TIMER_CONTROL             = 0xFF07;
 
-private const APU_REGISTERS_BEGIN        = 0xFF10;
-private const APU_REGISTERS_END          = 0xFF26;
+private const APU_REGISTERS_BEGIN       = 0xFF10;
+private const APU_REGISTERS_END         = 0xFF26;
 
-private const SERIAL_DATA                = 0xFF01;
-private const SERIAL_CONTROL             = 0xFF02;
+private const WAVE_RAM_BEGIN            = 0xFF30;
+private const WAVE_RAM_END              = 0xFF3F;
+
+private const SERIAL_DATA               = 0xFF01;
+private const SERIAL_CONTROL            = 0xFF02;
 
 private enum OamTransferState {
     NO_TRANSFER,
@@ -246,6 +249,9 @@ class MMU {
         if(address >= APU_REGISTERS_BEGIN && address <= APU_REGISTERS_END) {
             return apu.readApuRegister(cast(ushort)(address - APU_REGISTERS_BEGIN));
         }
+        if(address >= WAVE_RAM_BEGIN && address <= WAVE_RAM_END) {
+            return apu.readWaveRAM(cast(ubyte)(address - WAVE_RAM_BEGIN));
+        }
 
         debug {
             writefln("UNIMPLEMENTED : Reading address %04X", address);
@@ -352,6 +358,8 @@ class MMU {
 
         } else if(address >= APU_REGISTERS_BEGIN && address <= APU_REGISTERS_END) {
             apu.setApuRegister(cast(ushort)(address - APU_REGISTERS_BEGIN), val);
+        } else if(address >= WAVE_RAM_BEGIN && address <= WAVE_RAM_END) {
+            apu.writeWaveRAM(cast(ubyte)(address - WAVE_RAM_BEGIN), val);
 
         } else if(address == SERIAL_CONTROL) {
             serial.control = val;

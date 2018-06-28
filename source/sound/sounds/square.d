@@ -22,7 +22,7 @@ private union NR14 {
         ubyte, "higherFreq",  3, // High bits of frequency
         ubyte, "",            3,
         bool,  "counter",     1, // If false, output continuously regardless of NR11's soundLength
-        bool,  "initialize",  1, // Settings this to 1 restarts sound
+        bool,  "initialize",  1, // Setting this to 1 restarts the sound
     ));
 }
 
@@ -212,12 +212,12 @@ public class SquareSound {
         }
     }
 
-    /// Whether sound1 should be enabled
+    /// Whether the channel should be enabled
     @safe bool enabled() {
         return enable;
     }
 
-    /// Enable/disable sound1
+    /// Enable/disable the channel
     @safe void enabled(bool enabled) {
         // TODO we don't need this once the power control reg is properly implemented
         if (enabled) {
@@ -227,7 +227,7 @@ public class SquareSound {
         }
     }
 
-    /// Set one of the 4 sound1 registers
+    /// Set one of the 5 channel registers
     @safe void setRegister(ushort number, ubyte value) 
     in {
         assert(number <= 4);
