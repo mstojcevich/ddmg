@@ -41,6 +41,7 @@ class APU {
         frameCycleAccum++;
         while (frameCycleAccum >= TICKS_PER_FRAME) {
             sound1.frameUpdate(frame);
+            sound2.frameUpdate(frame);
             frame = (frame + 1) % 8;
             frameCycleAccum -= TICKS_PER_FRAME;
         }
