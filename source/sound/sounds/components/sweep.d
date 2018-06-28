@@ -4,16 +4,13 @@ import sound.consts;
 import std.bitmanip;
 import timing;
 
-/// The amount of CPU cycles before sweep is updated
-private const CYCLES_PER_SWEEP = DDMG_TICKS_HZ / 128; // Updated 128 times a second
-
 class Sweep {
-
-    /// The number of cycles since the last sweep update
-    private int cycleAccum;
 
     /// Internal enabled flag
     private bool enabled;
+
+    /// Number of frames remaining before a calculation
+    private int timeRemaining;
 
     // Hardware register for sweep control: This is NR10
     private union {
@@ -27,7 +24,7 @@ class Sweep {
     }
 
     /**
-     * Called every cpu cycle (4_194_304 times a second) to update.
+     * Called every sweep update frame.
      * @param frequency The current frequency (value of the 11 bit "shadow register")
      * @return the new frequency (value of the 11 bit "shadow register"). Note that
      *   the returned value may be greater than the max frequency: this is because overflow
@@ -35,14 +32,19 @@ class Sweep {
      */
     @safe int tick(int frequency)
     in { assert(frequency >= 0 && frequency <= MAX_FREQUENCY); }
-    out (outfreq) { assert(outfreq >= 0); }
     body {
-        cycleAccum++;
+        if (enabled) {
+            timeRemaining--; // TODO does the first sequence decrement at the beginning or end?
 
-        const cyclesPerStep = CYCLES_PER_SWEEP * (stepLength == 0 ? 8 : stepLength);
-        if(cycleAccum > cyclesPerStep) {
-            cycleAccum -= cyclesPerStep;
-            frequency = sweepCalculation(frequency);
+            if (timeRemaining == 0) {
+                if (stepLength != 0) {
+                    frequency = sweepCalculation(frequency);
+                }
+
+                if (frequency <= MAX_FREQUENCY) {
+                    timeRemaining = sweepTime;
+                }
+            }
         }
 
         return frequency;
@@ -52,12 +54,12 @@ class Sweep {
      * Called during the "trigger event" when a channel is enabled
      */
     @safe void triggerEvent() {
-        // The sweep timer is reloaded
-        this.cycleAccum = 0;
-
         // The internal enabled flag is set if either the sweep period or shift
         // are non-zero, cleared otherwise
         this.enabled = stepLength != 0 || shift != 0;
+
+        // The sweep timer is reloaded
+        this.timeRemaining = sweepTime;
     }
 
     /**
@@ -66,37 +68,21 @@ class Sweep {
      */
     @safe int sweepCalculation(int frequency)
     in { assert(frequency >= 0 && frequency <= MAX_FREQUENCY); }
-    out (outfreq) { assert(outfreq >= 0); }
     body {
-        if(active) {
-            const freqChange = frequency >> shift;
-            const newFreq = (mode == SweepMode.ADDITION) 
-                ? frequency + freqChange 
-                : frequency - freqChange;
-            return newFreq;       
-        } else {
-            return frequency;
-        }
+        const freqChange = frequency >> shift;
+        const newFreq = (mode == SweepMode.ADDITION) 
+            ? frequency + freqChange 
+            : frequency - freqChange;
+        return newFreq;
     }
 
     /**
-     * Whether sweeping is currently active.
-     * Note that this is different than effective.
-     * This should be used to determine whether overflow should be calculated.
-     */
-    @safe @property bool active() const {
-        return this.enabled && stepLength != 0;
-    }
-
-    /**
-     * This must be checked to determine whether the effective
-     * frequency is able to be updated.
-     * This is different than active because overflow checks
-     * should still happen even if the sweep isn't effective.
-     * This determines whether the sweep frequency should be used or thrown away.
+     * This must be checked to determine whether the effective frequency is able to be updated.
+     * This determines whether the sweep frequency should be written back or thrown away.
      */
     @safe @property bool effective() const {
-        return shift != 0;
+        // TODO verify that writeback always occurs in subtraction mode
+        return shift != 0 || (mode == SweepMode.SUBTRACTION);
     }
 
      /// Read the value of the sweep control register (used for NR10)
@@ -107,6 +93,10 @@ class Sweep {
     /// Write to the envelope control register (used for NR10)
     @safe void writeControlReg(ubyte val) {
         this.controlReg = val;
+    }
+
+    @safe @property private ubyte sweepTime() {
+        return stepLength == 0 ? 8 : stepLength; 
     }
 
 }

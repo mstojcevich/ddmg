@@ -3,17 +3,14 @@ import sound.consts;
 import std.bitmanip;
 import timing;
 
-/// The amount of CPU cycles before envelope is updated
-private const CYCLES_PER_ENVELOPE = DDMG_TICKS_HZ / 64; // Updated 64 times a second
-
 /**
  * The envelope component deals with fading the volume
  * up and down
  */
 class Envelope {
 
-    /// The number of cycles since the last envelope update
-    private int cycleAccum;
+    /// The number of frames remaining before a calculation
+    private int timeRemaining;
 
     /// Hardware register for envelope control: This is NR12, NR22, and NR42
     private union {
@@ -32,7 +29,7 @@ class Envelope {
     }
 
     /**
-     * Called every cpu cycle (4_194_304 times a second) to update.
+     * Called every relevant frame (64 times a second).
      * @param volume The current volume (value from 0 to 15)
      * @return the new volume (value from 0 to 15) 
      */
@@ -40,12 +37,11 @@ class Envelope {
     in { assert(volume >= 0 && volume <= MAX_VOLUME); }
     out (newVolume) { assert(newVolume >= 0 && newVolume <= MAX_VOLUME); }
     body {
-        cycleAccum++;
+        timeRemaining--; // TODO does the first sequence decrement at the beginning or end?
 
-        const cyclesPerStep = CYCLES_PER_ENVELOPE * stepLength;
-        if(cycleAccum > cyclesPerStep) {
-            cycleAccum -= cyclesPerStep;
+        if (timeRemaining == 0) {
             volume = evpStep(volume);
+            timeRemaining = stepLength;
         }
 
         return volume;
@@ -75,7 +71,7 @@ class Envelope {
      */
     @safe void triggerEvent() {
         // Volume envelope timer is reloaded
-        cycleAccum = 0;
+        timeRemaining = stepLength;
     }
 
     /// Read the value of the envelope control register (used for NR12, NR22, and NR42)

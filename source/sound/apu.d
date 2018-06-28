@@ -4,6 +4,7 @@ import sound.frontend;
 import sound.sounds;
 import std.bitmanip;
 import std.stdio;
+import timing;
 
 // Memory mappings, inclusive
 private const SOUND1_REGISTERS_BEGIN = 0x00;
@@ -11,7 +12,7 @@ private const SOUND1_REGISTERS_END   = 0x04;
 private const SOUND2_REGISTERS_BEGIN = 0x05;
 private const SOUND2_REGISTERS_END   = 0x09;
 
-// TODO evaluate writing "components" that the individual sounds can have, like evelope and sweep etc
+private const TICKS_PER_FRAME = DDMG_TICKS_HZ / 512;  // Frames are clocked @ 512Hz
 
 /// Sound processing unit for the Gameboy
 class APU {
@@ -25,6 +26,9 @@ class APU {
 
     private SoundFrontend frontend;
 
+    private int frameCycleAccum = 0;
+    private ubyte frame = 0;
+
     @safe this(SoundFrontend frontend) {
         this.frontend = frontend;
 
@@ -32,8 +36,15 @@ class APU {
         sound2 = new SquareSound(false, DutyCycle.PCT_12_5);
     }
 
-    // Run every CPU cycle
+    /// Run every CPU cycle
     @safe void tick() {
+        frameCycleAccum++;
+        while (frameCycleAccum >= TICKS_PER_FRAME) {
+            sound1.frameUpdate(frame);
+            frame = (frame + 1) % 8;
+            frameCycleAccum -= TICKS_PER_FRAME;
+        }
+
         ubyte s1out = cast(ubyte)(sound1.tick() + sound2.tick());
         frontend.playAudio(cast(ubyte) (s1out * volumes.leftVol/7.0), cast(ubyte) (s1out * volumes.rightVol/7.0));
 

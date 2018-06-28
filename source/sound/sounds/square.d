@@ -64,14 +64,14 @@ public class SquareSound {
     /// Counts how many cpu cycles have occurred since the last bit change in the waveform
     private int cycleAccum;
 
-    /// The amount of cpu cycles since the last timer update
-    private int timerAccum;
-
     /// The amount of timer cycles (1/256th of a second) remaining on the timer
     private int timerCount;
 
     /// Whether this square channel has sweep support (sound1 does, sound2 does not)
     private bool hasSweep;
+
+    /// Current frame sequencer frame
+    private ubyte frame;
 
     /**
      * @param hasSweep Whether this square voice has a sweep module
@@ -84,21 +84,10 @@ public class SquareSound {
 
     // Called every cpu cycle (4_194_304 times a second) to update. Returns the volume that should be played at this time.
     @safe ubyte tick() {
-        // Update the envelope/sweep
-        volume = evp.tick(volume);
-
-        freqUpdate();
-
-        timerAccum++;
-        if(timerAccum > CYCLES_PER_TIMER) {
-            timerTick();
-            timerAccum = 0;
-        }
-
         // Update 1/4194304th of a second worth of audio
 
         // Move forward in the duty cycle if needed
-        const period = (2048 - ((nr14.higherFreq << 8) | lowerFreq)) * 4;
+        const period = (2048 - frequency) * 4;
         this.cycleAccum++;
         while (cycleAccum >= period) {
             this.dutyLocation = (dutyLocation + 1) % 8;
@@ -114,18 +103,33 @@ public class SquareSound {
         return curAmplitude;
     }
 
+    /// Called each frame update (256Hz) w/ the current frame sequencer frame
+    @safe void frameUpdate(ubyte frame)
+    in { assert(frame >= 0 && frame <= 7); }
+    body {
+        if (frame == 2 || frame == 6) {
+            freqUpdate();
+        }
+        if (frame % 2 == 0) {
+            timerTick();
+        }
+        if (frame == 7) {
+            volume = evp.tick(volume);
+        }
+    }
+
     @safe private void freqUpdate() {
-        // Do one tick's worth of frequency update
+        // Do one tick's worth of frequency update 
 
         if(hasSweep) {
             int newFreq = sweep.tick(frequency);
-            if(newFreq > MAX_FREQUENCY) {
+            if(newFreq > MAX_FREQUENCY) { // TODO verify that overflow down doesn't result in channel disable
                 enable = false;
-            } else if (sweep.effective) {
-                frequency = newFreq & 0b1111_1111_111;
+            } else if (newFreq >= 0 && sweep.effective) { 
+                frequency = newFreq;
 
                 // Update the registers with the newly calculated frequency
-                lowerFreq = frequency & 0b11;
+                lowerFreq = frequency & 0xFF;
                 nr14.higherFreq = cast(ubyte)(frequency >> 8);
 
                 // This seems a bit odd, but the overflow check happens
@@ -135,10 +139,6 @@ public class SquareSound {
                     enable = false;
                 }
             }
-        }
-
-        if(!sweep.active || !hasSweep) {
-            frequency = (nr14.higherFreq << 8) | lowerFreq;
         }
     }
 
@@ -162,6 +162,10 @@ public class SquareSound {
     /// Set the lower frequency data (NR13)
     @safe void setLowerFreq(ubyte data) {
         lowerFreq = data;
+        if (!hasSweep) {
+            frequency &= 0b111_0000_0000;
+            frequency |= data;
+        }
     }
 
     /// Set the content of the NR14 register
@@ -187,10 +191,10 @@ public class SquareSound {
         evp.triggerEvent();
         this.volume = evp.defaultVolume;
 
-        sweep.triggerEvent();
-
         // Write frequency to the shadow register
         this.frequency = (nr14.higherFreq << 8) | lowerFreq;
+
+        sweep.triggerEvent();
 
         // This seems a bit odd, but the calculation and overflow check happens
         // I THINK the resulting frequency is just thrown away.
