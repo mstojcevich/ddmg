@@ -1,9 +1,11 @@
 module frontend.glfw;
 
+import derelict.sdl2.sdl;
 import frontend;
 import frontend.dummy.sound;
 import frontend.glfw.display;
 import frontend.glfw.keypad;
+import frontend.sdl.sound;
 import graphics.display;
 import serial;
 import sound.frontend;
@@ -14,13 +16,17 @@ class GLFWFrontend : Frontend {
 
     private GLFWDisplay display;
     private GLFWKeypad keypad;
-    private DummySound sound;
+    private SDLSound sound;
     private SerialIO serial;
 
-    @safe override void init() {
+    @trusted override void init() {
+        // We use SDL for sound for now
+        DerelictSDL2.load();
+        SDL_Init(SDL_INIT_AUDIO);
+
         this.display = new GLFWDisplay();
         this.keypad = new GLFWKeypad(display.glfwWindow);
-        this.sound = new DummySound();
+        this.sound = new SDLSound();
         this.serial = new StandardSerialIO();
     }
 

@@ -32,8 +32,8 @@ class GLFWDisplay : Display {
 
         Color white = {255, 255, 255};
         // Initialize the pixels all to white
-        for(ubyte x = 0; x < GB_DISPLAY_WIDTH; x++) {
-            for(ubyte y = 0; y < GB_DISPLAY_HEIGHT; y++) {
+        for(ubyte x; x < GB_DISPLAY_WIDTH; x++) {
+            for(ubyte y; y < GB_DISPLAY_HEIGHT; y++) {
                 setPixel(x, y, white);
             }
         }
@@ -64,10 +64,10 @@ class GLFWDisplay : Display {
                 "GLFW initialization failed. Make sure you have up-to-date graphics drivers installed.");
 
         // Set preferences for OpenGl context of the window
-        // Requesting 3.0 because we use glDrawPixels, which
+        // Requesting 2.1 because we use glDrawPixels, which
         //  is part of the fixed-function pipeline
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
 
         // Create a window
         window = glfwCreateWindow(DISPLAY_WIDTH, DISPLAY_HEIGHT, "DDMG", null, null); // 160x144 is Gameboy resolution
@@ -79,12 +79,13 @@ class GLFWDisplay : Display {
         DerelictGL.reload(); // Need to reload for full support
     }
 
-    @safe void resetFrameBuffer() {
+
+    @safe private void resetFrameBuffer() {
         Color white = {255, 255, 255};
 
         // Initialize the pixels all to white
-        for(ubyte x = 0; x < GB_DISPLAY_WIDTH; x++) {
-            for(ubyte y = 0; y < GB_DISPLAY_HEIGHT; y++) {
+        for(ubyte x; x < GB_DISPLAY_WIDTH; x++) {
+            for(ubyte y; y < GB_DISPLAY_HEIGHT; y++) {
                 setPixel(x, y, white);
             }
         }
@@ -93,9 +94,11 @@ class GLFWDisplay : Display {
     @trusted override void drawFrame() {
         glfwPollEvents();
 
-        glPixelZoom(DISPLAY_WIDTH / GB_DISPLAY_WIDTH, DISPLAY_HEIGHT / GB_DISPLAY_HEIGHT);
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+        glPixelZoom(width / GB_DISPLAY_WIDTH, height / GB_DISPLAY_HEIGHT);
 
-        glDrawPixels(GB_DISPLAY_WIDTH, GB_DISPLAY_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, &pixels);
+        glDrawPixels(GB_DISPLAY_WIDTH, GB_DISPLAY_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, &pixels[0]);
         
         glfwSwapInterval(1); // Use vsync
         
@@ -106,6 +109,7 @@ class GLFWDisplay : Display {
         glfwSetTime(0);
     }
 
+    /// Returns whether emulation should be stopped
     @trusted bool shouldProgramTerminate() {
         // Terminate the program if escape was pressed
         if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
@@ -126,7 +130,7 @@ class GLFWDisplay : Display {
         assert(y < GB_DISPLAY_HEIGHT);
     }
     body {
-        int pixelNum = ((GB_DISPLAY_HEIGHT - y - 1) * GB_DISPLAY_WIDTH) + x;
+        const pixelNum = ((GB_DISPLAY_HEIGHT - y - 1) * GB_DISPLAY_WIDTH) + x;
 
         return gbPixels[pixelNum];
     }
@@ -152,12 +156,13 @@ class GLFWDisplay : Display {
         gbPixels[pixelNum] = value;
     }
 
+    /// Get the window associated with the display
     @safe @property GLFWwindow* glfwWindow() {
         return window;
     }
 }
 
-struct Color {
+private struct Color {
     align(1):
         ubyte red, green, blue;
 }
