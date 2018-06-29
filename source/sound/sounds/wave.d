@@ -13,13 +13,20 @@ public class WaveSound {
     private bool dacPower;
     
     /// 256-NR31 register
-    private ubyte soundLength;
+    private ushort soundLength;
+    private ushort soundLengthRemaining;
 
     /// Amount to shift the output volume
     private ubyte shiftAmt;
 
     /// Lower 8 bits of the 11-bit frequency
     private ubyte lowerFreq;
+
+    /// Amount of time remaining on the current sample
+    private int sampleTimer;
+
+    /// Effective frequency
+    private int frequency;
 
     private union {
         ubyte nr34;
@@ -33,6 +40,15 @@ public class WaveSound {
 
     private ubyte[16] waveRam;
 
+    /// Position in the wave RAM (sample #)
+    private int position;
+
+    /// Current sample from the wave RAM
+    private ubyte sampleBuffer;
+
+    /// Time remaining (in length update frames)
+    private ushort lengthCounter;
+
     @safe this() {
         for (int i; i < waveRam.length; i++) {
             waveRam[i] = (i % 2 == 0) ? 0 : 0xFF;
@@ -41,13 +57,30 @@ public class WaveSound {
 
     /// Called every cpu cycle (4_194_304 times a second) to update. Returns the volume that should be played at this time.
     @safe ubyte tick() {
-        return 0;
+        this.sampleTimer--;
+
+        if (sampleTimer == 0) {
+            position = (position + 1) % (waveRam.length * 2);
+            sampleBuffer = waveRam[position >> 1];
+            if (position % 2 == 0) {
+                sampleBuffer >>= 4;
+            }
+
+            sampleBuffer &= 0xF;
+
+            sampleTimer = (2048 - frequency) * 2;
+        }
+
+        return sampleBuffer >> shiftAmt;
     }
 
     /// Called each frame update (256Hz) w/ the current frame sequencer frame
     @safe void frameUpdate(ubyte frame)
     in { assert(frame >= 0 && frame <= 7); }
     body {
+        if (frame % 2 == 0) {
+            timerTick();
+        }
     }
 
     /// Write one of the 5 channel registers
@@ -68,6 +101,7 @@ public class WaveSound {
                 break;
             case 3:
                 lowerFreq = value;
+                frequency = (frequency & 0b111_0000_0000) | lowerFreq;
                 break;
             case 4:
                 writeNR34(value);
@@ -133,6 +167,7 @@ public class WaveSound {
     /// Write the "length" (shortness) register (NR31)
     @safe void writeShortness(ubyte shortness) {
         soundLength = cast(ubyte)(256 - shortness);
+        soundLengthRemaining = cast(ubyte)(256 - shortness);
     }
 
     /// Read the "length" (shortness) register (NR31)
@@ -157,14 +192,38 @@ public class WaveSound {
 
     /// Write to the NR34 register
     @safe void writeNR34(ubyte val) {
-        nr34 = val;
+        this.nr34 = val;
+        this.frequency = (frequency & 0xFF) | higherFreq;
 
-        // TODO implement trigger event
+        if (initialize) {
+            // Reset the position of the current sample
+            this.position = 0;
+            // Note that the sample buffer isn't reloaded
+
+            // Reset the length counter if finished
+            if (this.lengthCounter == 0) {
+                this.lengthCounter = 256;
+            }
+
+            // Frequency timer is reloaded
+            this.sampleTimer = (2048 - frequency) * 2;
+        }
     }
 
     /// Read from the NR34 register
     @safe ubyte readNR34() const {
         return nr34 | 0b1011_1111;
+    }
+
+    /// Tick the timer as if 1/256th of a second has passed
+    @safe private void timerTick() {
+        if(counter && soundLengthRemaining != 0) {
+            immutable int newTimerCount = soundLengthRemaining - 1;
+            if(newTimerCount == 0) {
+                enable = false;
+            }
+            soundLengthRemaining = cast(ushort)(newTimerCount);
+        }
     }
 
 }

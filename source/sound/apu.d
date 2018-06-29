@@ -11,6 +11,8 @@ private const SOUND1_REGISTERS_BEGIN = 0x00;
 private const SOUND1_REGISTERS_END   = 0x04;
 private const SOUND2_REGISTERS_BEGIN = 0x05;
 private const SOUND2_REGISTERS_END   = 0x09;
+private const SOUND3_REGISTERS_BEGIN = 0x0A;
+private const SOUND3_REGISTERS_END   = 0x0E;
 
 private const TICKS_PER_FRAME = DDMG_TICKS_HZ / 512;  // Frames are clocked @ 512Hz
 
@@ -67,22 +69,27 @@ class APU {
         assert(number <= 0x16);
     }
     body {
-        if(number >= SOUND1_REGISTERS_BEGIN && number <= SOUND1_REGISTERS_END) {
+        if (number >= SOUND1_REGISTERS_BEGIN && number <= SOUND1_REGISTERS_END) {
             sound1.setRegister(cast(ubyte)(number - SOUND1_REGISTERS_BEGIN), value);
             return;
         }
 
-        if(number >= SOUND2_REGISTERS_BEGIN && number <= SOUND2_REGISTERS_END) {
+        if (number >= SOUND2_REGISTERS_BEGIN && number <= SOUND2_REGISTERS_END) {
             sound2.setRegister(cast(ubyte)(number - SOUND2_REGISTERS_BEGIN), value);
             return;
         }
 
-        if(number == 0x14) {
+        if (number >= SOUND3_REGISTERS_BEGIN && number <= SOUND3_REGISTERS_BEGIN) {
+            sound3.writeRegister(cast(ubyte)(number - SOUND3_REGISTERS_BEGIN), value);
+            return;
+        }
+
+        if (number == 0x14) {
             volumes.data = value;
             return;
         }
 
-        if(number == 0x16) {
+        if (number == 0x16) {
             // TODO when powered off, all registers are written to 0
             enabledSounds.data = value;
             sound1.enabled(enabledSounds.sound1Enable);
@@ -106,19 +113,23 @@ class APU {
         assert(number <= 0x16);
     }
     body {
-        if(number >= SOUND2_REGISTERS_BEGIN && number <= SOUND2_REGISTERS_END) {
+        if (number >= SOUND2_REGISTERS_BEGIN && number <= SOUND2_REGISTERS_END) {
             return sound2.readRegister(cast(ubyte)(number - SOUND2_REGISTERS_BEGIN));
         }
 
-        if(number >= SOUND1_REGISTERS_BEGIN && number <= SOUND1_REGISTERS_END) {
+        if (number >= SOUND1_REGISTERS_BEGIN && number <= SOUND1_REGISTERS_END) {
             return sound1.readRegister(cast(ubyte)(number - SOUND1_REGISTERS_BEGIN));
         }
 
-        if(number == 0x14) {
+        if (number >= SOUND3_REGISTERS_BEGIN && number <= SOUND3_REGISTERS_END) {
+            return sound3.readRegister(cast(ubyte)(number - SOUND3_REGISTERS_BEGIN));
+        }
+
+        if (number == 0x14) {
             return volumes.data;
         }
 
-        if(number == 0x16) {
+        if (number == 0x16) {
             return enabledSounds.data;
         }
 

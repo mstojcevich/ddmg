@@ -87,6 +87,8 @@ public class SquareSound {
         // Update 1/4194304th of a second worth of audio
 
         // Move forward in the duty cycle if needed
+        // TODO Probably change to precalculate period instead of each tick
+        // because it could change too often based on frequency changes!!
         const period = (2048 - frequency) * 4;
         this.cycleAccum++;
         while (cycleAccum >= period) {
