@@ -193,7 +193,7 @@ public class WaveSound {
     /// Write to the NR34 register
     @safe void writeNR34(ubyte val) {
         this.nr34 = val;
-        this.frequency = (frequency & 0xFF) | higherFreq;
+        this.frequency = (frequency & 0xFF) | (higherFreq << 7);
 
         if (initialize) {
             // Reset the position of the current sample
