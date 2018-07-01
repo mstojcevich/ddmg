@@ -35,7 +35,7 @@ const CYCLES_PER_TIMER    = DDMG_TICKS_HZ / 256; // Updated 256 times a second
 /// The sound1/sound2 gameboy sound. Square wave with envelope and optional sweep.
 public class SquareSound {
 
-    /// Whether sound1 is enabled
+    /// Whether the channel is enabled
     private bool enable;
 
     /// Whether the dac is off
