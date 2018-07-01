@@ -13,6 +13,8 @@ private const SOUND2_REGISTERS_BEGIN = 0x05;
 private const SOUND2_REGISTERS_END   = 0x09;
 private const SOUND3_REGISTERS_BEGIN = 0x0A;
 private const SOUND3_REGISTERS_END   = 0x0E;
+private const SOUND4_REGISTERS_BEGIN = 0x0F;
+private const SOUND4_REGISTERS_END   = 0x13;
 
 private const TICKS_PER_FRAME = DDMG_TICKS_HZ / 512;  // Frames are clocked @ 512Hz
 
@@ -26,6 +28,7 @@ class APU {
     private SquareSound sound1;
     private SquareSound sound2;
     private WaveSound sound3;
+    private NoiseSound sound4;
 
     private SoundFrontend frontend;
 
@@ -38,6 +41,7 @@ class APU {
         sound1 = new SquareSound(true, DutyCycle.PCT_50);
         sound2 = new SquareSound(false, DutyCycle.PCT_12_5);
         sound3 = new WaveSound();
+        sound4 = new NoiseSound();
     }
 
     /// Run every CPU cycle
@@ -47,16 +51,50 @@ class APU {
             sound1.frameUpdate(frame);
             sound2.frameUpdate(frame);
             sound3.frameUpdate(frame);
+            sound4.frameUpdate(frame);
             frame = (frame + 1) % 8;
             frameCycleAccum -= TICKS_PER_FRAME;
         }
 
-        ubyte s1out = cast(ubyte)(sound1.tick() + sound2.tick());
-        frontend.playAudio(cast(ubyte) (s1out * volumes.leftVol/7.0), cast(ubyte) (s1out * volumes.rightVol/7.0));
+        const s1out = sound1.tick();
+        const s2out = sound2.tick();
+        const s3out = 0;
+        const s4out = sound4.tick();
+
+        int leftOut;
+        if (enabledChannels.leftSound1) {
+            leftOut += s1out;
+        }
+        if (enabledChannels.leftSound2) {
+            leftOut += s2out;
+        }
+        if (enabledChannels.leftSound3) {
+            leftOut += s3out;
+        }
+        if (enabledChannels.leftSound4) {
+            leftOut += s4out;
+        }
+
+        int rightOut;
+        if (enabledChannels.rightSound1) {
+            rightOut += s1out;
+        }
+        if (enabledChannels.rightSound2) {
+            rightOut += s2out;
+        }
+        if (enabledChannels.rightSound3) {
+            rightOut += s3out;
+        }
+        if (enabledChannels.rightSound4) {
+            rightOut += s4out;
+        }    
+
+        frontend.playAudio(cast(ubyte)(leftOut / 4), cast(ubyte)(rightOut / 4));
 
         enabledSounds.sound1Enable = sound1.enabled();
         enabledSounds.sound2Enable = sound2.enabled();
         enabledSounds.sound3Enable = sound3.enabled();
+        enabledSounds.sound4Enable = sound4.enabled();
     }
 
     /**
@@ -79,13 +117,23 @@ class APU {
             return;
         }
 
-        if (number >= SOUND3_REGISTERS_BEGIN && number <= SOUND3_REGISTERS_BEGIN) {
+        if (number >= SOUND3_REGISTERS_BEGIN && number <= SOUND3_REGISTERS_END) {
             sound3.writeRegister(cast(ubyte)(number - SOUND3_REGISTERS_BEGIN), value);
+            return;
+        }
+
+        if (number >= SOUND4_REGISTERS_BEGIN && number <= SOUND4_REGISTERS_END) {
+            sound4.writeRegister(cast(ubyte)(number - SOUND4_REGISTERS_BEGIN), value);
             return;
         }
 
         if (number == 0x14) {
             volumes.data = value;
+            return;
+        }
+
+        if (number == 0x15) {
+            enabledChannels.data = value;
             return;
         }
 
@@ -95,6 +143,7 @@ class APU {
             sound1.enabled(enabledSounds.sound1Enable);
             sound2.enabled(enabledSounds.sound2Enable);
             sound3.enabled(enabledSounds.sound3Enable);
+            sound4.enabled(enabledSounds.sound4Enable);
             return;
         }
 
@@ -124,9 +173,17 @@ class APU {
         if (number >= SOUND3_REGISTERS_BEGIN && number <= SOUND3_REGISTERS_END) {
             return sound3.readRegister(cast(ubyte)(number - SOUND3_REGISTERS_BEGIN));
         }
+    
+        if (number >= SOUND4_REGISTERS_BEGIN && number <= SOUND4_REGISTERS_END) {
+            return sound4.readRegister(cast(ubyte)(number - SOUND4_REGISTERS_BEGIN));
+        }
 
         if (number == 0x14) {
             return volumes.data;
+        }
+
+        if (number == 0x15) {
+            return enabledChannels.data;
         }
 
         if (number == 0x16) {

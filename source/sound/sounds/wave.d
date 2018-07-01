@@ -206,7 +206,7 @@ public class WaveSound {
             }
 
             // Frequency timer is reloaded
-            this.sampleTimer = (2048 - frequency) * 2;
+            this.sampleTimer = (2048 - frequency) * 4;
         }
     }
 
