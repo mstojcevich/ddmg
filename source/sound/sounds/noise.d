@@ -15,7 +15,7 @@ class NoiseSound {
 
     private Envelope evp = new Envelope();
 
-    private ubyte timerCount;
+    private int timerCount;
 
     private ubyte volume;
 
@@ -55,6 +55,9 @@ class NoiseSound {
             this.cycleAccum -= period;
         }
 
+        if (!enable) {
+            return 0;
+        }
         return ((lfsr & 0b1) > 0) ? 0 : volume;
     }
 
@@ -64,6 +67,20 @@ class NoiseSound {
     body {
         if (frame == 7) {
             volume = evp.tick(volume);
+        }
+        if (frame % 2 == 0) {
+            timerTick();
+        }
+    }
+
+    /// Tick the timer as if 1/256th of a second has passed
+    @safe private void timerTick() {
+        if(counter && timerCount != 0) {
+            immutable int newTimerCount = timerCount - 1;
+            if(newTimerCount == 0) {
+                enable = false;
+            }
+            timerCount = newTimerCount;
         }
     }
 
