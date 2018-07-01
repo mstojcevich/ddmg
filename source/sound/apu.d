@@ -51,7 +51,7 @@ class APU {
             frameCycleAccum -= TICKS_PER_FRAME;
         }
 
-        ubyte s1out = cast(ubyte)(sound1.tick() + sound2.tick() + sound3.tick());
+        ubyte s1out = cast(ubyte)(sound1.tick() + sound2.tick());
         frontend.playAudio(cast(ubyte) (s1out * volumes.leftVol/7.0), cast(ubyte) (s1out * volumes.rightVol/7.0));
 
         enabledSounds.sound1Enable = sound1.enabled();
@@ -113,12 +113,12 @@ class APU {
         assert(number <= 0x16);
     }
     body {
-        if (number >= SOUND2_REGISTERS_BEGIN && number <= SOUND2_REGISTERS_END) {
-            return sound2.readRegister(cast(ubyte)(number - SOUND2_REGISTERS_BEGIN));
-        }
-
         if (number >= SOUND1_REGISTERS_BEGIN && number <= SOUND1_REGISTERS_END) {
             return sound1.readRegister(cast(ubyte)(number - SOUND1_REGISTERS_BEGIN));
+        }
+
+        if (number >= SOUND2_REGISTERS_BEGIN && number <= SOUND2_REGISTERS_END) {
+            return sound2.readRegister(cast(ubyte)(number - SOUND2_REGISTERS_BEGIN));
         }
 
         if (number >= SOUND3_REGISTERS_BEGIN && number <= SOUND3_REGISTERS_END) {
