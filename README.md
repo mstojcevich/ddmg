@@ -1,6 +1,6 @@
 # DDMG
 
-![build status](https://gitlab.com/mstojcevich/ddmg/badges/branch/build.svg)
+![build status](https://gitlab.com/mstojcevich/ddmg/badges/master/build.svg)
 
 DDMG is an emulator for the Nintendo Game Boy (DMG) written in [D](https://dlang.org). The goal of DDMG is to create a well-documented emulator with clear and concise code. These goals are not quite met yet.
 
