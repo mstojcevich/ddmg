@@ -58,7 +58,7 @@ class APU {
 
         const s1out = sound1.tick();
         const s2out = sound2.tick();
-        const s3out = 0;
+        const s3out = sound3.tick();
         const s4out = sound4.tick();
 
         int leftOut;
