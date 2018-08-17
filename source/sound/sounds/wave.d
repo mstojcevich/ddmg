@@ -71,6 +71,10 @@ public class WaveSound {
             sampleTimer = (2048 - frequency) * 2;
         }
 
+        if (!enable) {
+            return 0;
+        }
+
         return sampleBuffer >> shiftAmt;
     }
 
@@ -206,7 +210,7 @@ public class WaveSound {
             }
 
             // Frequency timer is reloaded
-            this.sampleTimer = (2048 - frequency) * 4;
+            this.sampleTimer = (2048 - frequency) * 2;
         }
     }
 

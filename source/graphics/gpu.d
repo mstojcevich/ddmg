@@ -313,8 +313,10 @@ class GPU {
             // Invert X since the bits are read backwards
             immutable invX = TILE_SIZE - 1 - x;
 
-            immutable bit1 = (tileData[upperBits ? (addr - 1) : addr] & (0b1 << invX)) > 0 ? 1 : 0;
-            immutable bit2 = (tileData[upperBits ? addr : (addr + 1)] & (0b1 << invX)) > 0 ? 2 : 0;
+            immutable bit1addr = upperBits ? (addr - 1) : addr;
+            immutable bit2addr = upperBits ? addr : (addr - 1);
+            immutable bit1 = (tileData[bit1addr] & (0b1 << invX)) > 0 ? 1 : 0;
+            immutable bit2 = (tileData[bit2addr] & (0b1 << invX)) > 0 ? 2 : 0;
 
             tileSet[tileNum][tileRow][x] = cast(ubyte)(bit1 + bit2);
         }

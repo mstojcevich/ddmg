@@ -107,7 +107,7 @@ class MBC1 : MBC {
         }
 
         @safe public void writeROM(size_t addr, ubyte val) {
-            // ROM is ready only and there's no control stuff
+            // ROM is read only and there's no control stuff
             if(RAM_ENABLE_BEGIN <= addr && addr <= RAM_ENABLE_END) {
                 if((val & 0b1111) == 0x0A) {
                     ramEnabled = true;
