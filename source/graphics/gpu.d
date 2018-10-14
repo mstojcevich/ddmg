@@ -526,7 +526,7 @@ class GPU {
 
         curScanline = 0;
         status.data = 0x85;
-        control.data = 0x90;
+        // control.data = 0x90;
         
         // TODO WX, WY, clocks spent in current cycle
     }

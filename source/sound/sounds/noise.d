@@ -141,6 +141,9 @@ class NoiseSound {
                 return 0xFF;
             case 2:
                 return evp.readControlReg();
+            case 3:
+                writefln("Game tried to read write-only APU register %02X", number);
+                return 0x00;
             case 4:
                 return readNR44();
             default:
@@ -173,7 +176,7 @@ class NoiseSound {
     }
 
     /// Whether the channel should be enabled
-    @safe bool enabled() {
+    @safe bool enabled() const {
         return enable;
     }
 

@@ -199,6 +199,10 @@ class MMU {
         if(address == 0xFF43) {
             return gpu.scxRegister;
         }
+        if(address == 0xFF4F) {
+            // TODO CGB vram banks
+            return 0xFF;
+        }
         if(address == WINDOW_Y) {
             return gpu.wyRegister;
         }
@@ -251,6 +255,11 @@ class MMU {
         }
         if(address >= WAVE_RAM_BEGIN && address <= WAVE_RAM_END) {
             return apu.readWaveRAM(cast(ubyte)(address - WAVE_RAM_BEGIN));
+        }
+
+        if (address >= 0xFEA0 && address <= 0xFEFF) {
+            // Unused memory area
+            return 0x00;
         }
 
         debug {

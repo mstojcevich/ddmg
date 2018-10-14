@@ -47,8 +47,8 @@ public class SquareSound {
     private ubyte lowerFreq; // Low bits of frequency
     private NR14 nr14;
 
-    private Envelope evp = new Envelope();
-    private Sweep sweep = new Sweep();
+    private Envelope evp;
+    private Sweep sweep;
 
     /// Internal effective frequency
     private int frequency;
@@ -80,6 +80,9 @@ public class SquareSound {
     @safe this(bool hasSweep, DutyCycle defaultDuty) {
         this.nr11.dutyCycle = defaultDuty;
         this.hasSweep = hasSweep;
+
+        this.evp = new Envelope();
+        this.sweep = new Sweep();
     }
 
     // Called every cpu cycle (4_194_304 times a second) to update. Returns the volume that should be played at this time.
@@ -215,7 +218,7 @@ public class SquareSound {
     }
 
     /// Whether the channel should be enabled
-    @safe bool enabled() {
+    @safe bool enabled() const {
         return enable;
     }
 

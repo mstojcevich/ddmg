@@ -40,8 +40,15 @@ class APU {
 
         sound1 = new SquareSound(true, DutyCycle.PCT_50);
         sound2 = new SquareSound(false, DutyCycle.PCT_12_5);
+        sound1.enabled = true;
+        sound1.setRegister(2, 0xF3);
+        sound2.setRegister(2, 0x00);
         sound3 = new WaveSound();
         sound4 = new NoiseSound();
+
+        volumes.data = 0x77;
+        enabledChannels.data = 0xF3;
+        enabledSounds.data = 0xF1; // TODO on read do we or the dead bit with 1?
     }
 
     /// Run every CPU cycle

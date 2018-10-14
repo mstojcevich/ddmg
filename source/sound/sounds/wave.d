@@ -14,6 +14,7 @@ public class WaveSound {
     
     /// 256-NR31 register
     private ushort soundLength;
+    /// Time remaining in frames (256Hz)
     private ushort soundLengthRemaining;
 
     /// Amount to shift the output volume
@@ -46,13 +47,13 @@ public class WaveSound {
     /// Current sample from the wave RAM
     private ubyte sampleBuffer;
 
-    /// Time remaining (in length update frames)
-    private ushort lengthCounter;
-
     @safe this() {
         for (int i; i < waveRam.length; i++) {
             waveRam[i] = (i % 2 == 0) ? 0 : 0xFF;
         }
+        shiftAmt = 3; // TODO verify
+        // ... TODO it doesn't seem like enable is being set how I want it to
+        // ex. if force enabling, the Pokemon Gold intro sounds much better
     }
 
     /// Called every cpu cycle (4_194_304 times a second) to update. Returns the volume that should be played at this time.
@@ -60,8 +61,8 @@ public class WaveSound {
         this.sampleTimer--;
 
         if (sampleTimer == 0) {
-            position = (position + 1) % (waveRam.length * 2);
-            sampleBuffer = waveRam[position >> 1];
+            position = (position + 1) % (waveRam.length);
+            sampleBuffer = waveRam[position];
             if (position % 2 == 0) {
                 sampleBuffer >>= 4;
             }
@@ -82,9 +83,7 @@ public class WaveSound {
     @safe void frameUpdate(ubyte frame)
     in { assert(frame >= 0 && frame <= 7); }
     body {
-        if (frame % 2 == 0) {
-            timerTick();
-        }
+        timerTick();
     }
 
     /// Write one of the 5 channel registers
@@ -170,8 +169,8 @@ public class WaveSound {
 
     /// Write the "length" (shortness) register (NR31)
     @safe void writeShortness(ubyte shortness) {
-        soundLength = cast(ubyte)(256 - shortness);
-        soundLengthRemaining = cast(ubyte)(256 - shortness);
+        soundLength = cast(ushort)(256 - shortness);
+        soundLengthRemaining = cast(ushort)(256 - shortness);
     }
 
     /// Read the "length" (shortness) register (NR31)
@@ -182,6 +181,7 @@ public class WaveSound {
     /// Write the output level register (NR32)
     @safe void writeOutputLevel(ubyte level) {
         level >>= 5;
+        level &= 0b11;
         if (level == 0) {
             shiftAmt = 4;
         } else {
@@ -191,22 +191,24 @@ public class WaveSound {
 
     /// Read the output level register (NR32)
     @safe ubyte readOutputLevel() const {
-        return ((shiftAmt + 1) % 4) << 5;
+        return (((shiftAmt + 1) % 5) << 5) | 0b10011111;
     }
 
     /// Write to the NR34 register
     @safe void writeNR34(ubyte val) {
         this.nr34 = val;
-        this.frequency = (frequency & 0xFF) | (higherFreq << 7);
+        this.frequency = (frequency & 0xFF) | (higherFreq << 8);
 
         if (initialize) {
+            this.enable = true;
+
             // Reset the position of the current sample
             this.position = 0;
             // Note that the sample buffer isn't reloaded
 
             // Reset the length counter if finished
-            if (this.lengthCounter == 0) {
-                this.lengthCounter = 256;
+            if (this.soundLengthRemaining == 0) {
+                this.soundLengthRemaining = 256;
             }
 
             // Frequency timer is reloaded
