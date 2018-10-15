@@ -42,6 +42,9 @@ class CPU {
     private InterruptHandler iuptHandler;
     private CB cbBlock;
 
+    // Whether interrupts should be disabled after the next instruction
+    private bool shouldEI = false;
+
     // Whether the CPU is halted (not executing until interrupt)
     private HaltMode haltMode;
 
@@ -299,7 +302,7 @@ class CPU {
                 regs.f &= 0b11110000; // The last 4 bits cannot be written to and should be forced 0
             }),
             Instruction("LD A,(C)",     &ldAC),
-            Instruction("DI",           {iuptHandler.masterToggle = false;}),
+            Instruction("DI",           {iuptHandler.masterToggle = false; shouldEI = false;}),
             Instruction("XX",           null),
             Instruction("PUSH AF",      {pushToStack(regs.af);}),
             Instruction("OR d8",        &orImmediate),
@@ -307,7 +310,7 @@ class CPU {
             Instruction("LD HL,SP+r8",  &loadSPplusImmediateToHL),
             Instruction("LD SP,HL",     {load(regs.sp, regs.hl);}),
             Instruction("LD A,(a16)",   {loadFromImmediateReference(regs.a);}),
-            Instruction("EI",           {iuptHandler.masterToggle = true;}),
+            Instruction("EI",           {shouldEI = true;}),
             Instruction("XX",           null),
             Instruction("XX",           null),
             Instruction("CP d8",        &cpImmediate),
@@ -423,6 +426,11 @@ class CPU {
 
                     break;
                 }
+            }
+
+            if (shouldEI) {
+                iuptHandler.masterToggle = true;
+                shouldEI = false;
             }
         }
 

@@ -111,6 +111,7 @@ class Clock {
      * Reset the divider register (FF04)
      */
     @safe void resetDivider() {
+        sinceTimaIncr = 0;
         this.div = 0;
     }
 
@@ -178,11 +179,11 @@ class Clock {
         }
 
         /*
-          Don't just set to 0 because due to integer 
-          division we may not have spent all of 
-          the cylces
-         */
-        this.sinceTimaIncr -= incrs * cyclesRequired;
+            Don't just set to 0 because due to integer
+            division we may not have spent all of
+            the cycles
+        */
+        this.sinceTimaIncr -= cyclesRequired * incrs;
     }
 
     /**
