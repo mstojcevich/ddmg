@@ -385,7 +385,6 @@ mooneye-reg_read:
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/oam_dma/reg_read.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 mooneye-halt_ime0_nointr_timing:
   stage: test

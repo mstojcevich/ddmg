@@ -89,6 +89,7 @@ class MMU {
     private uint oamCycleAccum; // Leftover cycles since the last transfered bytes
     private ushort oamTransferToAddr; // The current address to transfer to
     private ushort oamTransferFromAddr; // The current address to transfer from
+    private ubyte oamLastWritten;
 
     /// Create a new MMU connected to the specified components
     @safe this(Cartridge c, GPU g, Keypad k, InterruptHandler ih, Clock clk, APU apu, Serial serial) {
@@ -124,7 +125,8 @@ class MMU {
                 while(oamCycleAccum >= 4) {
                     oamCycleAccum -= 4;
 
-                    gpu.oam(cast(ushort)(oamTransferToAddr - OAM_BEGIN), readByte(oamTransferFromAddr));
+                    const ubyte srcByte = readByte(oamTransferFromAddr);
+                    gpu.oam(cast(ushort)(oamTransferToAddr - OAM_BEGIN), srcByte);
                     oamTransferToAddr++;
                     oamTransferFromAddr++;
 
@@ -217,6 +219,10 @@ class MMU {
         }
         if(address == OBP1) {
             return gpu.obp1Register;
+        }
+
+        if(address == DMA_TRANSFER_ADDR) {
+            return oamLastWritten;
         }
 
         if(address == 0xFF00) {
@@ -348,6 +354,7 @@ class MMU {
             oamTransferFromAddr = val << 8;
             oamTransferToAddr = OAM_BEGIN;
             oamTransferState = OamTransferState.SETUP;
+            oamLastWritten = val;
         } else if(address == 0xFF00) { 
             keypad.writeJOYP(val);
 
