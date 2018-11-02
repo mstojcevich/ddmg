@@ -1000,7 +1000,7 @@ class CPU {
      * and store it in itself
      */
     @safe private void complement(ref reg8 src) {
-        src = ~src;
+        src = cast(ubyte)(~cast(int)(src));
 
         regs.setFlag(Flag.SUBTRACTION, 1);
         regs.setFlag(Flag.HALF_OVERFLOW, 1);
