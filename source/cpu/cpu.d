@@ -395,7 +395,7 @@ class CPU {
         } else { // halted
             // TODO how many cycles??
             // Does this need to be a separate clock?
-           bus.update(4);
+            bus.update(4);
         }
 
         // TODO move everything from here on down in this fucntion
@@ -667,12 +667,12 @@ class CPU {
      *
      * For example, if the carry flag was set before the method call, and the parameter is 5, then 6 is added to A
      */
-     @safe private void adc(in ubyte src) {
+    @safe private void adc(in ubyte src) {
         // We can't just call add(src + carry) because if the ubyte overflows to 0 when adding carry, the GB's overflow bit won't get set among other problems
         // TODO check what real hardware does
 
         immutable ubyte c = regs.isFlagSet(Flag.OVERFLOW) ? 1 : 0;
-         
+
         immutable ushort result = regs.a + src + c; // Storing in a short so overflow can be checked
         immutable ubyte outResult = cast(ubyte) result; // The result that actually goes into the output register
 
@@ -688,8 +688,8 @@ class CPU {
 
         // Result with the extra bits dropped
         regs.a = outResult;
-     }
-     
+    }
+
     /**
      * Adc the 8-bit value stored in memory at the address stored in register HL to register A
      */
