@@ -1,5 +1,6 @@
 import std.bitmanip;
 
+import timing;
 import interrupt;
 
 // TODO verify behavior with http://gbdev.gg8.se/wiki/articles/Timer_Obscure_Behaviour
@@ -193,16 +194,16 @@ class Clock {
     @safe private uint numCycles(ClockRate rate) {
         final switch(rate) {
             case ClockRate.HZ_4096:
-            return 1024;
+            return DDMG_TICKS_HZ / 4096;
 
             case ClockRate.HZ_262144:
-            return 16;
+            return DDMG_TICKS_HZ / 262_144;
 
             case ClockRate.HZ_65536:
-            return 64;
+            return DDMG_TICKS_HZ / 65_536;
 
             case ClockRate.HZ_16384:
-            return 256;
+            return DDMG_TICKS_HZ / 16_384;
         }
     }
 
