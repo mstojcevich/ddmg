@@ -5,6 +5,9 @@ build:linux:
   script: ci/build-release.sh
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
+  cache:
+    paths:
+      - .dub/
   artifacts:
     paths:
       - ddmg
