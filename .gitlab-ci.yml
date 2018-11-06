@@ -98,7 +98,6 @@ mooneye-reti_intr_timing:
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/reti_intr_timing.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 #mooneye-boot_regs-mgb:
 #  stage: test
