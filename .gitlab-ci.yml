@@ -206,7 +206,6 @@ mooneye-div_write:
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/timer/div_write.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 mooneye-tim10_div_trigger:
   stage: test
