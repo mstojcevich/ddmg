@@ -31,7 +31,7 @@ enum HaltMode {
 /**
  * Implementation of the GameBoy CPU
  */
-class CPU : Fiber {
+final class CPU : Fiber {
 
     private Instruction[256] instructions;
 
