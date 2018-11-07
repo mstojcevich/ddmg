@@ -102,9 +102,6 @@ class Clock : Fiber {
             if(newTima > ubyte.max) { // Overflow
                 this.tima = 0; // 0 for 4 cycles
                 this.shouldReloadTima = true; // TIMA reload is delayed 4 cycles
-
-                // TODO should this happen after the actual reload (in 4 cycles) or now?
-                iuptHandler.fireInterrupt(Interrupts.TIMER_OVERFLOW);
             } else {
                 this.tima = cast(ubyte)(newTima);
             }
@@ -119,6 +116,7 @@ class Clock : Fiber {
         if (this.shouldReloadTima) {
             this.tima = this.tma;
             this.shouldReloadTima = false;
+            iuptHandler.fireInterrupt(Interrupts.TIMER_OVERFLOW);
         }
         for (int i; i < 4; i++) {
             // Div in incremented every clock cycle
