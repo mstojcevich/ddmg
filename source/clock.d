@@ -103,6 +103,7 @@ class Clock : Fiber {
                 this.tima = 0; // 0 for 4 cycles
                 this.shouldReloadTima = true; // TIMA reload is delayed 4 cycles
 
+                // TODO should this happen after the actual reload (in 4 cycles) or now?
                 iuptHandler.fireInterrupt(Interrupts.TIMER_OVERFLOW);
             } else {
                 this.tima = cast(ubyte)(newTima);

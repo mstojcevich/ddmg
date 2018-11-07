@@ -65,7 +65,6 @@ mooneye-rapid_di_ei:
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/rapid_di_ei.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 mooneye-oam_dma_start:
   stage: test
@@ -154,7 +153,6 @@ mooneye-tima_reload:
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/timer/tima_reload.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 mooneye-tma_write_reloading:
   stage: test
@@ -211,7 +209,6 @@ mooneye-tim10_div_trigger:
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/timer/tim10_div_trigger.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 mooneye-tim00_div_trigger:
   stage: test
@@ -224,14 +221,12 @@ mooneye-rapid_toggle:
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/timer/rapid_toggle.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 mooneye-tim01_div_trigger:
   stage: test
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/timer/tim01_div_trigger.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 #mooneye-boot_regs-sgb:
 #  stage: test
