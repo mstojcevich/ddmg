@@ -28,7 +28,7 @@ class Scheduler {
     /// Simulate the Gameboy
     @trusted final void step() {
         cpu.call(); 
-        clk.spendCycles(4);
+        clk.call();
         gpu.execute(4);
         mmu.step(4);
     

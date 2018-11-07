@@ -1,13 +1,15 @@
 import std.bitmanip;
 
+import core.thread;
+
 import timing;
 import interrupt;
 
 // TODO verify behavior with http://gbdev.gg8.se/wiki/articles/Timer_Obscure_Behaviour
 
 /**
- * Specifies the rate at which TIMA should increase
- * Stored in TAC
+ * Specifies the rate at which TIMA should increase.
+ * Stored in TAC.
  */
 private enum ClockRate : ubyte {
     HZ_4096     = 0b00,
@@ -17,7 +19,7 @@ private enum ClockRate : ubyte {
 }
 
 /**
- * Description of the TAC register
+ * Description of the TAC register.
  */
 private union TimerControl {
     ubyte data;
@@ -29,19 +31,15 @@ private union TimerControl {
 }
 
 /**
- * Keeps track of how many cycles have elapsed
+ * Keeps track of how many cycles have elapsed.
  */
-class Clock {
-    
-    /**
-     * The numbers of cycles that have elapsed so far
-     */
-    private ulong elapsedCycles = 0;
+class Clock : Fiber {
 
     /**
-     * The divider register, incremented at 1/256th the rate of the clock.
+     * The divider register, increased each clock cycle.
      * Internally this is stored as a 16 bit number which increments at the regular clock rate.
-     * The upper 8 bits are used as the value of DIV.
+     * The upper 8 bits are used as the value of the DIV register (FF04).
+     * Therefore, from the point-of-view of the program, it increases once every 256 cycles.
      */
     private ushort div = 0;
 
@@ -51,7 +49,8 @@ class Clock {
      * When overflowed an interrupt is requested.
      */
     private ubyte tima;
-    private ulong sinceTimaIncr; // The amount of CPU cycles since the last TIMA increase
+    private bool lastTimaCheck; // Whether the tima check passed last cycle
+    private bool shouldReloadTima;
 
     /**
      * The timer modulo register.
@@ -71,33 +70,61 @@ class Clock {
      * Params:
      *  iuptHandler = Interrupt handler to flag the timer overflow iupt with
      */
-    @safe this(InterruptHandler iuptHandler) {
+    @trusted this(InterruptHandler iuptHandler) {
+        super(&run);
+
         this.tac.data = 0xF8; // Unused bits to 1, used stuff to 0
         this.iuptHandler = iuptHandler;
         reset();
     }
 
-    /**
-     * Get the number of cycles that have elapsed so far
-     */
-    @safe @property public ulong getElapsedCycles() {
-        return elapsedCycles;
+    /// Run the clock indefinitely
+    @trusted private void run() {
+        while (true) {
+            runTick();
+            yield();
+        }
     }
 
     /**
-     * Cause the specified number of cycles to be elapsed
+     * Check whether TIMA should be incremented: if so, increment it.
+     * Should be called _whenever_ tima's sources change (TAC or DIV).
      */
-    @safe public void spendCycles(int num)
-    in {
-        assert(num >= 0);
-    }
-    body {
-        this.elapsedCycles += num;
-        this.div += num;
+    @safe private void checkAndIncrTima() {
+        // TIMA is incremented if it is enabled and a certain
+        // bit (depending on the frequency) is on in DIV.
+        const bool timaCheck = tac.timerRun && (this.div & this.timaMask) > 0;
 
-        if(tac.timerRun) {
-            sinceTimaIncr += num;
-            updateTima();
+        // Tima in only incremented on the falling edge of the tima check
+        if (!timaCheck && lastTimaCheck) {
+            ulong newTima = this.tima + 1;
+
+            if(newTima > ubyte.max) { // Overflow
+                this.tima = 0; // 0 for 4 cycles
+                this.shouldReloadTima = true; // TIMA reload is delayed 4 cycles
+
+                iuptHandler.fireInterrupt(Interrupts.TIMER_OVERFLOW);
+            } else {
+                this.tima = cast(ubyte)(newTima);
+            }
+        }
+
+        // Save for falling edge detection
+        lastTimaCheck = timaCheck;
+    }
+
+    // Run the clock for one "tick" (4 cycles)
+    @safe private void runTick() {
+        if (this.shouldReloadTima) {
+            this.tima = this.tma;
+            this.shouldReloadTima = false;
+        }
+        for (int i; i < 4; i++) {
+            // Div in incremented every clock cycle
+            this.div++;
+
+            // DIV changed, so update TIMA
+            checkAndIncrTima();
         }
     }
 
@@ -112,8 +139,7 @@ class Clock {
      * Reset the divider register (FF04)
      */
     @safe void resetDivider() {
-        sinceTimaIncr = 0;
-        this.div = 0;
+        this.div = 0; // The entire 16-bits get reset when written
     }
 
     /**
@@ -121,6 +147,8 @@ class Clock {
      */
     @safe @property void timerControl(ubyte newTac) {
         this.tac.data = 0b11111000 | (newTac & 0b111); // Only the lower 3 bits can be written
+        // TAC changed, so update TIMA
+        checkAndIncrTima();
     }
 
     /**
@@ -159,51 +187,20 @@ class Clock {
     }
 
     /**
-     * Updates the TIMA register based on
-     * the clock ticks since the last TIMA
-     * update
+     * Tima gets incremented based on a mask of the internal 16-bit div
+     * register. This mask depends on the rate set in TAC.
+     * This function returns the aforementioned mask.
      */
-    @safe private void updateTima() {        
-        // The number of cycles to increment tima by 1
-        immutable uint cyclesRequired = numCycles(tac.clockSelect);
-
-        // How many time units to increment tima by
-        immutable ulong incrs = sinceTimaIncr / cyclesRequired;
-
-        ulong newTima = this.tima + incrs;
-        if(newTima > ubyte.max) { // Overflow
-            this.tima = this.tma;
-            
-            iuptHandler.fireInterrupt(Interrupts.TIMER_OVERFLOW);
-        } else {
-            this.tima = cast(ubyte)(newTima);
-        }
-
-        /*
-            Don't just set to 0 because due to integer
-            division we may not have spent all of
-            the cycles
-        */
-        this.sinceTimaIncr -= cyclesRequired * incrs;
-    }
-
-    /**
-     * Get the number of CPU cycles between cycles
-     * at the specified clock rate
-     */
-    @safe private uint numCycles(ClockRate rate) {
-        final switch(rate) {
-            case ClockRate.HZ_4096:
-            return DDMG_TICKS_HZ / 4096;
-
+    @safe private ushort timaMask() {
+        final switch (tac.clockSelect) {
             case ClockRate.HZ_262144:
-            return DDMG_TICKS_HZ / 262_144;
-
+                return 0b1000; // 4th bit
             case ClockRate.HZ_65536:
-            return DDMG_TICKS_HZ / 65_536;
-
+                return 0b100000; // 6th bit
             case ClockRate.HZ_16384:
-            return DDMG_TICKS_HZ / 16_384;
+                return 0b10000000; // 8th bit
+            case ClockRate.HZ_4096:
+                return 0b1000000000; // 10th bit
         }
     }
 
@@ -211,7 +208,7 @@ class Clock {
         // Initial internal counter value for DIV is 0xABCC
         // This differs between DMG and GBC (GBC is 0x1EA0)
         // This is due to different boot roms probably
-        div = 0xABCC;
+        this.div = 0xABCC;
     }
 
 }
