@@ -407,13 +407,14 @@ final class CPU : Fiber {
                 foreach(iupt; EnumMembers!Interrupts) {
                     if(iuptHandler.shouldHandle(iupt)) {
                         if(haltMode != HaltMode.NO_INTERRUPT_JUMP) {
+                            // It takes 20 clocks to dispatch an interrupt. 8 if you account for the CALL.
+                            this.yield();
+                            this.yield();
+
                             callAddr(iupt.address);
+
                             iuptHandler.markHandled(iupt);
                             iuptHandler.masterToggle = false;
-    
-                            // It takes 20 clocks to dispatch an interrupt. 8 if you account for the CALL 
-                            this.yield();
-                            this.yield();
     
                             if(haltMode == HaltMode.NORMAL) {
                                 // If the CPU is in HALT mode, another 4 clocks are needed
