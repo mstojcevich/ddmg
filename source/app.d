@@ -42,7 +42,7 @@ long maxInstrs = 25_000_000;  // Max instructions to run a test rom for
 
     Gameboy g = new Gameboy(frontend, romName);
     CPU cpu = g.getCPU();
-    for(long i; i < maxInstrs; i++) {
+    while(cpu.instructionCount < maxInstrs) {
         g.step();
         const ubyte opcode = cpu.curOpcode;
 

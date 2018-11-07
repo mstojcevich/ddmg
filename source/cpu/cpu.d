@@ -353,6 +353,7 @@ class CPU : Fiber {
                 // Fetch the operation in memory
                 immutable ubyte opcode = mmu.readByte(regs.pc);
                 this.curFetchedOpcode = opcode;
+                this.instrCount++;
     
                 Instruction instr = instructions[opcode];
     
@@ -1254,9 +1255,13 @@ class CPU : Fiber {
     }
 
     // For automated test roms
-    private ubyte curFetchedOpcode;
+    private ubyte curFetchedOpcode; // last opcode fetched
+    private long instrCount = 0; // number of instructions fetched so far
     @safe @property public deprecated ubyte curOpcode() {
         return curFetchedOpcode;
+    }
+    @safe @property public deprecated long instructionCount() {
+        return instrCount;
     }
 
     version(test) @safe public void reset() {

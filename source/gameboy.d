@@ -35,7 +35,7 @@ class Gameboy {
         this.scheduler = new Scheduler(this.cpu, this.clock, this.gpu, this.mmu, this.apu, this.serial);
     }
 
-    @safe public void step() {
+    @safe public final void step() {
         scheduler.step;
     }
 
