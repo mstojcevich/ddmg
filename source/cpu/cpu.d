@@ -349,7 +349,7 @@ final class CPU : Fiber {
         while (true) {
             ubyte ret = 0x00;
     
-            if(haltMode == HaltMode.NO_HALT || haltMode == HaltMode.HALT_BUG) { // If the CPU is halted, stop execution
+            if(!isHalted) { // If the CPU is halted, stop execution
                 // Fetch the operation in memory
                 immutable ubyte opcode = mmu.readByte(regs.pc);
                 this.curFetchedOpcode = opcode;
@@ -371,7 +371,7 @@ final class CPU : Fiber {
                 // Done before instruction execution so that jumps are easier. Pretty sure that's how it's done on real hardware too.
                 if(haltMode != HaltMode.HALT_BUG) { // The halt bug causes the next instruction to repeat twice
                     regs.pc++;
-                } else {
+                } else { // haltMode == HALT_BUG
                     haltMode = HaltMode.NO_HALT;
                 }
     
@@ -437,6 +437,11 @@ final class CPU : Fiber {
                 }
             }
         }
+    }
+
+    /// Returns whether or not CPU execution is halted
+    @safe @property public bool isHalted() {
+        return haltMode != HaltMode.NO_HALT && haltMode != HaltMode.HALT_BUG;
     }
 
     // A debug function for printing the flag statuses

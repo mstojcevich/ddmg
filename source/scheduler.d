@@ -27,10 +27,12 @@ class Scheduler {
 
     /// Simulate the Gameboy
     @trusted final void step() {
-        cpu.call(); 
+        cpu.call();
         clk.call();
         gpu.execute(4);
-        mmu.call();
+        if (!cpu.isHalted) { // OAM DMA doesn't progress during HALT
+            mmu.call();
+        }
     
         // TODO verify where serial goes on the chain of components
     
