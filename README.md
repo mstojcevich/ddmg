@@ -97,7 +97,7 @@ Gekkio has many acceptance tests he's written for his emulator [mooneye-gb](http
 | call cc timing 2         | :white_check_mark: |
 | di timing GS             | :x: |
 | div timing               | :white_check_mark: |
-| ei timing                | :x: |
+| ei timing                | :white_check_mark: |
 | halt ime0 ei             | :white_check_mark: |
 | halt ime0 noinstr timing | :x: |
 | halt ime1 timing         | :white_check_mark: |
@@ -108,13 +108,13 @@ Gekkio has many acceptance tests he's written for his emulator [mooneye-gb](http
 | jp timing                | :white_check_mark: |
 | ld hl sp e timing        | :white_check_mark: |
 | oam dma restart          | :white_check_mark: |
-| oam dma start            | :x: |
+| oam dma start            | :white_check_mark: |
 | oam dma timing           | :white_check_mark: |
 | pop timing               | :white_check_mark: |
 | push timing              | :white_check_mark: |
-| rapid di ei              | :x: |
+| rapid di ei              | :white_check_mark: |
 | ret cc timing            | :white_check_mark: |
 | ret timing               | :white_check_mark: |
-| reti intr timing         | :x: |
+| reti intr timing         | :white_check_mark: |
 | reti timing              | :white_check_mark: |
 | rst timing               | :white_check_mark: |
