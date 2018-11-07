@@ -145,12 +145,7 @@ class APU {
         }
 
         if (number == 0x16) {
-            // TODO when powered off, all registers are written to 0
-            enabledSounds.data = value;
-            sound1.enabled(enabledSounds.sound1Enable);
-            sound2.enabled(enabledSounds.sound2Enable);
-            sound3.enabled(enabledSounds.sound3Enable);
-            sound4.enabled(enabledSounds.sound4Enable);
+            enabledSounds.data = (enabledSounds.data & 0b01111111) | (value & 0b10000000);
             return;
         }
 

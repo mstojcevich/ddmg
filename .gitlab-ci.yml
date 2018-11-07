@@ -296,8 +296,6 @@ mooneye-unused_hwio-GS:
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/bits/unused_hwio-GS.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
-# XXX: Varies depending on hardware: For DMG, MGB, SGB, SGB2. DDMG targets just the DMG for now.
 
 mooneye-div_timing:
   stage: test
