@@ -1232,19 +1232,19 @@ final class CPU : Fiber {
     @trusted private void readShort(ushort addr, out ushort dst) {
         dst = mmu.readByte(addr);
         this.yield();
-        dst |= mmu.readByte(addr + 1) << 8;
+        dst |= mmu.readByte(cast(ushort)(addr + 1)) << 8;
         this.yield();
     }
 
     @trusted private void writeShort(ushort addr, ushort toWrite) {
         mmu.writeByte(addr, toWrite & 0xFF);
         this.yield();
-        mmu.writeByte(addr + 1, toWrite >> 8);
+        mmu.writeByte(cast(ushort)(addr + 1), toWrite >> 8);
         this.yield();
     }
 
     @trusted private void writeShortBackwards(ushort addr, ushort toWrite) {
-        mmu.writeByte(addr + 1, toWrite >> 8);
+        mmu.writeByte(cast(ushort)(addr + 1), toWrite >> 8);
         this.yield();
         mmu.writeByte(addr, toWrite & 0xFF);
         this.yield();
