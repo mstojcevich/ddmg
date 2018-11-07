@@ -30,7 +30,7 @@ class Scheduler {
         cpu.call(); 
         clk.call();
         gpu.execute(4);
-        mmu.step(4);
+        mmu.call();
     
         // TODO verify where serial goes on the chain of components
     

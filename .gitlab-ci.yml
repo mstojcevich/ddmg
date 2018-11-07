@@ -71,7 +71,6 @@ mooneye-oam_dma_start:
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/oam_dma_start.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 mooneye-boot_regs-dmgABC:
   stage: test
