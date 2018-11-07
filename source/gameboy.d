@@ -1,6 +1,6 @@
 import frontend;
 import sound.apu;
-import mmu, cpu, clock, cartridge, graphics, keypad, interrupt, bus, serial;
+import mmu, cpu, clock, cartridge, graphics, keypad, interrupt, scheduler, serial;
 import std.stdio;
 
 class Gameboy {
@@ -14,7 +14,7 @@ class Gameboy {
     private Display display;
     private Keypad keypad;
     private InterruptHandler iuptHandler;
-    private Bus bus;
+    private Scheduler scheduler;
     private Frontend frontend;
     private Serial serial;
 
@@ -31,18 +31,19 @@ class Gameboy {
         this.gpu = new GPU(frontend, this.iuptHandler);
         this.apu = new APU(frontend.getSound());
         this.mmu = new MMU(this.cartridge, this.gpu, this.keypad, this.iuptHandler, this.clock, this.apu, this.serial);
-        this.bus = new Bus(this.clock, this.gpu, this.mmu, this.apu, this.serial);
-        this.cpu = new CPU(this.mmu, this.bus, this.iuptHandler);
+        this.cpu = new CPU(this.mmu, this.iuptHandler);
+        this.scheduler = new Scheduler(this.cpu, this.clock, this.gpu, this.mmu, this.apu, this.serial);
+    }
+
+    @safe public void step() {
+        scheduler.step;
     }
 
     @safe public void run() {
-        while(true) {
-            cpu.step();
-
-            if(frontend.shouldProgramTerminate()) {
-                break;
-            }
+        while (!frontend.shouldProgramTerminate()) {
+            scheduler.step();
         }
+        // TODO frontend.shouldProgramTerminate
     }
 
     @safe public const(MMU) getMMU() const {
