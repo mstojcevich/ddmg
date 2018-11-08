@@ -18,6 +18,8 @@ import interrupt;
 import std.bitmanip;
 import std.stdio;
 
+import core.thread;
+
 /// The width and height of the gameboy display in pixels
 private const DISPLAY_WIDTH = 160, DISPLAY_HEIGHT = 144;
 
@@ -74,7 +76,7 @@ private const CYCLES_PER_LINE = CYCLES_PER_OAM_SEARCH + CYCLES_PER_DATA_TRANSFER
  * The GPU takes information from VRAM+OAM and processes it.
  * It prepares scanlines and sends them to the display to render.
  */
-class GPU {
+final class GPU : Fiber {
 
     /// The LCD control register (LCDC)
     private LCDControl control;
@@ -176,18 +178,334 @@ class GPU {
 
     /// The frontend to update each frame
     private Frontend frontend;
+    
+    private Fiber fetcherFiber;
+    private Fiber writerFiber;
 
     /**
      * Create a GPU that renders onto the specified display
      * and fires interrupts using the specified interrupt handler
      */
-    @safe this(Frontend frontend, InterruptHandler ih) {
+    @trusted this(Frontend frontend, InterruptHandler ih) {
+        super(&run);
+
+        this.fetcherFiber = new Fiber(&pixelFetcher);
+        this.writerFiber = new Fiber(&pixelWriter);
+
         this.frontend = frontend;
         this.display = frontend.getDisplay;
         this.iuptHandler = ih;
 
         // Set the initial values. TODO bootrom support
         reset();
+    }
+
+    // List of the visible sprites, value = sprite memory index, -1 = no sprite
+    private int[10] visibleSprites; // filled by oamSearch
+
+    /// Perform the OAM search stage of the line, determining which sprites are visible
+    @trusted private void oamSearch() { // STAGE 2 (0b10)
+        // Search the sprites and determine which are visible
+        // NOTE that because the CPU can't access OAM during this stage,
+        // our intra-stage timing doesn't matter all that much.
+        // If we wanted to, we could probably do all this work in
+        // the data transfer stage.
+        status.gpuMode = GPUMode.OAM_SEARCH;
+        updateStatIupt();
+
+        // Number of visible sprites so far
+        int spritesDrawn = 0;
+
+        // It takes two cycles per visible sprite
+        for(int i; i < NUM_SPRITES && spritesDrawn < 10; i++) {
+            // Fetch attributes
+           auto attrs = (cast(SpriteAttributes[NUM_SPRITES]) spriteMemory)[i];
+
+            // Determine if visible
+            if (attrs.x != 0 && // x=0 means invisible
+                    curScanline + 16 >= attrs.y &&
+                    curScanline + 16 < attrs.y + spriteHeight) {
+                // The sprite is visible on the current line
+                visibleSprites[spritesDrawn] = i;
+                spritesDrawn++;
+
+                yield(); // lazy but shouldn't matter
+                yield();
+            }
+        }
+
+        // Fill the rest of the array
+        for(int i = spritesDrawn; i < 10; i++) {
+            visibleSprites[i] = -1;
+
+            yield(); // lazy but shouldn't matter
+            yield();
+        }
+
+        // Yield is guarenteed to be called _exactly_ 20 times, 20*4=80 cycles
+    }
+
+    private bool fetcherSpriteMode = false; // whether the fetcher is fetching a sprite
+    private int fetcherSpriteNum = 0; // if the fetcher is fetching the sprite, which one? (visibleSprites index)
+    private ubyte fetcherTileX; // which tile we're scrolled onto
+    @trusted private void pixelFetcher() {
+        if (fetcherSpriteMode) {
+            assert(fifoLength >= 8); // we need 8 to overlay the sprite
+
+            auto spriteAttribs = (cast(SpriteAttributes[NUM_SPRITES]) spriteMemory)[fetcherSpriteNum];
+
+            // The row on the sprite tile that the current scanline represents
+            auto rY = curScanline - spriteAttribs.y + (TILE_SIZE * 2);
+            if(spriteAttribs.yflip) {
+                rY = spriteHeight - 1 - rY;
+            }
+
+            // Fetch the sprite's tyle
+            immutable ubyte tileNum =
+                control.tallSprites
+                ? spriteAttribs.tileNum & 0b11111110
+                : spriteAttribs.tileNum;
+            Fiber.yield(); // read tile num
+            immutable ubyte[TILE_SIZE][TILE_SIZE] tile = 
+                        rY < TILE_SIZE
+                        ? tileSet[tileNum] 
+                        : tileSet[tileNum | 0b00000001]; // XXX ???
+            Fiber.yield(); // read data 1
+
+            // Draw each position of the sprite to the fifo
+            // Sprites ALWAYS get written to the first 8 pixels
+            for (int i = 0; i < TILE_SIZE; i++) {
+                auto rX = i;
+                if(spriteAttribs.xflip) {
+                    rX = TILE_SIZE - 1 - i;
+                }
+
+                auto spriteColor = tile[rY % TILE_SIZE][rX];
+                const ubyte paletted = applyPalette(
+                        spriteAttribs.palette
+                        ? spritePaletteB
+                        : spritePaletteA,
+                        spriteColor
+                );
+                if (spriteAttribs.belowBG) {
+                    if (pixelFifo[i] == 0) {
+                        pixelFifo[i] = spriteColor;
+                        pixelFifoPaletted[i] = paletted;
+                    }
+                } else if (spriteColor != 0) {
+                    // Overlay the background
+                    pixelFifo[i] = spriteColor;
+                    pixelFifoPaletted[i] = paletted;
+                }
+            }
+
+            // Return to background mode
+            fetcherSpriteMode = false;
+            Fiber.yield(); // read data 2 / write to fifo
+        }
+
+        immutable TileMap bgMap = control.bgMapSelect ? tileMapB : tileMapA;
+
+        // Fetcher fetches a tile
+        const tY = cast(ubyte)(curScanline + bgScrollY) / TILE_SIZE; // which tile we're scrolled onto
+        const rY = cast(ubyte)(curScanline + bgScrollY) % TILE_SIZE; // our y position within that tile
+        // Look up the tile in the tile set to use
+        Fiber.yield(); // read tile #
+
+        while (fetcherTileX < BG_SIZE_TILES) {
+            // Fetcher fetches tile data (takes two 2MHz fetcher cycles.)
+            const ubyte offset = bgMap.tileLocations[tY][fetcherTileX];
+            const ushort tileIndex = getTilesetIndex(offset, control.bgTileset);
+            const ubyte[TILE_SIZE][TILE_SIZE] tile = tileSet[tileIndex];
+            Fiber.yield(); // Read data 0
+
+            // Wait until there's room in the FIFO to put another tile
+            while (fifoLength > 8) {
+                Fiber.yield();
+            }
+            // vvv Assert is failing due to sprites
+            assert(fifoLength == 0 || fifoLength == 8); // waiting should have worked
+
+            // Put the tile into the pixel FIFO
+            for(int rx = 0; rx < 8; rx++) {
+                const ubyte bgPixel = tile[rY][rx];
+                const ubyte palettedBgPixel = applyPalette(backgroundPalette, bgPixel);
+                pixelFifo[fifoLength] = bgPixel;
+                pixelFifoPaletted[fifoLength] = palettedBgPixel;
+                fifoLength++;
+            }
+            fetcherTileX = (fetcherTileX + 1) % BG_SIZE_TILES; // move onto the next tile
+            Fiber.yield(); // read data 1
+        }
+    }
+
+    @trusted private void pixelWriter() {
+        // To implement background scrolling, we discard some pixels from the FIFO
+        int toDiscard = bgScrollX % TILE_SIZE;
+        ubyte xPosition = 0; // x position on the current line
+        // Wait for the fetcher to do something
+        while (true) {
+            // XXX Why <= 8, and not < 8????
+            while (fifoLength <= 8) {
+                Fiber.yield();
+            }
+            assert(fifoLength > 8);
+
+            // Take a pixel from the FIFO and place it onto the LCD
+            // Pop a pixel off of the FIFO
+            ubyte bgPixel = pixelFifoPaletted[0];
+            for (int i = 1; i < pixelFifo.length; i++) {
+                pixelFifo[i-1] = pixelFifo[i];
+                pixelFifoPaletted[i-1] = pixelFifoPaletted[i];
+            }
+            fifoLength -= 1;
+
+            // Either discard it or place it onto the display
+            if (toDiscard > 0) {
+                toDiscard--; // Discard the pixel
+            } else {
+                // Before we draw, check and get any sprite
+                for (int i; i < visibleSprites.length; i++) {
+                    int spriteNum = visibleSprites[i];
+                    if (spriteNum == -1) {
+                        break;
+                    }
+                    auto spriteAttribs = (cast(SpriteAttributes[NUM_SPRITES]) spriteMemory)[spriteNum];
+                    if (spriteAttribs.x - 8 == xPosition) {
+                        fetcherFiber.reset();
+                        fetcherSpriteMode = true;
+                        fetcherSpriteNum = spriteNum;
+
+                        // Yield for enough time for the sprite to draw
+                        while (fetcherSpriteMode) Fiber.yield();
+                        break;
+                    }
+                }
+
+                // Draw the pixel to the display
+                display.setPixelGB(xPosition, curScanline, bgPixel);
+                xPosition++;
+            }
+
+            Fiber.yield();
+            
+            if (xPosition == GB_DISPLAY_WIDTH) {
+                break;
+            }
+        }
+    }
+
+    ubyte[16] pixelFifo;
+    ubyte[16] pixelFifoPaletted; // Whether the pixel FIFO entry is from sprite
+    int fifoLength = 0; // Current number of pixels in the FIFO
+    /// Perform the pixel transfer stage of the line, copying pixels to the line
+    @trusted private int pixelTransfer() { // STAGE 3 (0b11)
+        // Transfer pixels into the backbuffer for the line
+        // NOTE that because the CPU can't access either VRAM or OAM during this stage,
+        // our intra-stage timing doesn't matter all that much.
+        status.gpuMode = GPUMode.DATA_TRANSFER;
+        updateStatIupt();
+
+        fifoLength = 0; // Current number of pixels in the FIFO
+        fetcherTileX = bgScrollX / TILE_SIZE;
+        fetcherSpriteMode = false; // default in tile mode
+        fetcherFiber.reset();
+        writerFiber.reset();
+
+        int cyclesToCompleteLine = 0;
+        while (writerFiber.state != Fiber.State.TERM) {
+            // Fetcher runs at 2MHz, writer runs at 1MHz
+            for(int i = 0; i < 4; i++) { // 4MHz
+                if (i % 2 == 0) { // 2Mhz
+                    fetcherFiber.call();
+                }
+                writerFiber.call();
+                if (writerFiber.state == Fiber.State.TERM) {
+                    break;
+                }
+            }
+            yield(); // 1MHz
+            cyclesToCompleteLine++;
+        }
+
+        // We have now completed the line
+        return cyclesToCompleteLine;
+    }
+
+    @trusted private void hblank(int cyclesLeft) {
+        // HBLANK does nothing, just waits to make up for leftover time
+        status.gpuMode = GPUMode.HORIZ_BLANK;
+        updateStatIupt(); // TODO the iupt for hblank is delayed
+
+        for (int i = 0; i < cyclesLeft; i++) {
+            yield();
+        }
+    }
+
+    bool shouldVblank = false;
+    @trusted final void vblankIfNeeded() {
+        if (shouldVblank) {
+            display.drawFrame();
+            frontend.update();
+            shouldVblank = false;
+        }
+    }
+
+    @trusted private void vblank() {
+        assert(curScanline == DISPLAY_HEIGHT);
+
+        status.gpuMode = GPUMode.VERT_BLANK;
+        updateStatIupt();
+
+        shouldVblank = true;
+        iuptHandler.fireInterrupt(Interrupts.VBLANK);
+
+        for(; curScanline <= VIRTUAL_HEIGHT; curScanline++) {
+            updateCoincidence();
+            updateStatIupt();
+            for(int i = 0; i < CYCLES_PER_LINE / 4; i++) {
+                yield();
+            }
+        }
+    }
+
+    @safe void updateStatIupt() {
+        bool statInterrupt =
+            (status.coincidenceInterrupt && status.coincidenceFlag) ||
+            (status.oamInterrupt && status.gpuMode == GPUMode.VERT_BLANK) ||
+            (status.oamInterrupt && status.gpuMode == GPUMode.OAM_SEARCH) ||
+            (status.hblankInterrupt && status.gpuMode == GPUMode.HORIZ_BLANK) ||
+            (status.vblankInterrupt && status.gpuMode == GPUMode.VERT_BLANK);
+
+        if (statInterrupt && !iuptSignal) {
+            iuptHandler.fireInterrupt(Interrupts.LCD_STATUS);
+        }
+
+        iuptSignal = statInterrupt;
+    }
+
+    /// Run the PPU indefinitely, yielding each 4 cycles
+    @trusted private void run() {
+        while (true) {
+            // Render each of the visible scanlines
+            for(curScanline = 0; curScanline < DISPLAY_HEIGHT; curScanline++) {
+                updateCoincidence();
+                updateStatIupt();
+
+                // We start out in OAM search mode
+                oamSearch();
+
+                // Then move on to pixel transfer
+                int cyclesToPixelTransfer = pixelTransfer();
+                assert(cyclesToPixelTransfer >= 43);
+
+                // And now hblank
+                hblank(CYCLES_PER_LINE/4 - CYCLES_PER_OAM_SEARCH/4 - cyclesToPixelTransfer);
+            }
+
+            // We're in vblank for the remainder of the time
+            vblank();
+        }
     }
 
     /// Execute the GPU for a number of cycles
@@ -429,6 +747,10 @@ class GPU {
         }
     }
 
+    @safe @property private ubyte spriteHeight() {
+        return control.tallSprites ? TILE_SIZE * 2 : TILE_SIZE;
+    }
+
     /// Draw the sprites on the current line
     @safe private void drawLineSprites() {
         // TODO handle priority between sprites
@@ -440,12 +762,10 @@ class GPU {
         bool[DISPLAY_WIDTH] filled;
 
         for(int i = 0; i < NUM_SPRITES && spritesDrawn < 10; i++) {
-            immutable SpriteAttributes attrs = (cast(SpriteAttributes[NUM_SPRITES]) spriteMemory)[i];
+            const SpriteAttributes attrs = (cast(SpriteAttributes[NUM_SPRITES]) spriteMemory)[i];
             
             // The row on the sprite that the current scanline represents
             auto tileRow = curScanline - attrs.y + (TILE_SIZE * 2);
-
-            immutable ubyte spriteHeight = control.tallSprites ? TILE_SIZE * 2 : TILE_SIZE;
 
             // Ensure that some part of the sprite is visible on the current scanline
             if(tileRow >= 0 && tileRow < spriteHeight) {
@@ -457,8 +777,8 @@ class GPU {
                 }
 
                 // Get the tile the current sprite is pulling from
-                immutable ubyte tileNum = control.tallSprites ? attrs.tileNum & 0b11111110 : attrs.tileNum;
-                immutable ubyte[TILE_SIZE][TILE_SIZE] tile = 
+                const ubyte tileNum = control.tallSprites ? attrs.tileNum & 0b11111110 : attrs.tileNum;
+                const ubyte[TILE_SIZE][TILE_SIZE] tile = 
                         tileRow < TILE_SIZE ? tileSet[tileNum] 
                         : tileSet[tileNum | 0b00000001];
 
@@ -475,7 +795,7 @@ class GPU {
                     }
 
                     // Get the unpaletted color to draw
-                    immutable ubyte color = tile[tileRow % TILE_SIZE][relativeX];
+                    const ubyte color = tile[tileRow % TILE_SIZE][relativeX];
                     if(color == 0) { // Never draw transparent sprites
                         continue;
                     }
@@ -483,7 +803,7 @@ class GPU {
                     filled[x] = true;
 
                     if(attrs.belowBG) {
-                        immutable ubyte bgColor = getBackgroundPixel(x, curScanline);
+                        const ubyte bgColor = getBackgroundPixel(x, curScanline);
 
                         // Only draw sprites below the background when the background is transparent
                         if(bgColor != 0) {
@@ -810,7 +1130,7 @@ private enum GPUMode : ubyte
     /// The CPU is unable to access OAM at this time but can access VRAM
     OAM_SEARCH = 2,
 
-    /// Data is transfered to the LCD controller. The CPU is unable to access OAM or VRAM at this time
+    /// Pixel data is transfered to the LCD controller. The CPU is unable to access OAM or VRAM at this time.
     DATA_TRANSFER = 3
 }
 
