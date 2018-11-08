@@ -487,6 +487,13 @@ final class GPU : Fiber {
     /// Run the PPU indefinitely, yielding each 4 cycles
     @trusted private void run() {
         while (true) {
+            // TODO we should probably immediately jump here if the LCD is disable
+            // (right now we wait until vblank is over...)
+            if (!control.lcdEnable) {
+                yield();
+                continue;
+            }
+
             // Render each of the visible scanlines
             for(curScanline = 0; curScanline < DISPLAY_HEIGHT; curScanline++) {
                 updateCoincidence();
