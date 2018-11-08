@@ -192,6 +192,8 @@ class GPU {
 
     /// Execute the GPU for a number of cycles
     @safe void execute(uint numCycles) {
+        if (!control.lcdEnable) return; 
+
         stateCycles += numCycles;
 
         final switch(status.gpuMode) {
