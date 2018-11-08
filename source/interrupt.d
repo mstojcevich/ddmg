@@ -16,9 +16,7 @@ enum Interrupts : Interrupt
     JOYPAD_PRESS    = Interrupt(1 << 4, 0x0060, 4),
 }
 
-// TODO emulate the delay bug for EI and DI instructions
-
-class InterruptHandler {
+final class InterruptHandler {
 
     // Master enable - Whether interrupts should be processed in general
     private bool masterEnable = true;
@@ -64,7 +62,7 @@ class InterruptHandler {
     }
 
     @safe void markHandled(Interrupts iupt) {
-        interruptFlags &= ~iupt.flagBit;
+        interruptFlags &= ~cast(uint)(iupt.flagBit); // compiler warning if we don't cast to uint...
     }
     
     @safe void fireInterrupt(Interrupts iupt) {

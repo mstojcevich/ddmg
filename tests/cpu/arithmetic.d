@@ -2,7 +2,6 @@ module tests.cpu.arithmetic;
 
 import cpu;
 import mmu;
-import bus;
 import dunit;
 import interrupt;
 
@@ -22,9 +21,7 @@ class ArithmeticTests {
     this() {
         m = new MMU(null, null, null, null, null, null, null);
         
-        Bus mockBus = mock!Bus;
-
-        c = new CPU(m, mockBus, null);
+        c = new CPU(m, null);
     }
 
     @Test
@@ -34,7 +31,8 @@ class ArithmeticTests {
         c.registers.f |= Flag.SUBTRACTION;
 
         m.writeByte(PGM_START, 0x80); // ADD A,B
-        c.step();
+        c.call(); // decode
+        c.call(); // single cycle
 
         // ADD should unset the subtraction flag
         (c.registers.f & Flag.SUBTRACTION).shouldEqual(0);
@@ -48,7 +46,8 @@ class ArithmeticTests {
         c.registers.a = 0xFE;
         c.registers.b = 0x03;
         m.writeByte(PGM_START, 0x80); // ADD A,B
-        c.step();
+        c.call(); // decode
+        c.call(); // single cycle
 
         // (0xFE + 0x03) & 0xFF = 0x01
         (c.registers.a).shouldEqual(0x01);
@@ -75,7 +74,8 @@ class ArithmeticTests {
         c.registers.a = 0xFE;
         c.registers.b = 0x02;
         m.writeByte(PGM_START, 0x80); // ADD A,B
-        c.step();
+        c.call(); // decode
+        c.call(); // single cycle
 
         // ADD should set the overflow flag when the result > 0xFF
         (c.registers.f & Flag.OVERFLOW).shouldNotEqual(0);
@@ -94,7 +94,8 @@ class ArithmeticTests {
         c.registers.a = 0xFE;
         c.registers.b = 0x02;
         m.writeByte(PGM_START, 0x80); // ADD A,B
-        c.step();
+        c.call(); // decode
+        c.call(); // single cycle
 
         // (0xFE + 0x02) & 0xFF = 0x00
         (c.registers.a).shouldEqual(0x00);

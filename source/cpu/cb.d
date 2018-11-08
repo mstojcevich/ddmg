@@ -1,11 +1,11 @@
 module cpu.cb;
 
 import core.bitop;
+import core.thread;
 
 import cpu.registers;
 import cpu.instruction;
 import mmu;
-import bus;
 
 // Portion of the CPU to deal with CB prefix instructions -
 // a set of instructions that deals with bit operations
@@ -30,7 +30,6 @@ class CB {
 
     private Registers regs;
     private MMU mmu;
-    private Bus bus;
 
     // Lookup tables for op and destination
     // Probably a perf penalty but at least I don't have to write a 256 item long table again
@@ -38,8 +37,7 @@ class CB {
     private @safe Operation[32] ops;
     private @safe Destination[8] destinations;
 
-    @safe this(ref Registers registers, ref MMU mmu, ref Bus bus) {
-        this.bus = bus;
+    @safe this(ref Registers registers, ref MMU mmu) {
         this.regs = registers;
         this.mmu = mmu;
 
@@ -50,9 +48,9 @@ class CB {
             Destination("E", 4, (Operation op, ubyte opcode) @safe => op(regs.e)),
             Destination("H", 4, (Operation op, ubyte opcode) @safe => op(regs.h)),
             Destination("L", 4, (Operation op, ubyte opcode) @safe => op(regs.l)),
-            Destination("(HL)", 4 /*remaining 8 spent in op itself*/, (Operation op, ubyte opcode) @safe {
+            Destination("(HL)", 4 /*remaining 8 spent in op itself*/, (Operation op, ubyte opcode) @trusted {
                 ubyte hlVal = this.mmu.readByte(this.regs.hl);
-                this.bus.update(4);
+                Fiber.yield();
                 op(hlVal);
 
                 // HACK: BIT operation doesn't need to write
@@ -61,7 +59,7 @@ class CB {
                 }
 
                 this.mmu.writeByte(this.regs.hl, hlVal);
-                this.bus.update(4);
+                Fiber.yield();
             }),
             Destination("A", 4, (Operation op, ubyte opcode) @safe => op(regs.a))
         ];

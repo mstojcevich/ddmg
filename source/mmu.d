@@ -1,6 +1,9 @@
 import sound.apu;
+
 import std.conv;
 import std.stdio;
+
+import core.thread;
 
 import cartridge, graphics, keypad, interrupt, clock, serial;
 
@@ -52,12 +55,6 @@ private const WAVE_RAM_END              = 0xFF3F;
 private const SERIAL_DATA               = 0xFF01;
 private const SERIAL_CONTROL            = 0xFF02;
 
-private enum OamTransferState {
-    NO_TRANSFER,
-    SETUP,
-    TRANSFER
-}
-
 /**
  * Exception to be thrown when a caller tries to access a memory address not mapped by the MMU
  */
@@ -71,7 +68,7 @@ class UnmappedMemoryAccessException : Exception {
  * Memory management unit of the emulator. Deals with mapping memory accesses.
  * Also stores the work RAM
  */
-class MMU {
+final class MMU : Fiber {
 
     private ubyte[WORK_RAM_END - WORK_RAM_BEGIN + 1] workRam;
 
@@ -85,14 +82,14 @@ class MMU {
     private APU apu;
     private Serial serial;
 
-    private OamTransferState oamTransferState;
-    private uint oamCycleAccum; // Leftover cycles since the last transfered bytes
-    private ushort oamTransferToAddr; // The current address to transfer to
     private ushort oamTransferFromAddr; // The current address to transfer from
     private ubyte oamLastWritten;
+    private bool oamRequested; // Whether an OAM DMA transfer should start next cycle
+    private bool oamInProgress;
 
     /// Create a new MMU connected to the specified components
-    @safe this(Cartridge c, GPU g, Keypad k, InterruptHandler ih, Clock clk, APU apu, Serial serial) {
+    @trusted this(Cartridge c, GPU g, Keypad k, InterruptHandler ih, Clock clk, APU apu, Serial serial) {
+        super(&run);
         this.cartridge = c;
         this.gpu = g;
         this.keypad = k;
@@ -102,40 +99,41 @@ class MMU {
         this.serial = serial;
     }
 
-    /// Simulate n cycles of the MMU running. Currently used for simulating OAM transfer
-    @safe void step(uint cyclesElapsed) {
-        if(oamTransferState != OamTransferState.NO_TRANSFER) {
-            oamCycleAccum += cyclesElapsed;
+    /// Simulate running the MMU
+    @safe void run() {
+        while (true) {
+            step();
         }
+    }
 
-        final switch(oamTransferState) {
-            case OamTransferState.NO_TRANSFER:
-                break;
-            case OamTransferState.SETUP:
-                // TODO this should maybe start after the CPU finishes an instruction
-                // TODO The OAM transfer takes 4 cycles to setup. Not sure why I need to spend 8
-                if(oamCycleAccum >= 8) {
-                    oamCycleAccum -= 8;
-                    oamTransferState = OamTransferState.TRANSFER;
-                    goto case OamTransferState.TRANSFER;
+    /// Simulate 4 clocks worth of MMU work (currently just OAM DMA)
+    @trusted void step() {
+        if (oamRequested) {
+            oamRequested = false;
+
+            // Do the OAM transfer
+            for(int destAddr = OAM_BEGIN; destAddr <= OAM_END; destAddr++) {
+                ubyte srcByte = readByte(oamTransferFromAddr);
+                yield();
+
+                if (oamRequested) {
+                    // Another OAM DMA has been requested mid-transfer.
+                    // Let's fix ourselves.
+                    oamRequested = false;
+                    destAddr = OAM_BEGIN; // rollback
+                    srcByte = readByte(oamTransferFromAddr);
+                    yield();
                 }
 
-                break;
-            case OamTransferState.TRANSFER:
-                while(oamCycleAccum >= 4) {
-                    oamCycleAccum -= 4;
+                oamInProgress = true;
+                gpu.oam(cast(ushort)(destAddr - OAM_BEGIN), srcByte);
+                oamTransferFromAddr++;
+            }
 
-                    const ubyte srcByte = readByte(oamTransferFromAddr);
-                    gpu.oam(cast(ushort)(oamTransferToAddr - OAM_BEGIN), srcByte);
-                    oamTransferToAddr++;
-                    oamTransferFromAddr++;
-
-                    if(oamTransferToAddr > OAM_END) {
-                        oamTransferState = OamTransferState.NO_TRANSFER;
-                        break;
-                    }
-                }
-                break;
+            yield();
+            oamInProgress = false;
+        } else { // No OAM request
+            this.yield(); // Do nothing
         }
     }
 
@@ -147,11 +145,6 @@ class MMU {
         assert(address <= 0xFFFF);
     }
     body {
-        // Cancel out certain reads if OAM DMA is occurring
-        if(oamTransferState == OamTransferState.TRANSFER && address >= OAM_BEGIN && address <= OAM_END) {
-            return 0xFF;
-        }
-
         if(ZERO_PAGE_BEGIN <= address && address <= ZERO_PAGE_END) {
             return zeroPage[address - ZERO_PAGE_BEGIN];
         }
@@ -180,7 +173,11 @@ class MMU {
         }
         
         if(OAM_BEGIN <= address && address <= OAM_END) {
-            return gpu.oam(cast(ushort)(address - OAM_BEGIN));
+            if (oamInProgress) {
+                return 0xFF;
+            } else {
+                return gpu.oam(cast(ushort)(address - OAM_BEGIN));
+            }
         }
 
         if(address == 0xFF40) {
@@ -295,11 +292,6 @@ class MMU {
         assert(address <= 0xFFFF);
     }
     body {
-        // Cancel out certain writes if OAM DMA is occurring
-        if(oamTransferState == OamTransferState.TRANSFER && address >= OAM_BEGIN && address <= OAM_END) {
-            return;
-        }
-
         if(ZERO_PAGE_BEGIN <= address && address <= ZERO_PAGE_END) {
             zeroPage[address - ZERO_PAGE_BEGIN] = val;
         } else
@@ -320,7 +312,9 @@ class MMU {
         } else
         
         if(OAM_BEGIN <= address && address <= OAM_END) {
-            gpu.oam(cast(ushort)(address - OAM_BEGIN), val);
+            if(!oamInProgress) {
+                gpu.oam(cast(ushort)(address - OAM_BEGIN), val);
+            }
         } else
 
         if(CARTRIDGE_BANK_0_BEGIN <= address && address <= CARTRIDGE_BANK_1_END) {
@@ -350,10 +344,8 @@ class MMU {
 
         } else if(address == DMA_TRANSFER_ADDR) {
             // Transfer from RAM to OAM
-            oamCycleAccum = 0;
             oamTransferFromAddr = val << 8;
-            oamTransferToAddr = OAM_BEGIN;
-            oamTransferState = OamTransferState.SETUP;
+            oamRequested = true;
             oamLastWritten = val;
         } else if(address == 0xFF00) { 
             keypad.writeJOYP(val);

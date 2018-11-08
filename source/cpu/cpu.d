@@ -6,6 +6,7 @@ import std.exception;
 import std.traits;
 
 import core.bitop;
+import core.thread;
 
 import mmu;
 import cpu.registers;
@@ -15,7 +16,6 @@ import graphics;
 import interrupt;
 import keypad;
 import cpu.cb;
-import bus;
 
 /**
  * The type of halt the CPU is in
@@ -31,14 +31,13 @@ enum HaltMode {
 /**
  * Implementation of the GameBoy CPU
  */
-class CPU {
+final class CPU : Fiber {
 
     private Instruction[256] instructions;
 
     private Registers regs = new Registers();
 
     private MMU mmu;
-    private Bus bus;
     private InterruptHandler iuptHandler;
     private CB cbBlock;
 
@@ -48,11 +47,12 @@ class CPU {
     // Whether the CPU is halted (not executing until interrupt)
     private HaltMode haltMode;
 
-    @safe this(MMU mmu, Bus bus, InterruptHandler ih) {
+    @trusted this(MMU mmu, InterruptHandler ih) {
+        super(&run);
+
         this.mmu = mmu;
-        this.bus = bus;
         this.iuptHandler = ih;
-        this.cbBlock = new CB(regs, mmu, bus);
+        this.cbBlock = new CB(regs, mmu);
 
         // 0 in the cycle count will mean it's calculated conditionally later
         this.instructions = [
@@ -343,98 +343,105 @@ class CPU {
     }
 
     /**
-     * Runs the CPU for one instruction, updating the bus and interrupt handler as necessary.
-     * @return opcode of the instruction that was executed
+     * Runs the CPU indefinitely
      */
-    @safe ubyte step() {
-        ubyte ret = 0x00;
-
-        if(haltMode == HaltMode.NO_HALT || haltMode == HaltMode.HALT_BUG) { // If the CPU is halted, stop execution
-            // Fetch the operation in memory
-            immutable ubyte opcode = mmu.readByte(regs.pc);
-            ret = opcode;
-
-            Instruction instr = instructions[opcode];
-
-            if(false) {
-                writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
-                writefln("PC: %04X\tSP: %04X", regs.pc, regs.sp);
-                writefln("@ %04X: %02X -> %s", regs.pc, opcode, instr.disassembly);
-                writeln();
-            }
-
-            //enforce(instr.impl !is null,
-            //    format("Emulated code used unimplemented operation 0x%02X @ 0x%04X", opcode, regs.pc));
-
-            // Increment the program counter
-            // Done before instruction execution so that jumps are easier. Pretty sure that's how it's done on real hardware too.
-            if(haltMode != HaltMode.HALT_BUG) { // The halt bug causes the next instruction to repeat twice
-                regs.pc++;
-            } else {
-                haltMode = HaltMode.NO_HALT;
-            }
-
-            if(instr.impl !is null) {
-                try {
-                    bus.update(4); // Decode
-
-                    instr.impl(); // Execute the operation
-                } catch (Exception e) {
-                    writefln("Instruction failed with exception \"%s\"", e.msg);
+    @trusted private void run() {
+        while (true) {
+            ubyte ret = 0x00;
+    
+            if(!isHalted) { // If the CPU is halted, stop execution
+                // Fetch the operation in memory
+                immutable ubyte opcode = mmu.readByte(regs.pc);
+                this.curFetchedOpcode = opcode;
+                this.instrCount++;
+    
+                Instruction instr = instructions[opcode];
+    
+                if (false) {
                     writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
                     writefln("PC: %04X\tSP: %04X", regs.pc, regs.sp);
                     writefln("@ %04X: %02X -> %s", regs.pc, opcode, instr.disassembly);
                     writeln();
-
-                    throw e;
                 }
-            } else {
-                writefln("Program tried to execute instruction %s at %02X, which isn't defined", instr.disassembly, regs.pc - 1);
-                writefln("The execution is probably tainted");
-            }
-        } else { // halted
-            // TODO how many cycles??
-            // Does this need to be a separate clock?
-           bus.update(4);
-        }
-
-        // TODO move everything from here on down in this fucntion
-        // to its own interrupthandler method
-        
-        // Handle any interrupts that were triggered
-        if(iuptHandler !is null) {
-            foreach(iupt; EnumMembers!Interrupts) {
-                if(iuptHandler.shouldHandle(iupt)) {
-                    if(haltMode != HaltMode.NO_INTERRUPT_JUMP) {
-                        call(iupt.address);
-                        iuptHandler.markHandled(iupt);
-                        iuptHandler.masterToggle = false;
-
-                        // It takes 20 clocks to dispatch an interrupt. 8 if you account for the CALL 
-                        bus.update(8);
-
-                        if(haltMode == HaltMode.NORMAL) {
-                            // If the CPU is in HALT mode, another 4 clocks are needed
-                            bus.update(4);
-                            haltMode = HaltMode.NO_HALT;
-                        }
-                    } else {
-                        // No interrupt jump halt mode continues execution but doesn't handle the interrupt
-                        haltMode = HaltMode.NO_HALT;
-                        iuptHandler.masterToggle = false;
+    
+                //enforce(instr.impl !is null,
+                //    format("Emulated code used unimplemented operation 0x%02X @ 0x%04X", opcode, regs.pc));
+    
+                // Increment the program counter
+                // Done before instruction execution so that jumps are easier. Pretty sure that's how it's done on real hardware too.
+                if(haltMode != HaltMode.HALT_BUG) { // The halt bug causes the next instruction to repeat twice
+                    regs.pc++;
+                } else { // haltMode == HALT_BUG
+                    haltMode = HaltMode.NO_HALT;
+                }
+    
+                if(instr.impl !is null) {
+                    try {
+                        this.yield(); // Decode
+    
+                        instr.impl(); // Execute the operation
+                    } catch (Exception e) {
+                        writefln("Instruction failed with exception \"%s\"", e.msg);
+                        writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
+                        writefln("PC: %04X\tSP: %04X", regs.pc, regs.sp);
+                        writefln("@ %04X: %02X -> %s", regs.pc, opcode, instr.disassembly);
+                        writeln();
+    
+                        throw e;
                     }
+                } else {
+                    writefln("Program tried to execute instruction %s at %02X, which isn't defined", instr.disassembly, regs.pc - 1);
+                    writefln("The execution is probably tainted");
+                }
+            } else { // halted
+                // TODO how many cycles??
+                // Does this need to be a separate clock?
+                this.yield();
+            }
+    
+            // TODO move everything from here on down in this fucntion
+            // to its own interrupthandler method
+            
+            // Handle any interrupts that were triggered
+            if(iuptHandler !is null) {
+                foreach(iupt; EnumMembers!Interrupts) {
+                    if(iuptHandler.shouldHandle(iupt)) {
+                        if(haltMode != HaltMode.NO_INTERRUPT_JUMP) {
+                            // It takes 20 clocks to dispatch an interrupt. 8 if you account for the CALL.
+                            this.yield();
+                            this.yield();
 
-                    break;
+                            callAddr(iupt.address);
+
+                            iuptHandler.markHandled(iupt);
+                            iuptHandler.masterToggle = false;
+    
+                            if(haltMode == HaltMode.NORMAL) {
+                                // If the CPU is in HALT mode, another 4 clocks are needed
+                                this.yield();
+                                haltMode = HaltMode.NO_HALT;
+                            }
+                        } else {
+                            // No interrupt jump halt mode continues execution but doesn't handle the interrupt
+                            haltMode = HaltMode.NO_HALT;
+                            iuptHandler.masterToggle = false;
+                        }
+    
+                        break;
+                    }
+                }
+    
+                if (shouldEI) {
+                    iuptHandler.masterToggle = true;
+                    shouldEI = false;
                 }
             }
-
-            if (shouldEI) {
-                iuptHandler.masterToggle = true;
-                shouldEI = false;
-            }
         }
+    }
 
-        return ret;
+    /// Returns whether or not CPU execution is halted
+    @safe @property public bool isHalted() {
+        return haltMode != HaltMode.NO_HALT && haltMode != HaltMode.HALT_BUG;
     }
 
     // A debug function for printing the flag statuses
@@ -497,13 +504,13 @@ class CPU {
     /**
      * Load the value from one register into another register
      */
-    @safe private void load(ref reg16 dest, in reg16 src) {
+    @trusted private void load(ref reg16 dest, in reg16 src) {
         dest = src;
 
-        bus.update(4);
+        this.yield(); // 16-bit delay
     }
 
-    @safe private void loadSPplusImmediateToHL() {
+    @trusted private void loadSPplusImmediateToHL() {
         regs.setFlag(Flag.ZERO, false);
         regs.setFlag(Flag.SUBTRACTION, false);
 
@@ -519,7 +526,7 @@ class CPU {
 
         regs.hl = cast(ushort) sum;
 
-        bus.update(4); // Not sure where these come from
+        this.yield(); // Not sure where the yield come from
     }
 
     /**
@@ -589,7 +596,7 @@ class CPU {
     /**
      * Add a 16-bit value to a 16-bit register
      */
-    @safe private void add(ref reg16 dst, in ushort src) {
+    @trusted private void add(ref reg16 dst, in ushort src) {
         immutable uint result = dst + src;
         immutable ushort outResult = cast(ushort) result;
 
@@ -603,15 +610,15 @@ class CPU {
 
         dst = outResult;
 
-        bus.update(4); // 16-bit math takes time. Not sure where this goes.
+        this.yield(); // 16-bit math takes time. Not sure where this goes.
     }
 
     /**
      * Add the next 8-bit value to the stack pointer
      */
-    @safe private void offsetStackPointerImmediate() {
+    @trusted private void offsetStackPointerImmediate() {
         immutable short toAdd = cast(short)(cast(byte)(readByte(regs.pc)));
-        regs.pc += 1;
+        regs.pc += 1; // for immediate
 
         immutable ushort result = cast(ushort)(regs.sp + toAdd);
 
@@ -622,8 +629,9 @@ class CPU {
 
         regs.setFlag(Flag.ZERO, false);
         regs.setFlag(Flag.SUBTRACTION, false);
-        
-        bus.update(8); // No idea where these come from
+       
+        this.yield();
+        this.yield(); // No idea where these yields come from
     }
 
     /**
@@ -667,12 +675,12 @@ class CPU {
      *
      * For example, if the carry flag was set before the method call, and the parameter is 5, then 6 is added to A
      */
-     @safe private void adc(in ubyte src) {
+    @safe private void adc(in ubyte src) {
         // We can't just call add(src + carry) because if the ubyte overflows to 0 when adding carry, the GB's overflow bit won't get set among other problems
         // TODO check what real hardware does
 
         immutable ubyte c = regs.isFlagSet(Flag.OVERFLOW) ? 1 : 0;
-         
+
         immutable ushort result = regs.a + src + c; // Storing in a short so overflow can be checked
         immutable ubyte outResult = cast(ubyte) result; // The result that actually goes into the output register
 
@@ -688,8 +696,8 @@ class CPU {
 
         // Result with the extra bits dropped
         regs.a = outResult;
-     }
-     
+    }
+
     /**
      * Adc the 8-bit value stored in memory at the address stored in register HL to register A
      */
@@ -880,14 +888,14 @@ class CPU {
         writeByte(regs.hl, mem);
     }
 
-    @safe private void inc(ref reg16 reg) {
+    @trusted private void inc(ref reg16 reg) {
         reg++;
-        bus.update(4); // Takes time to do 16 bit math. Not sure where this goes.
+        this.yield(); // Takes time to do 16 bit math. Not sure where this goes.
     }
 
-    @safe private void dec(ref reg16 reg) {
+    @trusted private void dec(ref reg16 reg) {
         reg--;
-        bus.update(4); // Takes time to do 16 bit math. Not sure where this goes.
+        this.yield(); // Takes time to do 16 bit math. Not sure where this goes.
     }
 
     /**
@@ -952,23 +960,24 @@ class CPU {
         regs.setFlag(Flag.OVERFLOW, rightmostBit);
     }
     
-    @safe private void jumpImmediate() {
+    @trusted private void jumpImmediate() {
         readShort(regs.pc, regs.pc);
         // No need to increment pc to compensate for the immediate value because we jumped
 
-        bus.update(4); // No idea where these come from
+        this.yield(); // No idea where this yield comes from
     }
 
     /**
      * Jump to the immediate address if the specified flag is set/reset (depending on second parameter)
      */
-    @safe private void jumpImmediateIfFlag(in Flag f, in bool set) {
+    @trusted private void jumpImmediateIfFlag(in Flag f, in bool set) {
         if(regs.isFlagSet(f) == set) {
             jumpImmediate();
         } else { // Update PC to account for theoretically reading a 16-bit immediate
             regs.pc += 2;
 
-            bus.update(8); // Pretend to read an immediate short
+            this.yield();
+            this.yield(); // Pretend to read an immediate short
         }
     }
 
@@ -984,22 +993,22 @@ class CPU {
     /**
      * Add the immediate 8-bit value (interpreted as signed two's complement) to the PC
      */
-    @safe private void jumpRelativeImmediate() {
-        regs.pc += cast(byte)(readByte(regs.pc)) + 1; // Casting to signed
+    @trusted private void jumpRelativeImmediate() {
+        regs.pc += cast(short)cast(byte)(readByte(regs.pc)) + 1; // Casting to signed
 
-        bus.update(4); // Not sure where these come from
+        this.yield(); // Not sure where these come from
     }
 
     /**
      * JR if the specified flag is set/unset
      */
-    @safe private void jumpRelativeImmediateIfFlag(Flag f, bool set) {
+    @trusted private void jumpRelativeImmediateIfFlag(Flag f, bool set) {
         if(regs.isFlagSet(f) == set) {
             jumpRelativeImmediate();
         } else {
             regs.pc += 1;
 
-            bus.update(4); // Pretend to read an immediate byte
+            this.yield(); // Pretend to read an immediate byte
         }
     }
 
@@ -1008,7 +1017,7 @@ class CPU {
      * and store it in itself
      */
     @safe private void complement(ref reg8 src) {
-        src = ~src;
+        src = cast(ubyte)(~cast(int)(src));
 
         regs.setFlag(Flag.SUBTRACTION, 1);
         regs.setFlag(Flag.HALF_OVERFLOW, 1);
@@ -1029,8 +1038,8 @@ class CPU {
     /**
      * Decrement the stack pointer by 2, then write a 16-bit value to the stack
      */
-    @safe private void pushToStack(in ushort src) {
-        bus.update(4); // Internal delay comes before write
+    @trusted private void pushToStack(in ushort src) {
+        this.yield(); // Internal delay comes before write
 
         regs.sp -= 2;
         writeShortBackwards(regs.sp, src);
@@ -1085,7 +1094,7 @@ class CPU {
     /**
      * Push the current PC to the stack, then jump to addr
      */
-    @safe private void call(in ushort addr) {
+    @safe private void callAddr(in ushort addr) {
         pushToStack(regs.pc);
         regs.pc = addr;
     }
@@ -1097,35 +1106,36 @@ class CPU {
         ushort toCall;
         readShort(regs.pc, toCall);
         regs.pc += 2; // Compensate for reading an immediate short
-        call(toCall);
+        callAddr(toCall);
     }
 
     /**
      * Call an immediate 16-bit value if the specified flag is set/reset (depending on second argument)
      */
-    @safe private void callImmediateIfFlag(in Flag f, in bool set) {
+    @trusted private void callImmediateIfFlag(in Flag f, in bool set) {
         if(regs.isFlagSet(f) == set) {
             callImmediate();
         } else {
             regs.pc += 2; // Compensate for theoretically reading an immediate short
             
-            bus.update(8); // spend time to read the immediate even though we don't
+            this.yield();
+            this.yield(); // spend time to read the immediate even though we don't
         }
     }
 
     /**
      * Pop 16 bits from the stack and jump to that address
      */
-    @safe private void ret() {
+    @trusted private void ret() {
         popFromStack(regs.pc);
-        bus.update(4); // Not sure where these come from
+        this.yield(); // Not sure where this yield comes from
     }
 
     /**
      * RET if the specified flag is set/reset (depending on the second parameter)
      */
-    @safe private void retIfFlag(in Flag f, in bool set) {
-        bus.update(4); // Internal delay
+    @trusted private void retIfFlag(in Flag f, in bool set) {
+        this.yield(); // Internal delay
         
         if(regs.isFlagSet(f) == set) {
             ret();
@@ -1208,36 +1218,36 @@ class CPU {
         }
     }
 
-    @safe private ubyte readByte(ushort addr) {
+    @trusted private ubyte readByte(ushort addr) {
         immutable ubyte read = mmu.readByte(addr);
-        bus.update(4); // 4 cycles to read a byte
+        this.yield(); // 4 cycles to read a byte
         return read;
     }
 
-    @safe private void writeByte(ushort addr, ubyte val) {
+    @trusted private void writeByte(ushort addr, ubyte val) {
         mmu.writeByte(addr, val);
-        bus.update(4);
+        this.yield();
     }
 
-    @safe private void readShort(ushort addr, out ushort dst) {
+    @trusted private void readShort(ushort addr, out ushort dst) {
         dst = mmu.readByte(addr);
-        bus.update(4);
+        this.yield();
         dst |= mmu.readByte(addr + 1) << 8;
-        bus.update(4);
+        this.yield();
     }
 
-    @safe private void writeShort(ushort addr, ushort toWrite) {
+    @trusted private void writeShort(ushort addr, ushort toWrite) {
         mmu.writeByte(addr, toWrite & 0xFF);
-        bus.update(4);
+        this.yield();
         mmu.writeByte(addr + 1, toWrite >> 8);
-        bus.update(4);
+        this.yield();
     }
 
-    @safe private void writeShortBackwards(ushort addr, ushort toWrite) {
+    @trusted private void writeShortBackwards(ushort addr, ushort toWrite) {
         mmu.writeByte(addr + 1, toWrite >> 8);
-        bus.update(4);
+        this.yield();
         mmu.writeByte(addr, toWrite & 0xFF);
-        bus.update(4);
+        this.yield();
     }
 
     version(test) {
@@ -1248,6 +1258,16 @@ class CPU {
         @safe @property public const(Registers) registers() const {
             return regs;
         }
+    }
+
+    // For automated test roms
+    private ubyte curFetchedOpcode; // last opcode fetched
+    private long instrCount = 0; // number of instructions fetched so far
+    @safe @property public deprecated ubyte curOpcode() {
+        return curFetchedOpcode;
+    }
+    @safe @property public deprecated long instructionCount() {
+        return instrCount;
     }
 
     version(test) @safe public void reset() {

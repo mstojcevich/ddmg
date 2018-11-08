@@ -42,8 +42,9 @@ long maxInstrs = 25_000_000;  // Max instructions to run a test rom for
 
     Gameboy g = new Gameboy(frontend, romName);
     CPU cpu = g.getCPU();
-    for(long i; i < maxInstrs; i++) {
-        const ubyte opcode = cpu.step();
+    while(cpu.instructionCount < maxInstrs) {
+        g.step();
+        const ubyte opcode = cpu.curOpcode;
 
         // Mooneye tests indicate that exeution has finished by executing LD B,B
         if (opcode == 0x40 && testMode == TestMode.mooneye) {
