@@ -372,17 +372,17 @@ final class CPU : Fiber {
             ubyte ret = 0x00;
     
             if(!isHalted) {
-                this.instrCount++;
-
                 // Fetch the operation in memory
                 immutable ubyte opcode = mmu.readByte(regs.pc);
                 this.curFetchedOpcode = opcode;
                 this.instrCount++;
     
                 Instruction instr = fetchAndDecode();
+                this.yield(); // All instructions take at least one cycle (for the fetch)
+                // NOTE: It seems weird to put the yield after the fetch/decode but before the execute, but it seems like the gameboy decodes after the previous instr.
+
                 instr.impl(); // Execute the operation
 
-                this.yield(); // All instructions take at least one cycle (for the fetch)
             } else { // halted
                 // TODO how many cycles??
                 // Does this need to be a separate clock?
