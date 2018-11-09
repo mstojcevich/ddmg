@@ -379,7 +379,6 @@ mooneye-halt_ime0_nointr_timing:
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/halt_ime0_nointr_timing.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 mooneye-vblank_stat_intr-GS:
   stage: test
