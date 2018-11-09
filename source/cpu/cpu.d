@@ -390,7 +390,7 @@ final class CPU : Fiber {
                 this.yield();
             }
 
-            const shouldHandleInterrupt = iuptHandler.masterToggle 
+            const shouldHandleInterrupt = iuptHandler !is null && iuptHandler.masterToggle 
                     && (iuptHandler.interruptEnableRegister & iuptHandler.interruptFlagRegister & 0b00011111) > 0;
 
             // XXX before or after shouldHandleInterrupt check?
