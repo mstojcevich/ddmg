@@ -547,7 +547,7 @@ final class GPU : Fiber {
         }
     }
 
-    @trusted private void vblank() {
+    @trusted private int vblank() {
         // vblank initially gets called with one "free" scanline (we need to account for that with yields later)
         assert(curScanline == DISPLAY_HEIGHT);
 
@@ -582,6 +582,8 @@ final class GPU : Fiber {
             curScanline++;
         }
         assert(cyclesSpent == (CYCLES_PER_LINE / 4) * 10); // VBlank should take the time of 10 lines
+
+        return cyclesSpent;
     }
 
     @safe private void updateStatIupt() {
@@ -607,6 +609,8 @@ final class GPU : Fiber {
                 continue;
             }
 
+            auto cyclesPerFrame = 0;
+
             // Render each of the visible scanlines
             for(curScanline = 0; curScanline < DISPLAY_HEIGHT; curScanline++) {
                 updateCoincidence();
@@ -627,11 +631,14 @@ final class GPU : Fiber {
                 );
 
                 // 114 cycles per line
+                cyclesPerFrame += cyclesToOamSearch + cyclesToPixelTransfer + cyclesToHblank;
                 assert(cyclesToOamSearch + cyclesToPixelTransfer + cyclesToHblank == 114);
             }
 
             // We're in vblank for the remainder of the time
-            vblank();
+            cyclesPerFrame += vblank();
+
+            assert(cyclesPerFrame == CYCLES_PER_LINE/4 * VIRTUAL_HEIGHT);
         }
     }
 
