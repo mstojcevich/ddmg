@@ -64,9 +64,9 @@ NOTE: these timings are not accurate as they vary
 see https://gist.github.com/drhelius/3730564
 w/ original thread http://forums.nesdev.com/viewtopic.php?t=7861
  */
-private const CYCLES_PER_OAM_SEARCH = 80;
+private const CYCLES_PER_OAM_SEARCH = 84;
 private const CYCLES_PER_DATA_TRANSFER = 172;
-private const CYCLES_PER_HBLANK = 204;
+private const CYCLES_PER_HBLANK = 200;
 private const CYCLES_PER_LINE = CYCLES_PER_OAM_SEARCH + CYCLES_PER_DATA_TRANSFER + CYCLES_PER_HBLANK; // 456
 
 
