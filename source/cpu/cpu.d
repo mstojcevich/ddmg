@@ -346,7 +346,6 @@ final class CPU : Fiber {
         const opcode = mmu.readByte(regs.pc);
 
         this.curFetchedOpcode = opcode;
-        this.instrCount++;
 
         const instr = instructions[opcode];
 
@@ -373,6 +372,8 @@ final class CPU : Fiber {
             ubyte ret = 0x00;
     
             if(!isHalted) {
+                this.instrCount++;
+
                 // Fetch the operation in memory
                 immutable ubyte opcode = mmu.readByte(regs.pc);
                 this.curFetchedOpcode = opcode;
