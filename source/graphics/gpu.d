@@ -1014,6 +1014,10 @@ final class GPU : Fiber {
         assert(addr < BYTES_PER_SPRITE_ATTR * NUM_SPRITES);
     }
     body {
+        if (status.gpuMode == GPUMode.OAM_SEARCH
+                || status.gpuMode == GPUMode.DATA_TRANSFER) {
+            return 0xFF;
+        }
         return spriteMemory[addr];
     }
 
