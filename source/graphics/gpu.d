@@ -602,8 +602,6 @@ final class GPU : Fiber {
     /// Run the PPU indefinitely, yielding each 4 cycles
     @trusted private void run() {
         while (true) {
-            // TODO we should probably immediately jump here if the LCD is disable
-            // (right now we wait until vblank is over...)
             if (!control.lcdEnable) {
                 yield();
                 continue;
@@ -1117,6 +1115,13 @@ final class GPU : Fiber {
             curScanline = 0;
             updateCoincidence();
             updateIuptSignal();
+
+            // HACK: After LCD enable, we start partway through the first scanline
+            // We're confident this won't cause an iupt, so we can simulate regularly here regardless
+            // of what the actual hardware behavior is here.
+            control.data = lcdc;
+            this.call();
+            this.call();
         }
 
         if(newControl.bgTileset != control.bgTileset) {
