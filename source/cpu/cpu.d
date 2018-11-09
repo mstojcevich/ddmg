@@ -406,6 +406,7 @@ final class CPU : Fiber {
                 if (haltMode == HaltMode.NO_INTERRUPT_JUMP) {
                     // No interrupt jump halt mode continues execution but doesn't handle the interrupt
                     haltMode = HaltMode.NO_HALT;
+                    yield(); // It takes an extra cycles to exit halt mode. TODO verify when this happens
                     continue;
                 }
 
