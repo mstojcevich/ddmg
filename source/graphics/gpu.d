@@ -516,15 +516,26 @@ final class GPU : Fiber {
         iuptHandler.fireInterrupt(Interrupts.VBLANK);
 
         auto cyclesSpent = 0;
-        for(; curScanline < VIRTUAL_HEIGHT; curScanline++) {
+        while(true) {
             // it's ok that we don't increment scanline first, due to the "free" scanline
             updateCoincidence();
             updateStatIupt();
 
             for(int i; i < CYCLES_PER_LINE / 4; i++) {
                 yield();
+
+                // Every cycle after the first cycle of 153 should report as scanline 0
+                if (curScanline == VIRTUAL_HEIGHT - 1) {
+                    curScanline = 0; // move on early
+                }
+
                 cyclesSpent++;
             }
+
+            if (curScanline == 0) { // past line 153 now
+                break;
+            }
+            curScanline++;
         }
         assert(cyclesSpent == (CYCLES_PER_LINE / 4) * 10); // VBlank should take the time of 10 lines
     }
@@ -1051,10 +1062,13 @@ final class GPU : Fiber {
             curScanline = 0;
             updateCoincidence();
             updateIuptSignal();
-            // TODO what does mode get set to? Write a test
+            
+            // TODO does mode immediately get set to OAM_SEARCH here? Or stick with what we have
         }
 
         if(newControl.lcdEnable && !control.lcdEnable) {
+            // TODO does mode immediately get set to OAM_SEARCH here? Or only once we power back on
+
             status.gpuMode = GPUMode.OAM_SEARCH;
             curScanline = 0;
             updateCoincidence();
