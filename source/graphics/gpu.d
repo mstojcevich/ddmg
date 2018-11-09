@@ -204,7 +204,7 @@ final class GPU : Fiber {
     private int[10] visibleSprites; // filled by oamSearch
 
     /// Perform the OAM search stage of the line, determining which sprites are visible
-    @trusted private void oamSearch() { // STAGE 2 (0b10)
+    @trusted private int oamSearch() { // STAGE 2 (0b10)
         auto cyclesSpent = 0;
 
         // Search the sprites and determine which are visible
@@ -249,9 +249,11 @@ final class GPU : Fiber {
         }
 
         // Yield is guarenteed to be called _exactly_ 20 times, 20*4=80 cycles
-        assert(cyclesSpent == 20);
 
         yield(); // XXX TODO HACK WRONG This was just thrown in to pass some tests. It's very very very wrong...
+        cyclesSpent++;
+
+        return cyclesSpent;
     }
 
     @safe @property private SpriteAttributes[NUM_SPRITES] sprites() {
@@ -479,14 +481,19 @@ final class GPU : Fiber {
         return cyclesToCompleteLine;
     }
 
-    @trusted private void hblank(int cyclesLeft) {
+    @trusted private int hblank(int cyclesLeft) {
         // HBLANK does nothing, just waits to make up for leftover time
+        auto cyclesToHblank = 0;
+
         status.gpuMode = GPUMode.HORIZ_BLANK;
         updateStatIupt(); // TODO the iupt for hblank is delayed
 
         for (int i; i < cyclesLeft; i++) {
             yield();
+            cyclesToHblank++;
         }
+
+        return cyclesToHblank;
     }
 
     bool shouldVblank = false;
@@ -519,7 +526,6 @@ final class GPU : Fiber {
                 cyclesSpent++;
             }
         }
-        writefln("vblank spent %d cycles", cyclesSpent);
         assert(cyclesSpent == (CYCLES_PER_LINE / 4) * 10); // VBlank should take the time of 10 lines
     }
 
@@ -554,15 +560,21 @@ final class GPU : Fiber {
                 updateStatIupt();
 
                 // We start out in OAM search mode
-                oamSearch();
+                const cyclesToOamSearch = oamSearch();
+                assert(cyclesToOamSearch >= 20);
 
                 // Then move on to pixel transfer
                 const cyclesToPixelTransfer = pixelTransfer();
-                writefln("Took %d cycles to do a pixel transfer", cyclesToPixelTransfer);
                 assert(cyclesToPixelTransfer >= 43);
 
                 // And now hblank
-                hblank(CYCLES_PER_LINE/4 - CYCLES_PER_OAM_SEARCH/4 - cyclesToPixelTransfer);
+                // (should take up the remainder of the cycles)
+                const cyclesToHblank = hblank(
+                        CYCLES_PER_LINE/4 - cyclesToOamSearch - cyclesToPixelTransfer
+                );
+
+                // 114 cycles per line
+                assert(cyclesToOamSearch + cyclesToPixelTransfer + cyclesToHblank == 114);
             }
 
             // We're in vblank for the remainder of the time
@@ -1002,6 +1014,10 @@ final class GPU : Fiber {
         assert(addr < BYTES_PER_SPRITE_ATTR * NUM_SPRITES);
     }
     body {
+        if (status.gpuMode == GPUMode.OAM_SEARCH
+                || status.gpuMode == GPUMode.DATA_TRANSFER) {
+            return 0xFF;
+        }
         return spriteMemory[addr];
     }
 
@@ -1010,6 +1026,7 @@ final class GPU : Fiber {
         // The first bit is always 1, and the user cannot write the last two bits
         // TODO According to the official docs, executing a write instruction forthe match flag resets that flag. Is this true?
         status.data = (status.data & 0b10000011) | (stat & 0b01111100);
+        updateStatIupt();
     }
 
     /// Read from the LCD status register (STAT)
