@@ -1026,6 +1026,7 @@ final class GPU : Fiber {
         // The first bit is always 1, and the user cannot write the last two bits
         // TODO According to the official docs, executing a write instruction forthe match flag resets that flag. Is this true?
         status.data = (status.data & 0b10000011) | (stat & 0b01111100);
+        updateStatIupt();
     }
 
     /// Read from the LCD status register (STAT)
