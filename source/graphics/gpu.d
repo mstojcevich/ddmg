@@ -527,6 +527,8 @@ final class GPU : Fiber {
                 // Every cycle after the first cycle of 153 should report as scanline 0
                 if (curScanline == VIRTUAL_HEIGHT - 1) {
                     curScanline = 0; // move on early
+                    updateCoincidence();
+                    updateStatIupt();
                 }
 
                 cyclesSpent++;
