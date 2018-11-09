@@ -588,11 +588,12 @@ final class GPU : Fiber {
 
     @safe private void updateStatIupt() {
         const statInterrupt =
+            control.lcdEnable && (
             (status.coincidenceInterrupt && status.coincidenceFlag) ||
             (status.oamInterrupt && status.gpuMode == GPUMode.VERT_BLANK) ||
             (status.oamInterrupt && status.gpuMode == GPUMode.OAM_SEARCH) ||
             (status.hblankInterrupt && status.gpuMode == GPUMode.HORIZ_BLANK) ||
-            (status.vblankInterrupt && status.gpuMode == GPUMode.VERT_BLANK);
+            (status.vblankInterrupt && status.gpuMode == GPUMode.VERT_BLANK));
 
         if (statInterrupt && !iuptSignal) {
             iuptHandler.fireInterrupt(Interrupts.LCD_STATUS);
@@ -992,6 +993,11 @@ final class GPU : Fiber {
         assert(addr < 8192);
     }
     body {
+        if (control.lcdEnable && status.gpuMode == GPUMode.DATA_TRANSFER) {
+            writeln("WRITE TO VRAM DURING DATA TRANSFER");
+            return;
+        }
+
         if(addr >= BG_MAP_A_BEGIN && addr <= BG_MAP_A_END) {
             if(!control.bgMapSelect) {
                 bgChanged = true;
@@ -1040,6 +1046,11 @@ final class GPU : Fiber {
         assert(addr < 8192);
     }
     body {
+        if (control.lcdEnable && status.gpuMode == GPUMode.DATA_TRANSFER) {
+            writeln("READ FROM VRAM DURING DATA TRANSFER");
+            return 0xFF;
+        }
+
         if(addr >= BG_MAP_A_BEGIN && addr <= BG_MAP_A_END) {
             return tileMapA.data[addr - BG_MAP_A_BEGIN];
         }
@@ -1065,6 +1076,11 @@ final class GPU : Fiber {
         assert(addr < BYTES_PER_SPRITE_ATTR * NUM_SPRITES);
     }
     body {
+        if (control.lcdEnable && (status.gpuMode == GPUMode.OAM_SEARCH
+                || status.gpuMode == GPUMode.DATA_TRANSFER)) {
+            writeln("Write to OAM occurred during search or transfer");
+            return;
+        }
         spriteMemory[addr] = val;
     }
 
@@ -1074,8 +1090,9 @@ final class GPU : Fiber {
         assert(addr < BYTES_PER_SPRITE_ATTR * NUM_SPRITES);
     }
     body {
-        if (status.gpuMode == GPUMode.OAM_SEARCH
-                || status.gpuMode == GPUMode.DATA_TRANSFER) {
+        if (control.lcdEnable && (status.gpuMode == GPUMode.OAM_SEARCH
+                || status.gpuMode == GPUMode.DATA_TRANSFER)) {
+            writeln("Read from OAM occurred during search or transfer");
             return 0xFF;
         }
         return spriteMemory[addr];
@@ -1091,9 +1108,8 @@ final class GPU : Fiber {
 
     /// Read from the LCD status register (STAT)
     @safe @property ubyte statRegister() const {
-        // TODO The mode returns 0 when the display is off. Does the mode actually change to 0??
         if(control.lcdEnable == 0) {
-            return status.data & 0b11111100;
+            return status.data & 0b11111000;
         }
 
         return status.data;
@@ -1109,17 +1125,17 @@ final class GPU : Fiber {
             // When the display is turned off, LY immediately becomes 0
             this.reset(); // reset our state machine
             curScanline = 0;
-            updateCoincidence();
-            updateIuptSignal();
+            updateStatIupt(); // internal flag becomes false
+            // XXX Do we fire interrupts here for the line changing?
             
             // TODO does mode immediately get set to OAM_SEARCH here? Or stick with what we have
         }
 
         if(newControl.lcdEnable && !control.lcdEnable) {
-            // TODO does mode immediately get set to OAM_SEARCH here? Or only once we power back on
-
             status.gpuMode = GPUMode.OAM_SEARCH;
             curScanline = 0;
+
+            // TODO do we do OAM_SEARCH iupt here? Do we do coincidence check here?
             updateCoincidence();
             updateIuptSignal();
 
