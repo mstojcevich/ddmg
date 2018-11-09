@@ -14,6 +14,7 @@ enum Interrupts : Interrupt
     TIMER_OVERFLOW  = Interrupt(1 << 2, 0x0050, 2),
     SERIAL_LINK     = Interrupt(1 << 3, 0x0058, 3),
     JOYPAD_PRESS    = Interrupt(1 << 4, 0x0060, 4),
+    UNKNOWN         = Interrupt(0, 0, 255)
 }
 
 final class InterruptHandler {
@@ -57,16 +58,27 @@ final class InterruptHandler {
         return masterEnable;
     }
 
-    @safe bool shouldHandle(Interrupts iupt) const {
-        return masterEnable && (interruptFlags & iupt.flagBit) != 0 && isInterruptEnabled(iupt);
+    @safe private bool shouldHandle(Interrupts iupt) const {
+        return (interruptFlags & iupt.flagBit) != 0 && isInterruptEnabled(iupt);
     }
 
-    @safe void markHandled(Interrupts iupt) {
+    @safe private void markHandled(Interrupts iupt) {
         interruptFlags &= ~cast(uint)(iupt.flagBit); // compiler warning if we don't cast to uint...
     }
     
     @safe void fireInterrupt(Interrupts iupt) {
         interruptFlags |= iupt.flagBit;
+    }
+
+    @safe Interrupt popInterrupt() {
+        foreach(iupt; EnumMembers!Interrupts) {
+            if(shouldHandle(iupt)) {
+                markHandled(iupt);
+                return iupt;
+            }
+        }
+
+        return Interrupts.UNKNOWN;
     }
 
 }
