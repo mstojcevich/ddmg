@@ -260,9 +260,12 @@ final class GPU : Fiber {
         return (cast(SpriteAttributes[NUM_SPRITES]) spriteMemory);
     }
 
+    private bool fetchingWindow = false;
     private bool fetcherSpriteMode = false; // whether the fetcher is fetching a sprite
     private int fetcherSpriteNum = 0; // if the fetcher is fetching the sprite, which one? (visibleSprites index)
     private ubyte fetcherTileX; // which tile we're scrolled onto
+    private int fetcherTileY;
+    private int fetcherReltY; // Y coordinate within the tile
     @trusted private void pixelFetcher() {
         if (fetcherSpriteMode) {
             /*
@@ -331,11 +334,12 @@ final class GPU : Fiber {
             Fiber.yield(); // read data 2 / write to fifo
         }
 
-        const bgMap = control.bgMapSelect ? tileMapB : tileMapA;
+        const mapSelect = fetchingWindow ? control.windowMapSelect : control.bgMapSelect;
+        const bgMap = mapSelect ? tileMapB : tileMapA;
 
         // Calculate the position of the tile and our relative-position within the tile
-        const tY = cast(ubyte)(curScanline + bgScrollY) / TILE_SIZE; // which tile we're scrolled onto
-        const rY = cast(ubyte)(curScanline + bgScrollY) % TILE_SIZE; // our y position within that tile
+        const tY = fetcherTileY; // which tile we're scrolled onto
+        const rY = fetcherReltY; // our y position within that tile
 
         // Now we enter the main tiler loop.
         // For every tile on the line, the tiler repeats a cycle of:
@@ -358,8 +362,12 @@ final class GPU : Fiber {
 
             // Put the tile into the pixel FIFO
             for(int rX; rX < 8; rX++) {
-                const bgPixel = tile[rY][rX];
-                const palettedBgPixel = applyPalette(backgroundPalette, bgPixel);
+                ubyte bgPixel = tile[rY][rX];
+                ubyte palettedBgPixel = applyPalette(backgroundPalette, bgPixel);
+                if (!control.bgEnabled) {
+                    bgPixel = 0;
+                    palettedBgPixel = 0;
+                }
 
                 pixelFifo[fifoLength] = bgPixel;
                 pixelFifoPaletted[fifoLength] = palettedBgPixel;
@@ -387,6 +395,8 @@ final class GPU : Fiber {
     }
 
     @trusted private void pixelWriter() {
+        bool partOfWindow = control.windowEnable && curScanline >= windowY;
+
         // To implement sub-tile background scrolling, we need to discard the "extra" pixels that were fetched
         int toDiscard = bgScrollX % TILE_SIZE;
 
@@ -405,24 +415,52 @@ final class GPU : Fiber {
                 consumePixelFifo();
                 toDiscard--; // Discard the pixel
             } else {
+                // Before we draw, we must check if we just entered the window.
+                // If so, we need to trash everything we've fetched and start over.
+                if (control.windowEnable && partOfWindow
+                        && windowX == xPosition + 8
+                        && !fetchingWindow) {
+                    // Trash the rest of the FIFO
+                    fifoLength = 0;
+
+                    // Start fetching the window
+                    fetchingWindow = true;
+                    fetcherTileX = 0;
+                    fetcherTileY = (curScanline - windowY) / TILE_SIZE;
+                    fetcherReltY = (curScanline - windowY) % TILE_SIZE;
+                    fetcherFiber.reset();
+
+                    // Wait for enough pixels to come in to start drawing agian
+                    while (fifoLength <= 8) {
+                        Fiber.yield();
+                    }
+                }
+
                 // Before we draw, we must check if any sprite needs to be drawn.
                 // If we need to draw a sprite, then we need to pause ourselves until
                 // the sprite gets fetched.
-                for (int i; i < visibleSprites.length; i++) {
-                    const spriteNum = visibleSprites[i];
-                    if (spriteNum == -1) {
-                        // -1 marks the end of the visible sprite list
-                        break;
-                    }
-                    const sprite = sprites[spriteNum];
-                    if (sprite.x == xPosition + 8) { // XXX What about a sprite that is partially off of the screen? When do we draw it?
-                        fetcherFiber.reset();
-                        fetcherSpriteMode = true;
-                        fetcherSpriteNum = spriteNum;
+                // XXX I'm making a guess here that sprites are checked before
+                // making the fetcher fetch one. This would impact timing and also
+                // have a visual effect -- for example, if sprites are enabled halfway
+                // through a sprite draw, they wouldn't show in this case, but idk
+                // if that's what would happen on real hardware. TODO.
+                if (control.spritesEnabled) {
+                    for (int i; i < visibleSprites.length; i++) {
+                        const spriteNum = visibleSprites[i];
+                        if (spriteNum == -1) {
+                            // -1 marks the end of the visible sprite list
+                            break;
+                        }
+                        const sprite = sprites[spriteNum];
+                        if (sprite.x == xPosition + 8) { // XXX What about a sprite that is partially off of the screen? When do we draw it?
+                            fetcherFiber.reset();
+                            fetcherSpriteMode = true;
+                            fetcherSpriteNum = spriteNum;
 
-                        // Wait for the sprite to get drawn
-                        while (fetcherSpriteMode) Fiber.yield();
-                        break;
+                            // Wait for the sprite to get drawn
+                            while (fetcherSpriteMode) Fiber.yield();
+                            break;
+                        }
                     }
                 }
 
@@ -456,6 +494,9 @@ final class GPU : Fiber {
         fifoLength = 0; // Current number of pixels in the FIFO
         fetcherTileX = bgScrollX / TILE_SIZE; // the first tile we need to fetch from
         fetcherSpriteMode = false; // default in tile mode
+        fetchingWindow = false; // start out fetching bg
+        fetcherTileY = cast(ubyte)(curScanline + bgScrollY) / TILE_SIZE; // which tile we're scrolled onto
+        fetcherReltY = cast(ubyte)(curScanline + bgScrollY) % TILE_SIZE; // our y position within that tile
         fetcherFiber.reset();
         writerFiber.reset();
 
