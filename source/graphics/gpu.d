@@ -415,7 +415,7 @@ final class GPU : Fiber {
                 // Before we draw, we must check if we just entered the window.
                 // If so, we need to trash everything we've fetched and start over.
                 if (control.windowEnable && partOfWindow
-                        && windowX == xPosition + 8
+                        && windowX <= xPosition + 8
                         && !fetchingWindow) {
                     // Trash the rest of the FIFO
                     fifoLength = 0;
