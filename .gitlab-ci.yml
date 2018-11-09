@@ -400,7 +400,6 @@ mooneye-stat_irq_blocking:
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/ppu/stat_irq_blocking.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 mooneye-intr_1_2_timing-GS:
   stage: test
@@ -423,7 +422,6 @@ mooneye-intr_2_mode0_timing:
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/ppu/intr_2_mode0_timing.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 mooneye-lcdon_write_timing-GS:
   stage: test
@@ -446,7 +444,6 @@ mooneye-intr_2_0_timing:
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/ppu/intr_2_0_timing.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 mooneye-stat_lyc_onoff:
   stage: test
@@ -460,14 +457,12 @@ mooneye-intr_2_mode3_timing:
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/ppu/intr_2_mode3_timing.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 mooneye-intr_2_oam_ok_timing:
   stage: test
   dependencies:
     - build:linux
   script: ./ddmg --rom "./test-roms/mooneye-gb_hwtests/acceptance/ppu/intr_2_oam_ok_timing.gb" --testMode "mooneye"
-  allow_failure: true  # HW characteristic not yet implemented. TODO pass this test.
 
 mooneye-call_cc_timing:
   stage: test
