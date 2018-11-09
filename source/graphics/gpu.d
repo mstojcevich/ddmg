@@ -250,6 +250,10 @@ final class GPU : Fiber {
 
         // Yield is guarenteed to be called _exactly_ 20 times, 20*4=80 cycles
 
+        // HACK: Should this really take 84 cycles?? I don't think so??
+        yield();
+        cyclesSpent++;
+
         return cyclesSpent;
     }
 
@@ -524,10 +528,10 @@ final class GPU : Fiber {
         auto cyclesToHblank = 0;
 
         status.gpuMode = GPUMode.HORIZ_BLANK;
+        updateStatIupt();
 
         for (int i; i < cyclesLeft; i++) {
             yield();
-            updateStatIupt(); // the iupt for hblank is delayed, so we do it after the first cycle
             cyclesToHblank++;
         }
 
