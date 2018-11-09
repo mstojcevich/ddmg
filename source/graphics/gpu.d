@@ -526,7 +526,6 @@ final class GPU : Fiber {
                 cyclesSpent++;
             }
         }
-        writefln("vblank spent %d cycles", cyclesSpent);
         assert(cyclesSpent == (CYCLES_PER_LINE / 4) * 10); // VBlank should take the time of 10 lines
     }
 
