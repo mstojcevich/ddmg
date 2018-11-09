@@ -413,7 +413,7 @@ final class GPU : Fiber {
                         break;
                     }
                     const sprite = sprites[spriteNum];
-                    if (sprite.x == xPosition + 7) { // XXX What about a sprite that is partially off of the screen? When do we draw it?
+                    if (sprite.x == xPosition + 8) { // XXX What about a sprite that is partially off of the screen? When do we draw it?
                         fetcherFiber.reset();
                         fetcherSpriteMode = true;
                         fetcherSpriteNum = spriteNum;
