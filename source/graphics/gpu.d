@@ -566,7 +566,6 @@ final class GPU : Fiber {
 
                 // Then move on to pixel transfer
                 const cyclesToPixelTransfer = pixelTransfer();
-                writefln("Took %d cycles to do a pixel transfer", cyclesToPixelTransfer);
                 assert(cyclesToPixelTransfer >= 43);
 
                 // And now hblank
