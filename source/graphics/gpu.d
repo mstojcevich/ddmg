@@ -204,7 +204,7 @@ final class GPU : Fiber {
     private int[10] visibleSprites; // filled by oamSearch
 
     /// Perform the OAM search stage of the line, determining which sprites are visible
-    @safe private int oamSearch() { // STAGE 2 (0b10)
+    @trusted private int oamSearch() { // STAGE 2 (0b10)
         auto cyclesSpent = 0;
 
         // Search the sprites and determine which are visible
@@ -231,9 +231,9 @@ final class GPU : Fiber {
                 visibleSprites[spritesDrawn] = i;
                 spritesDrawn++;
 
-                endCycle(); // lazy but shouldn't matter
+                yield(); // lazy but shouldn't matter
                 cyclesSpent++;
-                endCycle();
+                yield();
                 cyclesSpent++;
             }
         }
@@ -242,16 +242,16 @@ final class GPU : Fiber {
         for(int i = spritesDrawn; i < 10; i++) {
             visibleSprites[i] = -1;
 
-            endCycle(); // lazy but shouldn't matter
+            yield(); // lazy but shouldn't matter
             cyclesSpent++;
-            endCycle();
+            yield();
             cyclesSpent++;
         }
 
         // Yield is guarenteed to be called _exactly_ 20 times, 20*4=80 cycles
 
         // HACK: Should this really take 84 cycles?? I don't think so??
-        endCycle();
+        yield();
         cyclesSpent++;
 
         return cyclesSpent;
@@ -515,7 +515,7 @@ final class GPU : Fiber {
                 }
             }
 
-            endCycle(); // 1MHz
+            yield(); // 1MHz
             cyclesToCompleteLine++;
         }
 
@@ -523,7 +523,7 @@ final class GPU : Fiber {
         return cyclesToCompleteLine;
     }
 
-    @safe private int hblank(int cyclesLeft) {
+    @trusted private int hblank(int cyclesLeft) {
         // HBLANK does nothing, just waits to make up for leftover time
         auto cyclesToHblank = 0;
 
@@ -531,7 +531,7 @@ final class GPU : Fiber {
         updateStatIupt();
 
         for (int i; i < cyclesLeft; i++) {
-            endCycle();
+            yield();
             cyclesToHblank++;
         }
 
@@ -539,7 +539,7 @@ final class GPU : Fiber {
     }
 
     bool shouldVblank = false;
-    @safe final void vblankIfNeeded() {
+    @trusted final void vblankIfNeeded() {
         if (shouldVblank) {
             display.drawFrame();
             frontend.update();
@@ -547,7 +547,7 @@ final class GPU : Fiber {
         }
     }
 
-    @safe private int vblank() {
+    @trusted private int vblank() {
         // vblank initially gets called with one "free" scanline (we need to account for that with yields later)
         assert(curScanline == DISPLAY_HEIGHT);
 
@@ -560,12 +560,17 @@ final class GPU : Fiber {
         auto cyclesSpent = 0;
         while(true) {
             // it's ok that we don't increment scanline first, due to the "free" scanline
+            updateCoincidence();
+            updateStatIupt();
+
             for(int i; i < CYCLES_PER_LINE / 4; i++) {
-                endCycle();
+                yield();
 
                 // Every cycle after the first cycle of 153 should report as scanline 0
                 if (curScanline == VIRTUAL_HEIGHT - 1) {
                     curScanline = 0; // move on early
+                    updateCoincidence();
+                    updateStatIupt();
                 }
 
                 cyclesSpent++;
@@ -598,10 +603,10 @@ final class GPU : Fiber {
     }
 
     /// Run the PPU indefinitely, yielding each 4 cycles
-    @safe private void run() {
+    @trusted private void run() {
         while (true) {
             if (!control.lcdEnable) {
-                endCycle();
+                yield();
                 continue;
             }
 
@@ -609,6 +614,9 @@ final class GPU : Fiber {
 
             // Render each of the visible scanlines
             for(curScanline = 0; curScanline < DISPLAY_HEIGHT; curScanline++) {
+                updateCoincidence();
+                updateStatIupt();
+
                 // We start out in OAM search mode
                 const cyclesToOamSearch = oamSearch();
                 assert(cyclesToOamSearch >= 20);
@@ -645,7 +653,7 @@ final class GPU : Fiber {
                     // Move on to the next mode
                     stateCycles -= CYCLES_PER_OAM_SEARCH;
                     status.gpuMode = GPUMode.DATA_TRANSFER;
-                    updateStatIupt();
+                    updateIuptSignal();
                 }
                 break;
 
@@ -664,7 +672,7 @@ final class GPU : Fiber {
                     // Move on to the next mode
                     stateCycles -= CYCLES_PER_DATA_TRANSFER;
                     status.gpuMode = GPUMode.HORIZ_BLANK;
-                    updateStatIupt();
+                    updateIuptSignal();
                 }
                 break;
 
@@ -677,6 +685,7 @@ final class GPU : Fiber {
 
                     // We're done with a line, move on to the next one
                     curScanline++;
+                    updateCoincidence();
 
                     // If we just finished the HBLANK for the last scanline,
                     // then we enter VBLANK. Otherwise we move on to the
@@ -698,7 +707,7 @@ final class GPU : Fiber {
                         status.gpuMode = GPUMode.OAM_SEARCH;
                     }
 
-                    updateStatIupt();
+                    updateIuptSignal();
                 }
                 break;
 
@@ -707,13 +716,15 @@ final class GPU : Fiber {
                 if(stateCycles >= CYCLES_PER_LINE) {
                     stateCycles -= CYCLES_PER_LINE;
                     curScanline++;
+                    updateCoincidence();
                     // TODO does the coincidence interrupt happen for the virtual lines?
 
                     if(curScanline >= VIRTUAL_HEIGHT) {
                         // Begin again at the first line
                         curScanline = 0;
+                        updateCoincidence();
                         status.gpuMode = GPUMode.OAM_SEARCH;
-                        updateStatIupt();
+                        updateIuptSignal();
 
                         // TODO what exactly gets reset on a vblank?
                     }
@@ -1124,6 +1135,10 @@ final class GPU : Fiber {
             status.gpuMode = GPUMode.OAM_SEARCH;
             curScanline = 0;
 
+            // TODO do we do OAM_SEARCH iupt here? Do we do coincidence check here?
+            updateCoincidence();
+            updateIuptSignal();
+
             // HACK: After LCD enable, we start partway through the first scanline
             // We're confident this won't cause an iupt, so we can simulate regularly here regardless
             // of what the actual hardware behavior is here.
@@ -1238,16 +1253,25 @@ final class GPU : Fiber {
     /// Write to the scanline compare register
     @safe @property void lycRegister(ubyte lyc) {
         scanlineCompare = lyc;
+        updateCoincidence();
+        updateIuptSignal();
 
         // TODO check conincidence. Also can the coincidence interrupt happen here?
     }
 
-    @trusted private void endCycle() {
-        if (control.lcdEnable) {
-            updateCoincidence();
+    /// Updates the internal STAT interrupt signal. Should be called on mode change.
+    @safe private void updateIuptSignal() {
+        immutable bool newIuptSignal = 
+            (status.coincidenceInterrupt && status.coincidenceFlag) ||
+            (status.hblankInterrupt && status.gpuMode == GPUMode.HORIZ_BLANK) ||
+            (status.oamInterrupt && (status.gpuMode == GPUMode.OAM_SEARCH || status.gpuMode == GPUMode.VERT_BLANK)) ||
+            (status.vblankInterrupt && (status.gpuMode == GPUMode.VERT_BLANK));
+        
+        if(!iuptSignal && newIuptSignal) {
+            iuptHandler.fireInterrupt(Interrupts.LCD_STATUS);
         }
-        updateStatIupt();
-        yield();
+
+        iuptSignal = newIuptSignal;
     }
 
     /// Update the coincidence flag. Should be called every scanline change.
