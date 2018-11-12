@@ -1076,11 +1076,6 @@ final class GPU : Fiber {
         assert(addr < BYTES_PER_SPRITE_ATTR * NUM_SPRITES);
     }
     body {
-        if (control.lcdEnable && (status.gpuMode == GPUMode.OAM_SEARCH
-                || status.gpuMode == GPUMode.DATA_TRANSFER)) {
-            writeln("Write to OAM occurred during search or transfer");
-            return;
-        }
         spriteMemory[addr] = val;
     }
 
