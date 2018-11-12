@@ -61,15 +61,7 @@ private const TILE_DATA_BEGIN = 0x0000; /// Tile data begins at 0x8000, which is
 private const TILE_DATA_END   = 0x17FF; /// Tile data ends at 0x97FF, which is 0x17FF in VRAM
 
 // Timings
-/*
-NOTE: these timings are not accurate as they vary
-see https://gist.github.com/drhelius/3730564
-w/ original thread http://forums.nesdev.com/viewtopic.php?t=7861
- */
-private const CYCLES_PER_OAM_SEARCH = 80;
-private const CYCLES_PER_DATA_TRANSFER = 172;
-private const CYCLES_PER_HBLANK = 204;
-private const CYCLES_PER_LINE = CYCLES_PER_OAM_SEARCH + CYCLES_PER_DATA_TRANSFER + CYCLES_PER_HBLANK; // 456
+private const CYCLES_PER_LINE = 456; // Time to render a single scanline
 
 
 /**
@@ -89,37 +81,6 @@ final class GPU : Fiber {
 
     /// The scanline to compare with for the conincidence (LY=LYC) interrupt. AKA LYC
     private ubyte scanlineCompare;
-
-    /*
-    The background consists of 32x32 8x8 tiles, making 256x256 pixels total.
-    When rendered, it is offset by the SCX and SCY registers and wraps around.
-
-    For performance reasons, I keep the current unscrolled background calculated
-    ahead of time. This also makes the data read timing slightly more (but not fully) accurate.
-    */
-
-    /// y-major representation of the background (unpaletted)
-    private ubyte[BG_SIZE][BG_SIZE] background;
-
-    /// y-major representation of the window (unpaletted)
-    private ubyte[BG_SIZE][BG_SIZE] window;
-
-    /**
-    * Whether something has been changed since the last DATA_TRANSFER mode 
-    * that would require the background to be redrawn.
-    *
-    * For example, if the tile map or tile data gets changed.
-    */
-    private bool bgChanged;
-
-    /**
-    * Whether something has been changed since the last DATA_TRANSFER mode 
-    * that would require the window to be redrawn.
-    *
-    * For example, if the tile map or tile data gets changed.
-    */
-    private bool windowChanged;
-    
 
     private ubyte bgScrollY; /// SCY register: The y coordinate of the background at the top left of the display
     private ubyte bgScrollX; /// SCX register: The x coordinate of the background at the top left of the display
@@ -163,9 +124,6 @@ final class GPU : Fiber {
 
     /// Sprite attribute memory (OAM)
     private ubyte[BYTES_PER_SPRITE_ATTR * NUM_SPRITES] spriteMemory;
-
-    /// The amount of cycles we have spent in our current state. Used internally to time out the states properly.
-    private uint stateCycles;
 
     /// Internal STAT interrupt signal. STAT iupt is triggered when this goes from false to true
     private bool iuptSignal;
@@ -659,93 +617,6 @@ final class GPU : Fiber {
         }
     }
 
-    /// Execute the GPU for a number of cycles
-    @safe void execute(uint numCycles) {
-        stateCycles += numCycles;
-
-        final switch(status.gpuMode) {
-            case GPUMode.OAM_SEARCH:
-                if(stateCycles >= CYCLES_PER_OAM_SEARCH) {
-                    // Move on to the next mode
-                    stateCycles -= CYCLES_PER_OAM_SEARCH;
-                    status.gpuMode = GPUMode.DATA_TRANSFER;
-                    updateStatIupt();
-                }
-                break;
-
-            case GPUMode.DATA_TRANSFER:
-                if(stateCycles >= CYCLES_PER_DATA_TRANSFER) {
-                    // Update the background
-                    if(bgChanged) {
-                        redrawBackground();
-                        bgChanged = false;
-                    }
-                    if(windowChanged) {
-                        redrawWindow();
-                        windowChanged = false;
-                    }
-
-                    // Move on to the next mode
-                    stateCycles -= CYCLES_PER_DATA_TRANSFER;
-                    status.gpuMode = GPUMode.HORIZ_BLANK;
-                    updateStatIupt();
-                }
-                break;
-
-            case GPUMode.HORIZ_BLANK:
-                if(stateCycles >= CYCLES_PER_HBLANK) {
-                    stateCycles -= CYCLES_PER_HBLANK;
-
-                    // Draw the line onto the display
-                    drawLine();
-
-                    // We're done with a line, move on to the next one
-                    curScanline++;
-
-                    // If we just finished the HBLANK for the last scanline,
-                    // then we enter VBLANK. Otherwise we move on to the
-                    // OAM scan for the next scanline.
-                    if(curScanline == DISPLAY_HEIGHT) {
-                        status.gpuMode = GPUMode.VERT_BLANK;
-
-                        // TODO does the vblank happen here or does it happen on 143???
-                        // TODO Write a test that gets LY when a VBLANK occurs
-
-                        iuptHandler.fireInterrupt(Interrupts.VBLANK);
-
-                        // Present the frame
-                        display.drawFrame();
-
-                        frontend.update();
-                    } else {
-                        // Move on to the next mode
-                        status.gpuMode = GPUMode.OAM_SEARCH;
-                    }
-
-                    updateStatIupt();
-                }
-                break;
-
-            case GPUMode.VERT_BLANK:
-                // VBLANK starts at line 144 and goes until line 154
-                if(stateCycles >= CYCLES_PER_LINE) {
-                    stateCycles -= CYCLES_PER_LINE;
-                    curScanline++;
-                    // TODO does the coincidence interrupt happen for the virtual lines?
-
-                    if(curScanline >= VIRTUAL_HEIGHT) {
-                        // Begin again at the first line
-                        curScanline = 0;
-                        status.gpuMode = GPUMode.OAM_SEARCH;
-                        updateStatIupt();
-
-                        // TODO what exactly gets reset on a vblank?
-                    }
-                }
-                break;
-        }
-    }
-
     /// Update the internal tile representation given new tile data
     @safe private void updateTileData(in ushort addr) {
         /* Tile data:
@@ -788,182 +659,13 @@ final class GPU : Fiber {
         }
     }
 
-    /// Redraws the pixels held in the background array
-    @safe private void redrawBackground() {
-        // Go through all of the tiles in the tile map
-        for(int tY = 0; tY < BG_SIZE_TILES; tY++) {
-            for(int tX = 0; tX < BG_SIZE_TILES; tX++) {
-                immutable TileMap map = control.bgMapSelect ? tileMapB : tileMapA;
-                
-                // The offset of the tile in the tileset
-                immutable ubyte offset = map.tileLocations[tY][tX];
-
-                // Look up the tile in the tile set to use
-                immutable ushort tileIndex = getTilesetIndex(offset, control.bgTileset);
-                
-                immutable ubyte[TILE_SIZE][TILE_SIZE] tile = tileSet[tileIndex];
-
-                immutable pixelX = tX * TILE_SIZE;
-                immutable pixelY = tY * TILE_SIZE;
-
-                // Fill in the tile on the cached background
-                for(int rY = 0; rY < TILE_SIZE; rY++) {
-                    for(int rX = 0; rX < TILE_SIZE; rX++) {
-                        background[pixelY + rY][pixelX + rX] = tile[rY][rX];
-                    }
-                }
-            }
-        }
-    }
-
-    /// Redraws the pixels held in the cached window array
-    @safe private void redrawWindow() {
-        // Go through all of the tiles in the tile map
-        for(int tY = 0; tY < (WINDOW_HEIGHT / TILE_SIZE); tY++) {
-            for(int tX = 0; tX < (WINDOW_WIDTH / TILE_SIZE); tX++) {
-                immutable TileMap map = control.windowMapSelect ? tileMapB : tileMapA;
-                
-                // The offset of the tile in the tileset
-                immutable ubyte offset = map.tileLocations[tY][tX];
-
-                // Look up the tile in the tile set to use
-                immutable ushort tileIndex = getTilesetIndex(offset, control.bgTileset);
-                
-                immutable ubyte[TILE_SIZE][TILE_SIZE] tile = tileSet[tileIndex];
-
-                immutable pixelX = tX * TILE_SIZE;
-                immutable pixelY = tY * TILE_SIZE;
-
-                // Fill in the tile on the cached background
-                for(int rY = 0; rY < TILE_SIZE; rY++) {
-                    for(int rX = 0; rX < TILE_SIZE; rX++) {
-                        window[pixelY + rY][pixelX + rX] = tile[rY][rX];
-                    }
-                }
-            }
-        }
-    }
-
     /// Get the corrected index in the tilset for the specific indexing type
     @safe private ushort getTilesetIndex(ubyte value, TilesetIndexing indexingType) {
         return indexingType == TilesetIndexing.SIGNED ? (cast(byte)(value) + 256) : value;
     }
 
-    /// Get the (unpaletted) background pixel at the specific coordinates on the screen
-    @safe private ubyte getBackgroundPixel(int screenX, int screenY) {
-        if(control.windowEnable) {
-            immutable winX = screenX - (windowX - 7);
-            immutable winY = screenY - windowY;
-
-            if(winX >= 0 && winY >= 0) {
-                return window[winY][winX];
-            }
-        }
-
-        /// The scrolled X used to get the background pixel
-        immutable ubyte bgX = cast(ubyte)(screenX + bgScrollX);
-
-        /// The scrolled Y used to get the background pixel 
-        immutable ubyte bgY = cast(ubyte)(screenY + bgScrollY);
-
-        /// The pixel at the current position in the background
-        return background[bgY][bgX];
-    }
-
-    /// Draw the current scanline onto the display
-    @safe private void drawLine() {
-        if(!control.lcdEnable) {
-            return;
-        }
-
-        // Draw the background+window for the line
-        if(control.bgEnabled || control.windowEnable) {
-            for(ubyte x = 0; x < DISPLAY_WIDTH; x++) {
-                /// The pixel at the current position in the background
-                immutable ubyte bgPixel = getBackgroundPixel(x, curScanline);
-
-                // Apply the palette and draw the pixel
-                immutable ubyte palettedBgPixel = applyPalette(backgroundPalette, bgPixel);
-
-                display.setPixelGB(x, curScanline, palettedBgPixel);
-            }
-        }
-
-        // Draw the sprites for the line
-        if(control.spritesEnabled) {
-            drawLineSprites();
-        }
-    }
-
     @safe @property private ubyte spriteHeight() {
         return control.tallSprites ? TILE_SIZE * 2 : TILE_SIZE;
-    }
-
-    /// Draw the sprites on the current line
-    @safe private void drawLineSprites() {
-        // TODO handle priority between sprites
-
-        // Count how many sprites are drawn because a max of 10 are allowed per scanline
-        auto spritesDrawn = 0;
-
-        // Whether the given pixel already has a sprite on it
-        bool[DISPLAY_WIDTH] filled;
-
-        for(int i = 0; i < NUM_SPRITES && spritesDrawn < 10; i++) {
-            const SpriteAttributes attrs = (cast(SpriteAttributes[NUM_SPRITES]) spriteMemory)[i];
-            
-            // The row on the sprite that the current scanline represents
-            auto tileRow = curScanline - attrs.y + (TILE_SIZE * 2);
-
-            // Ensure that some part of the sprite is visible on the current scanline
-            if(tileRow >= 0 && tileRow < spriteHeight) {
-                // NOTE: the sprite count & priority still includes sprites that are not visible due to their X coordinate
-                spritesDrawn++;
-
-                if(attrs.yflip) {
-                    tileRow = spriteHeight - 1 - tileRow;
-                }
-
-                // Get the tile the current sprite is pulling from
-                const ubyte tileNum = control.tallSprites ? attrs.tileNum & 0b11111110 : attrs.tileNum;
-                const ubyte[TILE_SIZE][TILE_SIZE] tile = 
-                        tileRow < TILE_SIZE ? tileSet[tileNum] 
-                        : tileSet[tileNum | 0b00000001];
-
-                // Draw the entire width of the sprite
-                for(int x = attrs.x - TILE_SIZE; x < attrs.x; x++) {
-                    if(x < 0 || x >= GB_DISPLAY_WIDTH || filled[x]) {
-                        continue;
-                    }
-
-                    // Get the x position relative to the tile
-                    auto relativeX = attrs.x - x - 1;
-                    if(!attrs.xflip) {
-                        relativeX = TILE_SIZE - 1 - relativeX;
-                    }
-
-                    // Get the unpaletted color to draw
-                    const ubyte color = tile[tileRow % TILE_SIZE][relativeX];
-                    if(color == 0) { // Never draw transparent sprites
-                        continue;
-                    }
-
-                    filled[x] = true;
-
-                    if(attrs.belowBG) {
-                        const ubyte bgColor = getBackgroundPixel(x, curScanline);
-
-                        // Only draw sprites below the background when the background is transparent
-                        if(bgColor != 0) {
-                            continue;
-                        }
-                    }
-
-                    immutable ubyte paletted = applyPalette(attrs.palette ? spritePaletteB : spritePaletteA, color);
-                    display.setPixelGB(cast(ubyte) x, curScanline, paletted);
-                }
-            }
-        }
     }
 
     /// Apply the specified palette to the specified gameboy color
@@ -1012,36 +714,16 @@ final class GPU : Fiber {
         }
 
         if(addr >= BG_MAP_A_BEGIN && addr <= BG_MAP_A_END) {
-            if(!control.bgMapSelect) {
-                bgChanged = true;
-            }
-
-            if(!control.windowMapSelect) {
-                windowChanged = true;
-            }
-
             tileMapA.data[addr - BG_MAP_A_BEGIN] = val;
             return;
         }
 
         if(addr >= BG_MAP_B_BEGIN && addr <= BG_MAP_B_END) {
-            if(control.bgMapSelect) {
-                bgChanged = true;
-            }
-
-            if(control.windowMapSelect) {
-                windowChanged = true;
-            }
-
             tileMapB.data[addr - BG_MAP_B_BEGIN] = val;
             return;
         }
 
         if(addr >= TILE_DATA_BEGIN && addr <= TILE_DATA_END) {
-            // TODO only update if the changed data is indexable using the current selected BG/window data indexing type (signed/unsigned)
-            bgChanged = true;
-            windowChanged = true;
-
             tileData[addr - TILE_DATA_BEGIN] = val;
             updateTileData(addr - TILE_DATA_BEGIN);
             return;
@@ -1111,7 +793,7 @@ final class GPU : Fiber {
         // The first bit is always 1, and the user cannot write the last two bits
         // TODO According to the official docs, executing a write instruction forthe match flag resets that flag. Is this true?
         status.data = (status.data & 0b10000011) | (stat & 0b01111100);
-        updateStatIupt();
+        // updateStatIupt();
     }
 
     /// Read from the LCD status register (STAT)
@@ -1133,7 +815,7 @@ final class GPU : Fiber {
             // When the display is turned off, LY immediately becomes 0
             this.reset(); // reset our state machine
             curScanline = 0;
-            updateStatIupt(); // internal flag becomes false
+            // updateStatIupt(); // internal flag becomes false
             // XXX Do we fire interrupts here for the line changing?
             
             // TODO does mode immediately get set to OAM_SEARCH here? Or stick with what we have
@@ -1149,18 +831,6 @@ final class GPU : Fiber {
             control.data = lcdc;
             this.call();
             this.call();
-        }
-
-        if(newControl.bgTileset != control.bgTileset) {
-            bgChanged = true;
-            windowChanged = true;
-        }
-
-        if(newControl.bgMapSelect != control.bgMapSelect) {
-            bgChanged = true;
-        }
-        if(newControl.windowMapSelect != control.windowMapSelect) {
-            windowChanged = true;
         }
 
         control.data = lcdc;
