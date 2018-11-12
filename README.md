@@ -70,7 +70,7 @@ This fails because CGB double-speed mode is not implemented. It should work once
 
 | Test name         | Status             |
 |-------------------|:------------------:|
-| 1-lcd_sync        | :x: (regression) |
+| 1-lcd_sync        | :x: |
 | 2-causes          | :x: |
 | 3-non_causes      | :white_check_mark: |
 | 4-scanline_timing | :x: |
@@ -87,9 +87,7 @@ Gekkio has many acceptance tests he's written for his emulator [mooneye-gb](http
 | Test name            | Status |
 |----------------------|:------:|
 | add sp e timing          | :white_check_mark: |
-| boot hwio dmg0           | :x: |
 | boot hwio dmgABCXmgb     | :x: |
-| boot regs dmg0           | :x: |
 | boot regs dmgABCX        | :white_check_mark: |
 | call timing              | :white_check_mark: |
 | call timing 2            | :white_check_mark: |
@@ -99,7 +97,7 @@ Gekkio has many acceptance tests he's written for his emulator [mooneye-gb](http
 | div timing               | :white_check_mark: |
 | ei timing                | :white_check_mark: |
 | halt ime0 ei             | :white_check_mark: |
-| halt ime0 noinstr timing | :x: |
+| halt ime0 noinstr timing | :white_check_mark: |
 | halt ime1 timing         | :white_check_mark: |
 | halt ime1 timing2 GS     | :x: |
 | if ie registers          | :white_check_mark: |
