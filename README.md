@@ -70,7 +70,7 @@ This fails because CGB double-speed mode is not implemented. It should work once
 
 | Test name         | Status             |
 |-------------------|:------------------:|
-| 1-lcd_sync        | :white_check_mark: |
+| 1-lcd_sync        | :x: (regression) |
 | 2-causes          | :x: |
 | 3-non_causes      | :white_check_mark: |
 | 4-scanline_timing | :x: |

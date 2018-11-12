@@ -9,6 +9,7 @@ import std.parallelism;
 import std.getopt;
 import frontend;
 import frontend.glfw;
+import frontend.sdl;
 import frontend.test;
 
 private enum TestMode { none, blargg_serial, blargg_memory, mooneye }
@@ -25,7 +26,7 @@ long maxInstrs = 25_000_000;  // Max instructions to run a test rom for
     if (testMode != TestMode.none) {
         runTest();
     } else {
-        Frontend frontend = new GLFWFrontend();
+        Frontend frontend = new SDLFrontend();
         frontend.init();
 
         Gameboy g = new Gameboy(frontend, romName);

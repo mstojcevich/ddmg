@@ -29,7 +29,8 @@ class Scheduler {
     @trusted final void step() {
         cpu.call();
         clk.call();
-        gpu.execute(4);
+        gpu.call();
+        gpu.vblankIfNeeded();
         if (!cpu.isHalted) { // OAM DMA doesn't progress during HALT
             mmu.call();
         }

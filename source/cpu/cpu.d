@@ -72,7 +72,7 @@ final class CPU : Fiber {
             Instruction("DEC C",        {dec(regs.c);}),
             Instruction("LD C,d8",      {loadImmediate(regs.c);}),
             Instruction("RRCA",         &rrca),
-            Instruction("STOP 0",       null),
+            Instruction("STOP 0",       {writeln("STOP NOT IMPLEMENTED");}),
             Instruction("LD DE,d16",    {loadImmediate(regs.de);}),
             Instruction("LD (DE),A",    {storeInMemory(regs.de, regs.a);}),
             Instruction("INC DE",       {inc(regs.de);}),
@@ -342,6 +342,28 @@ final class CPU : Fiber {
         // TODO the rom disable I/O register at memory address 0xFF50 should be set to 1
     }
 
+    @trusted private Instruction fetchAndDecode() {
+        const opcode = mmu.readByte(regs.pc);
+
+        this.curFetchedOpcode = opcode;
+
+        const instr = instructions[opcode];
+
+        // Increment the program counter
+        // Done before instruction execution so that jumps are easier. Pretty sure that's how it's done on real hardware too.
+        if(haltMode != HaltMode.HALT_BUG) { // The halt bug causes the next instruction to repeat twice
+            regs.pc++;
+        } else { // haltMode == HALT_BUG
+            haltMode = HaltMode.NO_HALT;
+        }
+
+        if(instr.impl is null) {
+            throw new Exception("Bad instruction");
+        }
+
+        return instr;
+    }
+
     /**
      * Runs the CPU indefinitely
      */
@@ -349,91 +371,69 @@ final class CPU : Fiber {
         while (true) {
             ubyte ret = 0x00;
     
-            if(!isHalted) { // If the CPU is halted, stop execution
+            if(!isHalted) {
                 // Fetch the operation in memory
                 immutable ubyte opcode = mmu.readByte(regs.pc);
                 this.curFetchedOpcode = opcode;
                 this.instrCount++;
     
-                Instruction instr = instructions[opcode];
-    
-                if (false) {
-                    writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
-                    writefln("PC: %04X\tSP: %04X", regs.pc, regs.sp);
-                    writefln("@ %04X: %02X -> %s", regs.pc, opcode, instr.disassembly);
-                    writeln();
-                }
-    
-                //enforce(instr.impl !is null,
-                //    format("Emulated code used unimplemented operation 0x%02X @ 0x%04X", opcode, regs.pc));
-    
-                // Increment the program counter
-                // Done before instruction execution so that jumps are easier. Pretty sure that's how it's done on real hardware too.
-                if(haltMode != HaltMode.HALT_BUG) { // The halt bug causes the next instruction to repeat twice
-                    regs.pc++;
-                } else { // haltMode == HALT_BUG
-                    haltMode = HaltMode.NO_HALT;
-                }
-    
-                if(instr.impl !is null) {
-                    try {
-                        this.yield(); // Decode
-    
-                        instr.impl(); // Execute the operation
-                    } catch (Exception e) {
-                        writefln("Instruction failed with exception \"%s\"", e.msg);
-                        writefln("A: %02X\tF: %02X\tB: %02X\tC: %02X\tD: %02X\tE: %02X\tH: %02X\tL: %02X", regs.a, regs.f, regs.b, regs.c, regs.d, regs.e, regs.h, regs.l);
-                        writefln("PC: %04X\tSP: %04X", regs.pc, regs.sp);
-                        writefln("@ %04X: %02X -> %s", regs.pc, opcode, instr.disassembly);
-                        writeln();
-    
-                        throw e;
-                    }
-                } else {
-                    writefln("Program tried to execute instruction %s at %02X, which isn't defined", instr.disassembly, regs.pc - 1);
-                    writefln("The execution is probably tainted");
-                }
+                Instruction instr = fetchAndDecode();
+                this.yield(); // All instructions take at least one cycle (for the fetch)
+                // NOTE: It seems weird to put the yield after the fetch/decode but before the execute, but it seems like the gameboy decodes after the previous instr.
+
+                instr.impl(); // Execute the operation
+
             } else { // halted
                 // TODO how many cycles??
                 // Does this need to be a separate clock?
+
                 this.yield();
             }
-    
-            // TODO move everything from here on down in this fucntion
-            // to its own interrupthandler method
-            
+
+            const shouldHandleInterrupt = iuptHandler !is null && iuptHandler.masterToggle 
+                    && (iuptHandler.interruptEnableRegister & iuptHandler.interruptFlagRegister & 0b00011111) > 0;
+
+            // XXX before or after shouldHandleInterrupt check?
+            if (shouldEI) {
+                iuptHandler.masterToggle = true;
+                shouldEI = false;
+            }
+
             // Handle any interrupts that were triggered
-            if(iuptHandler !is null) {
-                foreach(iupt; EnumMembers!Interrupts) {
-                    if(iuptHandler.shouldHandle(iupt)) {
-                        if(haltMode != HaltMode.NO_INTERRUPT_JUMP) {
-                            // It takes 20 clocks to dispatch an interrupt. 8 if you account for the CALL.
-                            this.yield();
-                            this.yield();
+            if (shouldHandleInterrupt) {
+                iuptHandler.masterToggle = false;
 
-                            callAddr(iupt.address);
-
-                            iuptHandler.markHandled(iupt);
-                            iuptHandler.masterToggle = false;
-    
-                            if(haltMode == HaltMode.NORMAL) {
-                                // If the CPU is in HALT mode, another 4 clocks are needed
-                                this.yield();
-                                haltMode = HaltMode.NO_HALT;
-                            }
-                        } else {
-                            // No interrupt jump halt mode continues execution but doesn't handle the interrupt
-                            haltMode = HaltMode.NO_HALT;
-                            iuptHandler.masterToggle = false;
-                        }
-    
-                        break;
-                    }
+                if (haltMode == HaltMode.NO_INTERRUPT_JUMP) {
+                    // No interrupt jump halt mode continues execution but doesn't handle the interrupt
+                    haltMode = HaltMode.NO_HALT;
+                    yield(); // It takes an extra cycles to exit halt mode. TODO verify when this happens
+                    continue;
                 }
-    
-                if (shouldEI) {
-                    iuptHandler.masterToggle = true;
-                    shouldEI = false;
+
+                // Internal delay
+                this.yield();
+                this.yield();
+
+                // Write half of our PC to the stack
+                regs.sp -= 1;
+                mmu.writeByte(regs.sp, regs.pc >> 8);
+                this.yield();
+
+                // Figure out which interrupt happened
+                const iupt = iuptHandler.popInterrupt();
+
+                // Write the other half of our PC to the stack
+                regs.sp -= 1;
+                mmu.writeByte(regs.sp, regs.pc & 0xFF);
+                this.yield();
+
+                regs.pc = iupt.address;
+                this.yield();
+
+                if(haltMode == HaltMode.NORMAL) {
+                    // If the CPU is in HALT mode, another 4 clocks are needed
+                    this.yield();
+                    haltMode = HaltMode.NO_HALT;
                 }
             }
         }

@@ -50,7 +50,7 @@ class SDLSound : SoundFrontend {
     }
 
     @trusted override void playAudio(ubyte left, ubyte right) {
-        // while(SDL_GetQueuedAudioSize(1) > 2048) {} // Drain
+        while(SDL_GetQueuedAudioSize(1) > 2048) {} // Drain
         if(SDL_GetQueuedAudioSize(1) <= 4096) {
             if(bufferWriteAccum >= ticksPerSample) {
                 bufferWriteAccum = 0;
