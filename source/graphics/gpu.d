@@ -267,6 +267,7 @@ final class GPU : Fiber {
     private ubyte fetcherTileX; // which tile we're scrolled onto
     private int fetcherTileY;
     private int fetcherReltY; // Y coordinate within the tile
+    private int fetcherSpriteOffset; // HACK: Which position within the sprite to start at (for sprites that begin offscreen)
     @trusted private void pixelFetcher() {
         if (fetcherSpriteMode) {
             /*
@@ -299,7 +300,7 @@ final class GPU : Fiber {
 
             // Draw each position of the sprite to the fifo
             // Sprites ALWAYS get written to the first 8 pixels
-            for (int i; i < TILE_SIZE; i++) {
+            for (int i = fetcherSpriteOffset; i < TILE_SIZE; i++) {
                 auto rX = i; // tile-relative position
                 if(sprite.xflip) {
                     rX = TILE_SIZE - 1 - i;
@@ -319,14 +320,14 @@ final class GPU : Fiber {
 
                 if (sprite.belowBG) {
                     // Only draw the pixel if the background is transparent
-                    if (pixelFifo[i] == 0) {
-                        pixelFifo[i] = spriteColor;
-                        pixelFifoPaletted[i] = paletted;
+                    if (pixelFifo[i - fetcherSpriteOffset] == 0) {
+                        pixelFifo[i - fetcherSpriteOffset] = spriteColor;
+                        pixelFifoPaletted[i - fetcherSpriteOffset] = paletted;
                     }
                 } else if (spriteColor != 0) { // This pixel isn't transparent
                     // Draw on top of the background
-                    pixelFifo[i] = spriteColor;
-                    pixelFifoPaletted[i] = paletted;
+                    pixelFifo[i - fetcherSpriteOffset] = spriteColor;
+                    pixelFifoPaletted[i - fetcherSpriteOffset] = paletted;
                 }
             }
 
@@ -446,6 +447,28 @@ final class GPU : Fiber {
                 // through a sprite draw, they wouldn't show in this case, but idk
                 // if that's what would happen on real hardware. TODO.
                 if (control.spritesEnabled) {
+                    // Draw all of the slightly-offscreen sprites (INACCURATE)
+                    if (xPosition == 0) {
+                        for (int i; i < visibleSprites.length; i++) {
+                            const spriteNum = visibleSprites[i];
+                            if (spriteNum == -1) {
+                                // -1 marks the end of the visible sprite list
+                                break;
+                            }
+                            const sprite = sprites[spriteNum];
+                            if (sprite.x >= 8) {
+                                continue; // fully on screen
+                            }
+                            // sprite is partially off screen
+                            fetcherFiber.reset();
+                            fetcherSpriteOffset = 8 - sprite.x;
+                            fetcherSpriteMode = true;
+                            fetcherSpriteNum = spriteNum;
+                            // Wait for the sprite to get drawn
+                            while (fetcherSpriteMode) Fiber.yield();
+                        }
+                    }
+
                     for (int i; i < visibleSprites.length; i++) {
                         const spriteNum = visibleSprites[i];
                         if (spriteNum == -1) {
@@ -457,6 +480,7 @@ final class GPU : Fiber {
                             fetcherFiber.reset();
                             fetcherSpriteMode = true;
                             fetcherSpriteNum = spriteNum;
+                            fetcherSpriteOffset = 0;
 
                             // Wait for the sprite to get drawn
                             while (fetcherSpriteMode) Fiber.yield();
@@ -480,9 +504,9 @@ final class GPU : Fiber {
         }
     }
 
-    ubyte[16] pixelFifo;
-    ubyte[16] pixelFifoPaletted; // Whether the pixel FIFO entry is from sprite
-    int fifoLength = 0; // Current number of pixels in the FIFO
+    private ubyte[16] pixelFifo;
+    private ubyte[16] pixelFifoPaletted; // Whether the pixel FIFO entry is from sprite
+    private int fifoLength = 0; // Current number of pixels in the FIFO
     /// Perform the pixel transfer stage of the line, copying pixels to the line
     @trusted private int pixelTransfer() { // STAGE 3 (0b11)
         // Transfer pixels into the backbuffer for the line
