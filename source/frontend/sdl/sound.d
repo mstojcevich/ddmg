@@ -50,27 +50,27 @@ class SDLSound : SoundFrontend {
     }
 
     @trusted override void playAudio(ubyte left, ubyte right) {
-        while(SDL_GetQueuedAudioSize(1) > 2048) {} // Drain
-        if(SDL_GetQueuedAudioSize(1) <= 4096) {
-            if(bufferWriteAccum >= ticksPerSample) {
-                bufferWriteAccum = 0;
-                buffer[bufferPos] = cast(ubyte)(left * (128/15));
-                buffer[bufferPos + 1] = cast(ubyte)(right * (128/15));
-                bufferPos += 2;
-
-                // Write out the buffer if it is full
-                if(bufferPos >= buffer.length) {
-                    const ret = SDL_QueueAudio(1, &buffer[0], bufferPos);
-                    if (ret != 0) {
-                        writefln("SDL_QueueAudio failed: %s", SDL_GetError());
-                    }
-
-                    bufferPos = 0;
-                }
-            }
-
-            bufferWriteAccum++;
-        }
+//         while(SDL_GetQueuedAudioSize(1) > 2048) {} // Drain
+//         if(SDL_GetQueuedAudioSize(1) <= 4096) {
+//             if(bufferWriteAccum >= ticksPerSample) {
+//                 bufferWriteAccum = 0;
+//                 buffer[bufferPos] = cast(ubyte)(left * (128/15));
+//                 buffer[bufferPos + 1] = cast(ubyte)(right * (128/15));
+//                 bufferPos += 2;
+// 
+//                 // Write out the buffer if it is full
+//                 if(bufferPos >= buffer.length) {
+//                     const ret = SDL_QueueAudio(1, &buffer[0], bufferPos);
+//                     if (ret != 0) {
+//                         writefln("SDL_QueueAudio failed: %s", SDL_GetError());
+//                     }
+// 
+//                     bufferPos = 0;
+//                 }
+//             }
+// 
+//             bufferWriteAccum++;
+//         }
     }
 
 }

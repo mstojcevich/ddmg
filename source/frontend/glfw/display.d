@@ -91,6 +91,7 @@ class GLFWDisplay : Display {
         }
     }
 
+    int numFrames = 0;
     @trusted override void drawFrame() {
         glfwPollEvents();
 
@@ -100,13 +101,21 @@ class GLFWDisplay : Display {
 
         glDrawPixels(GB_DISPLAY_WIDTH, GB_DISPLAY_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, &pixels[0]);
         
-        glfwSwapInterval(1); // Use vsync
+        glfwSwapInterval(0); // Use vsync
         
         glfwSwapBuffers(window);
 
         // Limit framerate to 15 ms per frame to simulate gameboy
-        while(glfwGetTime() < 0.015) {}
-        glfwSetTime(0);
+        // while(glfwGetTime() < 0.015) {}
+        //glfwSetTime(0);
+        
+        numFrames++;
+
+        if (numFrames % 120 == 0) {
+            writefln("FPS: %d", cast(int)(numFrames / glfwGetTime()));
+            numFrames = 0;
+            glfwSetTime(0);
+        }
     }
 
     /// Returns whether emulation should be stopped

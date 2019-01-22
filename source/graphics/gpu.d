@@ -462,6 +462,127 @@ final class GPU : Fiber {
         }
     }
 
+    @trusted private int fastPixelTransfer() {
+        // "fifoless" pixel transfer stage
+
+        status.gpuMode = GPUMode.DATA_TRANSFER;
+        updateStatIupt();
+
+        // Background step
+        // TODO is it possible to start off of tile 0?
+        {
+
+            // Y position relative to the top of the tile
+            // TODO do we need to calculate this each yield since bgScrollY can change?
+            const relY = cast(ubyte)(curScanline + bgScrollY) % TILE_SIZE; // our y position within that tile
+            const tileY = cast(ubyte)(curScanline + bgScrollY) / TILE_SIZE; // our y position within that tile
+
+            int tileNum = -1;
+            ubyte[TILE_SIZE] curTileLine;
+            for (ubyte x = 0; x < GB_DISPLAY_WIDTH; x++) {
+                const inWindow = control.windowEnable && curScanline >= windowY && windowX <= x + 8;
+
+                // TODO can these change while we're doing pixel transfer?
+                const mapSelect = inWindow ? control.windowMapSelect : control.bgMapSelect;
+                const bgMap = mapSelect ? tileMapB : tileMapA;
+
+                // X position within the background
+                const bgX = x + bgScrollX;
+
+                // If necessary, read in a new tile:
+                // The "fetcher" step
+                if (bgX % TILE_SIZE == 0 || tileNum == -1) {
+                    // Read the new tile
+                    tileNum++;
+
+                    // If there's scroll, we may need to loop back to the leftmost tile
+                    const tileX = (bgX / TILE_SIZE) % BG_SIZE_TILES;
+
+                    const offset = bgMap.tileLocations[tileY][tileX];
+                    const tileIndex = getTilesetIndex(offset, control.bgTileset);
+                    const unpalettedLine = tileSet[tileIndex][relY];
+
+                    // Apply the palette to each pixel
+                    for(int rX; rX < 8; rX++) {
+                        ubyte bgPixel = unpalettedLine[rX];
+                        ubyte palettedBgPixel = applyPalette(backgroundPalette, bgPixel);
+                        if (!control.bgEnabled) {
+                            bgPixel = 0;
+                            palettedBgPixel = 0;
+                        }
+
+                        curTileLine[rX] = palettedBgPixel;
+                    }
+                }
+
+                const relX = bgX % TILE_SIZE; // relative to left of tile
+                display.setPixelGB(x, curScanline, curTileLine[relX]);
+            }
+        }
+
+        // Sprite step (TODO: interleave into background step)
+        if (control.spritesEnabled) {
+            for (int i; i < visibleSprites.length; i++) {
+                const spriteNum = visibleSprites[i];
+                if (spriteNum == -1) {
+                    // -1 marks the end of the visible sprite list
+                    break;
+                }
+                const sprite = sprites[spriteNum];
+
+                // If the sprite is tall then round down to a multiple of 2
+                // to get the tile number
+                const tileNum =
+                    control.tallSprites
+                    ? sprite.tileNum & 0b11111110
+                    : sprite.tileNum;
+    
+                // The row on the sprite tile that the current scanline represents
+                auto rY = (curScanline + 16) - sprite.y; // sprites are offset by 16
+                if(sprite.yflip) {
+                    rY = spriteHeight - 1 - rY;
+                }
+
+                // If we're on the "tall part" of a tall sprite, use its tile
+                const tile = 
+                    rY < TILE_SIZE
+                    ? tileSet[tileNum] 
+                    : tileSet[tileNum + 1];
+
+                auto rX = 0;
+                auto x = sprite.x - 8;
+                if (x < 0) {
+                    rX -= x;
+                    x = 0;
+                }
+                for (; x < sprite.x && x < GB_DISPLAY_WIDTH; x++) {
+                    auto rXa = rX;
+                    if(sprite.xflip) {
+                        rXa = TILE_SIZE - 1 - rX;
+                    }
+
+                    auto spriteColor = tile[rY % TILE_SIZE][rXa]; // rY % TILE_SIZE to support tall sprites
+                    const ubyte paletted = applyPalette(
+                            sprite.palette
+                            ? spritePaletteB
+                            : spritePaletteA,
+                            spriteColor
+                    );
+
+                    display.setPixelGB(cast(ubyte)(x), curScanline, paletted);
+
+                    rX++;
+                }
+            }
+        }
+
+        for (int i = 0; i < 43; i++) {
+            this.yield();
+        }
+
+        return 43;
+    }
+
     private ubyte[16] pixelFifo;
     private ubyte[16] pixelFifoPaletted; // Whether the pixel FIFO entry is from sprite
     private int fifoLength = 0; // Current number of pixels in the FIFO
@@ -596,7 +717,7 @@ final class GPU : Fiber {
                 assert(cyclesToOamSearch >= 20);
 
                 // Then move on to pixel transfer
-                const cyclesToPixelTransfer = pixelTransfer();
+                const cyclesToPixelTransfer = fastPixelTransfer();
                 assert(cyclesToPixelTransfer >= 43);
 
                 // And now hblank
